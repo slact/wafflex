@@ -222,15 +222,17 @@ if [[ -z $NO_MAKE ]]; then
   #  exit 1
   #fi
 
+  #generate parser code
   bundle exec hsss --format split \
     --no-hashes --no-name --no-each --no-count --no-static \
-    --struct ngx_wafflex_lua_scripts_t \
-    --scripts ngx_wafflex_lua_scripts \
-    "${_src_dir}"/lua/* > "${_src_dir}/ngx_wafflex_lua_scripts.h"
+    --struct ngx_wfx_parser_lua_scripts_t \
+    --scripts ngx_wfx_parser_lua_scripts \
+    "${_src_dir}"/lua/parser/* > "${_src_dir}/ngx_wafflex_parser_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
-    echo "failed generating lua scripts";
+    echo "failed generating parser lua scripts";
     exit 1
   fi  
+  
   pushd $pkg_path >/dev/null
   
   _build_nginx
