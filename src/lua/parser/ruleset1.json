@@ -1,0 +1,29 @@
+{
+  //is this allowed?
+  "name": "ruleset1",
+  "table": {
+    "request": { "list1" }
+  },
+  "lists": {
+    "list1": [
+      "rule1",
+      "rule2",
+      {
+        "name": "ratelimit",
+        "info": "This rule rate-limits by ip",
+        "if": {"#limit-break" : {
+          "name": "rate-limit",
+          "key": "$request_real_ip"
+        }},
+        "then": [
+          {"#tag": "slowdown"},
+          {"#reject": {"status": 403, "body": "Slow down!!!"}}
+        ]
+      }
+    ]
+  },
+  "rules": {   //named rules
+    "rule1": {}, 
+    "rule2": {}
+  }
+}

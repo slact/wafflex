@@ -1,7 +1,7 @@
 --David Kolf's JSON module for Lua 5.1/5.2
 
-local always_try_using_lpeg = true
-local register_global_module_table = false
+local always_try_using_lpeg = false
+local register_global_module_table = true
 local global_module_name = 'json'
 
 --[==[

@@ -227,7 +227,7 @@ if [[ -z $NO_MAKE ]]; then
     --no-hashes --no-name --no-each --no-count --no-static \
     --struct ngx_wfx_parser_lua_scripts_t \
     --scripts ngx_wfx_parser_lua_scripts \
-    "${_src_dir}"/lua/parser/* > "${_src_dir}/ngx_wafflex_parser_lua_scripts.h"
+    "${_src_dir}"/lua/parser/*.lua > "${_src_dir}/ngx_wafflex_parser_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
     echo "failed generating parser lua scripts";
     exit 1

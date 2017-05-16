@@ -1,5 +1,8 @@
 #include <ngx_wafflex.h>
 #include <ipc.h>
+
+#include <lua.h>
+#include <lualib.h>
 #include <lauxlib.h>
 
 #include "ngx_wafflex_parser_lua_scripts.h"
@@ -26,11 +29,11 @@
 
 #ifdef LOAD_SCRIPTS_AS_NAMED_CHUNKS
   #define ngx_wfx_parser_lua_loadscript(lua_state, name)                 \
-          luaL_loadbuffer(lua_state, ngx_ipc_lua_scripts.name, strlen(ngx_ipc_lua_scripts.name), #name); \
+          luaL_loadbuffer(lua_state, ngx_wfx_parser_lua_scripts.name, strlen(ngx_wfx_parser_lua_scripts.name), #name); \
           lua_call(lua_state, 0, LUA_MULTRET)
 #else
   #define ngx_wfx_parser_lua_loadscript(lua_state, name)                 \
-          luaL_dostring(lua_state, ngx_ipc_lua_scripts.name)
+          luaL_dostring(lua_state, ngx_wfx_parser_lua_scripts.name)
 #endif
 
 ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
@@ -42,15 +45,19 @@ ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
   return NGX_OK;
 }
 
-static ipc_t  *ipc;
-
-
-static int ngx_wafflex_init_parser(lua_State * L) {
-  return 0;
-}
+static ipc_t        *ipc = NULL;
+static lua_State    *Lua = NULL;
 
 static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
-  ngx_wafflex_init_parser(NULL);
+  Lua = luaL_newstate();
+  luaL_openlibs(Lua);
+  
+  //load JSON parser
+  ngx_wfx_parser_lua_loadscript(Lua, dkjson);
+  
+  //ruleset parser
+  
+  
   return NGX_OK;
 }
 

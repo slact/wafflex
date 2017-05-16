@@ -1,0 +1,17 @@
+#!/usr/bin/lua 
+
+local mm = require "mm"
+
+dofile("./dkjson.lua")
+dofile("./parser.lua")
+
+local f = io.open("./ruleset1.json", "rb")
+local rs1 = f:read("*all")
+f:close()
+
+local data, pos, err = json.decode(rs1, 1, nil)
+mm(data)
+
+local p = parser.new()
+
+print(p:parseRuleSet(data))
