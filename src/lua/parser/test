@@ -14,4 +14,4 @@ mm(data)
 
 local p = parser.new()
 
-print(p:parseRuleSet(data))
+mm(p:parseRuleSet(data))

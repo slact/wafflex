@@ -2,11 +2,11 @@
   //is this allowed?
   "name": "ruleset1",
   "table": {
-    "request": { "list1" }
+    "request": [ "list1" ]
   },
   "lists": {
     "list1": [
-      "rule1",
+      10,
       "rule2",
       {
         "name": "ratelimit",
@@ -23,7 +23,12 @@
     ]
   },
   "rules": {   //named rules
-    "rule1": {}, 
-    "rule2": {}
+    "rule1": {
+      "if": { "#condition": "foo"},
+      "then": [
+        {"#tag":"yeah"}
+      ]
+    }, 
+    "rule2": { "always": { "#tag":"this is a tag yo" } }
   }
 }
