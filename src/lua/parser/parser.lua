@@ -74,18 +74,13 @@ local function newparser()
       })
       
       self.ruleset.table = self:parseRuleTable(data.table)
-      
       return self.ruleset
     end,
     
     parseRuleTable = function(self, data)
       mm(data)
       assert_jsontype(data, "object", "rule table must be an object")
-      local rule_table = {name="rule-table"}
-      
-      local function findNamedList(name)
-        
-      end
+      local rule_table = {}
       
       for k,v in pairs(data) do
         assert_type(k, "string", "rule table entries must be strings")
@@ -176,15 +171,43 @@ local function newparser()
     end,
     
     parseCondition = function(self, data) 
-      --TODO: check condition list
+      local condition
       if type(data) == "string" then
-        return {[data]={}}
+        condition = {[data]={}}
       elseif type(data) == "table" then
         assert_jsontype(data, "object", "condition cannot be an array, must be an object")
         assert_table_size(data, 1, "condition object must have exactly one attribute (the condition name)")
-        return data
+        condition = data
       else
         error(("wrong type (%s) for condition"):format(type(data)))
+      end
+      --TODO: parse this specific condition
+      return condition
+    end,
+    
+    parseAction = function(self, data)
+      local action
+      if type(data) == "string" then
+        action = {[data]={}}
+      elseif jsontype(data) == "object" then
+        assert(next(a, next(a)) == nil, "action object must have only 1 attribute -- the action name")
+        action = data
+      else
+        error(("action must be string on 1-attribute object, but instead was a %s"):format(jsontype(data)))
+      end
+      --TODO: parse this specific action
+      return action
+    end,
+    
+    parseActions = function(self, data)
+      local actions = {}
+      if jsontype(data) == "array" then
+        for i, v in ipairs(data) do
+          table.insert(actions, self:parseAction(data))
+        end
+        return actions
+      else
+        return { self:parseAction(data) }
       end
     end,
     
@@ -198,4 +221,5 @@ local function newparser()
 end
 
 
-_G['parser']={new = newparser}
+_G['Parser']={new = newparser}
+

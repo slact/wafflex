@@ -6,7 +6,7 @@
   },
   "lists": {
     "list1": [
-      10,
+      "rule1",
       "rule2",
       {
         "name": "ratelimit",
@@ -24,10 +24,8 @@
   },
   "rules": {   //named rules
     "rule1": {
-      "if": { "#condition": "foo"},
-      "then": [
-        {"#tag":"yeah"}
-      ]
+      "if": { "#tag": "foo"},
+      "then": {"#tag":"yeah"}
     }, 
     "rule2": { "always": { "#tag":"this is a tag yo" } }
   }

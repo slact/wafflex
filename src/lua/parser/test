@@ -2,8 +2,10 @@
 
 local mm = require "mm"
 
-dofile("./dkjson.lua")
-dofile("./parser.lua")
+local json = require("dkjson")
+
+require("parser")
+require("ruleset")
 
 local f = io.open("./ruleset1.json", "rb")
 local rs1 = f:read("*all")
@@ -12,6 +14,10 @@ f:close()
 local data, pos, err = json.decode(rs1, 1, nil)
 mm(data)
 
-local p = parser.new()
+local p = Parser.new()
 
-mm(p:parseRuleSet(data))
+local parsed = p:parseRuleSet(data)
+
+local rs = Ruleset.new(parsed)
+
+mm(rs)
