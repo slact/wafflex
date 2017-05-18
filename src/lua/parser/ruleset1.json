@@ -24,7 +24,7 @@
   },
   "rules": {   //named rules
     "rule1": {
-      "if": { "#tag": "foo"},
+      "if": { "#tag-check": "foo"},
       "then": {"#tag":"yeah"}
     }, 
     "rule2": { "always": { "#tag":"this is a tag yo" } }

@@ -1,4 +1,5 @@
 local mm = require "mm"
+local Rule = require "rule"
 
 local function jsontype(var)
   if type(var) == "table" then
@@ -47,8 +48,12 @@ end
 local function newparser()
   local parser = {}
   setmetatable(parser, {__index = {
+    
+    assert_type = assert_type,
+    jsontype = jsontype,
+    assert_jsontype = assert_jsontype,
+    
     parseRuleSet = function(self, data, name)
-      
       self.ruleset = {
         limiters= {},
         rules= {},
@@ -181,8 +186,7 @@ local function newparser()
       else
         error(("wrong type (%s) for condition"):format(type(data)))
       end
-      --TODO: parse this specific condition
-      return condition
+      return Rule.condition.parse(condition, self)
     end,
     
     parseAction = function(self, data)
@@ -195,8 +199,7 @@ local function newparser()
       else
         error(("action must be string on 1-attribute object, but instead was a %s"):format(jsontype(data)))
       end
-      --TODO: parse this specific action
-      return action
+      return Rule.action.parse(action, self)
     end,
     
     parseActions = function(self, data)
