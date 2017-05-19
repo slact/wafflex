@@ -6,8 +6,8 @@ local mm = require "mm"
 
 local json = require("dkjson")
 
-require("parser")
-require("ruleset")
+local Parser = require("parser")
+local Ruleset = require("ruleset")
 
 local f = io.open("./ruleset1.json", "rb")
 local rs1 = f:read("*all")
