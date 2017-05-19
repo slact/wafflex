@@ -1,3 +1,4 @@
 nginx
+!lua/nginx
 nginx-source
 lua-nginx-module-source
