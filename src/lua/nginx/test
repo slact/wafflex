@@ -1,5 +1,7 @@
 #!/usr/bin/lua 
 
+package.path = "./modules/?.lua;"..package.path
+
 local mm = require "mm"
 
 local json = require("dkjson")
