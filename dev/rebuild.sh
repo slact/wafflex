@@ -222,14 +222,22 @@ if [[ -z $NO_MAKE ]]; then
   #  exit 1
   #fi
 
-  #generate parser code
-  bundle exec hsss --format split \
-    --no-hashes --no-name --no-each --no-count --no-static \
-    --struct ngx_wfx_parser_lua_scripts_t \
-    --scripts ngx_wfx_parser_lua_scripts \
-    "${_src_dir}"/lua/parser/*.lua > "${_src_dir}/ngx_wafflex_parser_lua_scripts.h"
+  #generate nginx script embeds
+  bundle exec hsss --format whole \
+    --no-hashes --no-each --no-count --no-static \
+    --prefix wfx_ \
+    "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
-    echo "failed generating parser lua scripts";
+    echo "failed generating nginx lua scripts";
+    exit 1
+  fi
+  
+  bundle exec hsss --format whole\
+    --no-hashes --no-name --no-static \
+    --prefix wfx_module_ \
+    "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
+  if ! [ $? -eq 0 ]; then;
+    echo "failed generating nginx lua module scripts";
     exit 1
   fi  
   
