@@ -1,23 +1,22 @@
 local mm = require "mm"
 local Rule = require "rule"
 local json = require "dkjson"
+local Binding = require "binding"
 
 local function parseRulesetThing(parser, data_in, opt)
-  parser:pushContext(data_in, opt.key)
   local data = data_in[opt.key]
+  parser:pushContext(data, opt.key)
   local ruleset = parser.ruleset
   
   if data then
-    parser:assert_type(data, opt.type, "wrong type for ruleset " .. opt.key)
+    parser:assert_type(data, opt.type, ("wrong type for ruleset %s, expected %s, got %s"):format(opt.key, opt.type, parser:jsontype(data)))
     local ret, err
     for k,v in pairs(data) do
-      print("yep", k,v)
+      parser:assert_type(k, "string", ("wrong key type for %s, expected string, got %s %s"):format(opt.thing, parser:jsontype(k), tostring(k)))
       ret, err = opt.parser_method(parser, v, k)
       parser:assert(ret, err)
       --assert(ret.id, ("failed to generate id for %s"):format(opt.thing))
-      print("name is", ret.name)
       parser:assert(ruleset[opt.key][ret.name] == nil, ("%s %s already exists"):format(opt.thing, ret.name))
-      print(opt.key, ret.name)
       ruleset[opt.key][ret.name]=ret
     end
   end
@@ -154,7 +153,12 @@ function class:parseRuleSet(data, name)
   
   parseRulesetThing(self, data, {
     thing="rule", key="rules",  type="table",
-    parser_method= self.parseRule
+    parser_method=function(self, data, name)
+      self:pushContext(data, "rule")
+      self:assert(type(data) ~= "string", ("named rule \"%s\" cannot be a string referring to another named rule \"%s\""):format(name, tostring(data)))
+      self:popContext()
+      return self:parseRule(data, name)
+    end
   })
   
   parseRulesetThing(self, data, {
@@ -263,21 +267,21 @@ function class:parseRule(data, name)
       local conditions = {}
       for _, v in ipairs(data["if-any"] or data["if-all"]) do
         condition = self:assert(self:parseCondition(v))
-        mm(condition)
         table.insert(conditions, condition)
       end
       condition = {[(data["if-any"] and "any" or "all")]=conditions}
-      mm(condition)
     end
-    rule = {["if"]=condition, ["then"]=data["then"], name=data["name"] or name, key=data["key"]}
-    
+    rule = {["if"]=condition, ["then"]=data["then"], ["else"]=data["else"], name=data["name"] or name, info=data["info"], key=data["key"]}
   elseif data["always"] then
-    rule = {["if"]={["true"]={}}, ["then"]=data["always"], name=data["name"] or name, key=data["key"]}
+    rule = {["if"]={["true"]={}}, ["then"]=data["always"], name=data["name"] or name, info=data["info"], key=data["key"]}
+  elseif next(data) == nil then
+    self:error("empty rule not allowed")
   else
-    self:error("something went wrong parsing rule")
+    self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")
   end
-  if self:jsontype(rule["then"]) ~= "array" or (#rule["then"] == 0 and next(rule["then"]) ~= nil) then
-    rule["then"] = { rule["then"] }
+  if rule["if"] then
+    rule["then"] = self:parseActions(rule["then"])
+    rule["else"] = self:parseActions(rule["else"])
   end
   
   self:popContext()
@@ -319,14 +323,17 @@ function class:parseAction(data)
 end
 
 function class:parseActions(data)
+  if data == nil then
+    return {}
+  end
   self:pushContext(data) --no context name plz
   local actions = {}
-  if self:jsontype(data) == "array" then
+  if self:jsontype(data) == "object" or type(data)=="string" or (#data == 0 and next(data) ~= nil) then
+    table.insert(actions, self:parseAction(data))
+  elseif type(data) == "table" then
     for _, v in ipairs(data) do
       table.insert(actions, self:parseAction(v))
     end
-  else
-    actions = { self:parseAction(data) }
   end
   self:popContext()
   return actions
@@ -334,9 +341,8 @@ end
 
 function class:parseLimiter(data, name)
   self:pushContext(data)
-  print("parseLimiter", data, name)
+  self:assert("limiters not yet implemented")
   self:popContext()
-  return nil, "nonono"
 end
 
 local function newparser()

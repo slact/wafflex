@@ -28,7 +28,9 @@
     }, 
     "fwoop": { "always": { "#tag":"this is a tag yo" } },
     "rule1": { 
-      "if-all": ["#true", "#true"],
-      "then": { "#tag":"this is a tag yo" } }
+      "if-all": ["#true", {"any": ["#true", "#false"]}],
+      "then": "accept",
+      "else": "reject"
+    }
   }
 }

@@ -1,42 +1,4 @@
 local Rule = require "rule"
---local mm = require "mm"
-
-local function inject_event_listeners(mt)
-  mt.__index.addListener = function(self, event_name, callback)
-    if not self.__event_listeners then
-      self.__event_listeners = {}
-    end
-    if not self.__event_listeners[event_name] then
-      self.__event_listeners[event_name] = {}
-    end
-    table.insert(self.__event_listeners[event_name], callback)
-    return self
-  end
-  
-  mt.__index.removeListener = function(self, event_name, callback)
-    if not self.__event_listeners or not self.__event_listeners[event_name] then
-      return nil
-    end
-    for i,v in ipairs(self.__event_listeners[event_name]) do
-      if v == callback then
-        table.remove(self.__event_listeners[event_name], i)
-        return self
-      end
-    end
-    return self
-  end
-  
-  mt.__index.emit = function(self, event_name, ...)
-    if not self.__event_listeners or not self.__event_listeners[event_name] then
-      return nil
-    end
-    for _,listener in ipairs(self.__event_listeners[event_name]) do
-      listener(self, ...)
-    end
-    return self
-  end
-  return mt
-end
 
 local function assert_unique_name(what, tbl, data)
   assert(data.name, ("a %s must have a name"):format(what))
@@ -53,7 +15,7 @@ local function thing_name(thing)
   end
 end
 
-local ruleset_meta = inject_event_listeners({ __index = {
+local ruleset_meta = { __index = {
   type="ruleset",
   
   findLimiter = function(self, name)
@@ -82,13 +44,14 @@ local ruleset_meta = inject_event_listeners({ __index = {
     if data["if"] then
       data["if"] = Rule.condition.new(rule["if"], rule)
     end
-    if data["then"] then
-      local actions = {}
-      for _,v in pairs(data["then"]) do
-        print("whoosh", v, self)
-        table.insert(actions, Rule.action.new(v, self))
+    for _,clause in pairs{"then", "else"} do
+      if data[clause] then
+        local actions = {}
+        for _,v in pairs(data[clause]) do
+          table.insert(actions, Rule.action.new(v, self))
+        end
+        data[clause]=actions
       end
-      data["then"]=actions
     end
     self.rules[data.name]=rule
     return rule
@@ -137,7 +100,7 @@ local ruleset_meta = inject_event_listeners({ __index = {
     end
   end
   
-}})
+}}
 
 local function newRuleset(data)
   local ruleset = setmetatable({
@@ -151,11 +114,13 @@ local function newRuleset(data)
   ruleset.__submeta = {
     rule = {__index = {
       type="rule",
-      ruleset = ruleset
+      ruleset = ruleset,
+      in_lists = {},
     }},
     list = {__index = {
       type="list",
-      ruleset = ruleset
+      ruleset = ruleset,
+      in_tables = {}
     }},
     limiter = {__index = {
       type="limiter",
@@ -185,7 +150,7 @@ local function newRuleset(data)
   return ruleset
 end
 
-local Ruleset = {new = newRuleset}
+local Ruleset = {new = newRuleset, hook}
 
 return Ruleset
 
