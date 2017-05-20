@@ -1,7 +1,39 @@
 local mm = require "mm"
 local Rule = require "rule"
+local json = require "dkjson"
 
-local function jsontype(var)
+local function parseRulesetThing(parser, data_in, opt)
+  parser:pushContext(data_in, opt.key)
+  local data = data_in[opt.key]
+  local ruleset = parser.ruleset
+  
+  if data then
+    parser:assert_type(data, opt.type, "wrong type for ruleset " .. opt.key)
+    local ret, err
+    for k,v in pairs(data) do
+      print("yep", k,v)
+      ret, err = opt.parser_method(parser, v, k)
+      parser:assert(ret, err)
+      --assert(ret.id, ("failed to generate id for %s"):format(opt.thing))
+      print("name is", ret.name)
+      parser:assert(ruleset[opt.key][ret.name] == nil, ("%s %s already exists"):format(opt.thing, ret.name))
+      print(opt.key, ret.name)
+      ruleset[opt.key][ret.name]=ret
+    end
+  end
+  parser:popContext()
+  return true
+end
+
+local function jsonmeta(what)
+  return function(str, where)
+    return {__pos=where, __jsontype = what}
+  end
+end
+
+local class = {}
+
+function class:jsontype(var)
   if type(var) == "table" then
     local m = getmetatable(var)
     return m and m.__jsontype or nil
@@ -9,216 +41,283 @@ local function jsontype(var)
     return type(var)
   end
 end
-
-local function assert_type(var, expected_type, err)
-  assert(type(var) == expected_type, err)
+function class:assert(cond, err)
+  if not cond then self:error(err) end
 end
-
-local function assert_jsontype(var, expected_type, err)
-  assert(jsontype(var) == expected_type, err)
+function class:assert_type(var, expected_type, err)
+  self:assert(type(var) == expected_type, err or ("expected type '%s', got '%s'"):format(expected_type, type(var)))
 end
-
-local function assert_table_size(var, sz, err)
+function class:assert_jsontype(var, expected_type, err)
+  self:assert(self:jsontype(var) == expected_type, err or ("expected JSON type '%s', got '%s'"):format(expected_type, self:jsontype(var)))
+end
+function class:assert_table_size(var, expected_size, err)
+  self:assert_type(var, "table")
   local n = 0
   for _, _ in pairs(var) do
-    n=n+1
+    n = n + 1
   end
-  assert(sz == n, err)
+  if n ~= expected_size then
+    self:error(err or ("wrong table size, expected %i, got %i"):format(expected_size, n))
+  end
 end
-
-local function parseRulesetThing(data_in, ruleset, opt)
-  local data = data_in[opt.key]
-  if data then
-    assert_type(data, opt.type, "wrong type for ruleset " .. opt.key)
-    local ret, err
-    for k,v in pairs(data) do
-      print("yep", k,v)
-      ret, err = opt.parser_method(opt.parser, v, k)
-      assert(ret, err)
-      --assert(ret.id, ("failed to generate id for %s"):format(opt.thing))
-      print("name is", ret.name)
-      assert(ruleset[opt.key][ret.name] == nil, ("%s %s already exists"):format(opt.thing, ret.name))
-      print(opt.key, ret.name)
-      ruleset[opt.key][ret.name]=ret
+function class:error(err)
+  local getloc = function(str, where)
+    local line, pos, linepos = 1, 1, 0
+    while true do
+      pos = str:find("\n", pos, true)
+      if pos and pos < where then
+        line = line + 1
+        linepos = pos
+        pos = pos + 1
+      else
+        break
+      end
+    end
+    return "line " .. line .. ", column " .. (where - linepos)
+  end
+  
+  local getpos = function(ctx)
+    local meta = getmetatable(ctx)
+    if meta then
+      return meta.__pos
     end
   end
-  return true
+  
+  if not err then err = "unknown error" end
+  
+  local nested_names = {}
+  
+  for i=#self.ctx_stack,1,-1 do
+    local cur = self.ctx_stack[i]
+    if cur.name then table.insert(nested_names, cur.name) end
+    local pos = getpos(cur.ctx)
+    if pos then
+      error(("%s at %s: %s"):format(table.concat(nested_names, " in "), getloc(self.source, pos), err))
+    end
+  end  
+  error(("%s: %s"):format(table.concat(nested_names, " in "), err))
+end
+function class:pushContext(ctx, name)
+  local meta = getmetatable(ctx)
+  table.insert(self.ctx_stack, {ctx=ctx, name=name})
+  self.context = self.ctx_stack[#self.ctx_stack]
+  return self
+end
+function class:popContext()
+  table.remove(self.ctx_stack, #self.ctx_stack)
+  self.context = self.ctx_stack[#self.ctx_stack]
+end
+
+function class:parseFile(path)
+  local file = assert(io.open(path, "rb")) -- r read mode and b binary mode
+  local content = file:read("*a") -- *a or *all reads the whole file
+  file:close()
+  self.name = path
+  return self:parseJSON(content, "file " .. path)
+end
+
+function class:parseJSON(json_str, json_name)
+  self:assert_type(json_str, "string", "expected a JSON string")
+  local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
+  self.name = json_name or self.context_name
+  self.source = json_str
+  if not data then
+    self:error(err)
+  end
+  return self:parseRuleSet(data)
+end
+
+function class:parseRuleSet(data, name)
+  self.ruleset = {
+    limiters= {},
+    rules= {},
+    lists= {},
+    table= {},
+    name = name
+  }
+  self:pushContext(data, "ruleset")
+  
+  self:assert_type(data, "table", "wrong type for ruleset")
+  parseRulesetThing(self, data, {
+    thing="limiter", key="limiters", type="table",
+    parser_method= self.parseLimiter
+  })
+  
+  parseRulesetThing(self, data, {
+    thing="rule", key="rules",  type="table",
+    parser_method= self.parseRule
+  })
+  
+  parseRulesetThing(self, data, {
+    thing="list", key="lists",  type="table",
+    parser_method= self.parseRuleList
+  })
+  
+  self.ruleset.table = self:parseRuleTable(data.table)
+  return self.ruleset
+end
+
+function class:parseRuleTable(data)
+  self:pushContext(data, "ruletable")
+  self:assert_jsontype(data, "object", "rule table must be an object")
+  local rule_table = {}
+  
+  for k,v in pairs(data) do
+    self:assert_type(k, "string", "rule table entries must be strings")
+    if self:jsontype(v) == "array" then
+      --array of lists
+      local lists = {}
+      for _, vv in ipairs(v) do
+        if type(vv)=="string" or self:jsontype(vv) == "array" or self:jsontype(vv) == "object" then
+          table.insert(lists, self:parseRuleList(vv))
+        else
+          self:error(("invalid rule list type: %s"):format(self:jsontype(vv)))
+        end
+      end
+      rule_table[k]=lists
+    elseif type(v) == "string" then
+      --singe named list
+      rule_table[k]={ self:parseRuleList(v) }
+    elseif self:jsontype(v)=="object" then
+      --single long-form list
+      rule_table[k]=self:parseRuleList(v)
+    end
+  end
+  
+  self:popContext()
+  return rule_table
+end
+
+function class:parseRuleList(data, name)
+  self:pushContext(data, "list")
+  if type(data)=="string" then
+    self:assert(self.ruleset.lists[data], ([[named list "%s" not found]]):format(data))
+    self:popContext()
+    return self.ruleset.lists[data]
+  end
+  
+  if self:jsontype(data) == "object" then
+    if name then
+      self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
+    else
+      name = tostring(data.name)
+    end
+    data = data.rules
+  end
+  self:assert_jsontype(data, "array", "rule list must be an array")
+  local rules = {}
+  for _,v in ipairs(data) do
+    table.insert(rules, self:parseRule(v))
+  end
+  self:popContext()
+  return {name=name, rules=rules}
+end
+
+function class:parseRule(data, name)
+  self:pushContext(data, "rule")
+  local rule
+  if type(data) == "string" then
+    rule = self.ruleset.rules[data]
+    self:assert(rule, ([[named rule "%s" not found]]):format(data))
+    self:popContext()
+    return rule
+  end
+  self:assert_type(data, "table", "invalid rule data type: " .. type(data))
+  self:assert_jsontype(data, "object", ("invalid rule data type: %s"):format(self:jsontype(data)))
+  
+  if ((data["if"] or data["if-any"] or data["if-all"]) or data["then"]) then
+    self:assert(not data["always"], [["always" clause can't be present in if/then rule]])
+    self:assert(not data["switch"], [["switch" clause can't be present in if/then rule]])
+  end
+  
+  if data["then"] then
+    if (data["if"] and (data["if-any"] or data["if-all"])) or (data["if-any"] and data["if-all"]) then
+      self:error("only one of \"if\", \"if-any\" or \"if-all\" allowed in if/then rule")
+    end
+    
+    local condition
+    if data["if"] then
+      condition = self:parseCondition(data["if"])
+    elseif data["if-any"] or data["if-all"] then
+      local conditions = {}
+      for _, v in ipairs(data["if-any"] or data["if-all"]) do
+        condition = self:assert(self:parseCondition(v))
+        table.insert(conditions, condition)
+      end
+      condition = {[(data["if-any"] and "any" or "all")]=conditions}
+    end
+    rule = {["if"]=condition, ["then"]=data["then"], name=data["name"] or name, key=data["key"]}
+    
+  elseif data["always"] then
+    rule = {["if"]={always={}}, ["then"]=data["always"], name=data["name"] or name, key=data["key"]}
+  else
+    self:error("something went wrong parsing rule")
+  end
+  self:popContext()
+  return rule
+end
+
+function class:parseCondition(data)
+  self:pushContext(data, "condition")
+  local condition
+  if type(data) == "string" then
+    condition = {[data]={}}
+  elseif type(data) == "table" then
+    self:assert_jsontype(data, "object", "condition cannot be an array, must be an object")
+    self:assert_table_size(data, 1, "condition object must have exactly one attribute (the condition name)")
+    condition = data
+  else
+    self:error(("wrong type (%s) for condition"):format(type(data)))
+  end
+  condition = Rule.condition.parse(condition, self)
+  self:popContext()
+  return condition
+end
+  
+function class:parseAction(data)
+  self:pushContext(data, "action")
+  local action
+  if type(data) == "string" then
+    action = {[data]={}}
+  elseif self:jsontype(data) == "object" then
+    self:assert(next(data, next(data)) == nil, "action object must have only 1 attribute -- the action name")
+    action = data
+  else
+    self:error(("action must be string on 1-attribute object, but instead was a %s"):format(self:jsontype(data)))
+  end
+  action = Rule.action.parse(action, self)
+  self:popContext()
+  return action
+end
+
+function class:parseActions(data)
+  self:pushContext(data) --no context name plz
+  local actions = {}
+  if self:jsontype(data) == "array" then
+    for _, v in ipairs(data) do
+      table.insert(actions, self:parseAction(v))
+    end
+  else
+    actions = { self:parseAction(data) }
+  end
+  self:popContext()
+  return actions
+end
+
+function class:parseLimiter(data, name)
+  self:pushContext(data)
+  print("parseLimiter", data, name)
+  self:popContext()
+  return nil, "nonono"
 end
 
 local function newparser()
-  local parser = {}
-  setmetatable(parser, {__index = {
-    
-    assert_type = assert_type,
-    jsontype = jsontype,
-    assert_jsontype = assert_jsontype,
-    
-    parseRuleSet = function(self, data, name)
-      self.ruleset = {
-        limiters= {},
-        rules= {},
-        lists= {},
-        table= {},
-        name = name
-      }
-      
-      assert_type(data, "table", "wrong type for ruleset")
-      
-      parseRulesetThing(data, self.ruleset, {
-        thing="limiter", key="limiters", type="table",
-        parser= self, parser_method= self.parseLimiter
-      })
-      
-      parseRulesetThing(data, self.ruleset, {
-        thing="rule", key="rules",  type="table",
-        parser= self, parser_method= self.parseRule
-      })
-      
-      parseRulesetThing(data, self.ruleset, {
-        thing="list", key="lists",  type="table",
-        parser= self, parser_method= self.parseRuleList
-      })
-      
-      self.ruleset.table = self:parseRuleTable(data.table)
-      return self.ruleset
-    end,
-    
-    parseRuleTable = function(self, data)
-      mm(data)
-      assert_jsontype(data, "object", "rule table must be an object")
-      local rule_table = {}
-      
-      for k,v in pairs(data) do
-        assert_type(k, "string", "rule table entries must be strings")
-        if jsontype(v) == "array" then
-          --array of lists
-          local lists = {}
-          for _, vv in ipairs(v) do
-            if type(vv)=="string" or jsontype(vv) == "array" or jsontype(vv) == "object" then
-              table.insert(lists, self:parseRuleList(vv))
-            else
-              error(("invalid rule list type: %s"):format(jsontype(vv)))
-            end
-          end
-          rule_table[k]=lists
-        elseif type(v) == "string" then
-          --singe named list
-          rule_table[k]={ self:parseRuleList(v) }
-        elseif jsontype(v)=="object" then
-          --single long-form list
-          rule_table[k]=self:parseRuleList(v)
-        end
-      end
-      
-      return rule_table
-    end,
-    
-    parseRuleList = function(self, data, name)
-      if type(data)=="string" then
-        assert(self.ruleset.lists[data], ([[named list "%s" not found]]):format(data))
-        return self.ruleset.lists[data]
-      end
-      
-      if jsontype(data) == "object" then
-        if name then
-          assert(name == data.name, "rule list 'name' attribute must match outside list name")
-        else
-          name = tostring(data.name)
-        end
-        data = data.rules
-      end
-      assert_jsontype(data, "array", "rule list must be an array")
-      local rules = {}
-      for _,v in ipairs(data) do
-        table.insert(rules, self:parseRule(v))
-      end
-      return {name=name, rules=rules}
-    end,
-    
-    parseRule = function(self, data, name)
-      if type(data) == "string" then
-        local rule = self.ruleset.rules[data]
-        assert(rule, ([[named rule "%s" not found]]):format(data))
-        return rule
-      end
-      assert_type(data, "table", "invalid rule data type: " .. type(data))
-      assert_jsontype(data, "object", ("invalid rule data type: %s"):format(jsontype(data)))
-      
-      if ((data["if"] or data["if-any"] or data["if-all"]) or data["then"]) then
-        assert(not data["always"], [["always" clause can't be present in if/then rule]])
-        assert(not data["switch"], [["switch" clause can't be present in if/then rule]])
-      end
-      
-      if data["then"] then
-        if (data["if"] and (data["if-any"] or data["if-all"])) or (data["if-any"] and data["if-all"]) then
-          return nil, "only one of \"if\", \"if-any\" or \"if-all\" allowed in if/then rule"
-        end
-        
-        local condition
-        if data["if"] then
-          condition = self:parseCondition(data["if"])
-        elseif data["if-any"] or data["if-all"] then
-          local conditions = {}
-          for _, v in ipairs(data["if-any"] or data["if-all"]) do
-            condition = assert(self:parseCondition(v))
-            table.insert(conditions, condition)
-          end
-          condition = {[(data["if-any"] and "any" or "all")]=conditions}
-        end
-        return {["if"]=condition, ["then"]=data["then"], name=data["name"] or name, key=data["key"]}
-        
-      elseif data["always"] then
-        return {["if"]={always={}}, ["then"]=data["always"], name=data["name"] or name, key=data["key"]}
-      else
-        error("something went wrong parsing rule")
-      end
-    end,
-    
-    parseCondition = function(self, data)
-      local condition
-      if type(data) == "string" then
-        condition = {[data]={}}
-      elseif type(data) == "table" then
-        assert_jsontype(data, "object", "condition cannot be an array, must be an object")
-        assert_table_size(data, 1, "condition object must have exactly one attribute (the condition name)")
-        condition = data
-      else
-        error(("wrong type (%s) for condition"):format(type(data)))
-      end
-      return Rule.condition.parse(condition, self)
-    end,
-    
-    parseAction = function(self, data)
-      local action
-      if type(data) == "string" then
-        action = {[data]={}}
-      elseif jsontype(data) == "object" then
-        assert(next(data, next(data)) == nil, "action object must have only 1 attribute -- the action name")
-        action = data
-      else
-        error(("action must be string on 1-attribute object, but instead was a %s"):format(jsontype(data)))
-      end
-      return Rule.action.parse(action, self)
-    end,
-    
-    parseActions = function(self, data)
-      local actions = {}
-      if jsontype(data) == "array" then
-        for _, v in ipairs(data) do
-          table.insert(actions, self:parseAction(v))
-        end
-        return actions
-      else
-        return { self:parseAction(data) }
-      end
-    end,
-    
-    parseLimiter = function(self, data, name)
-      print("parseLimiter", data, name)
-      return nil, "nonono"
-    end
-  }})
+  local parser = {
+    name = "<?>",
+    ctx_stack = {}
+  }
   
+  setmetatable(parser, {__index = class})
   return parser
 end
 

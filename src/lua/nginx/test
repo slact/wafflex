@@ -9,16 +9,12 @@ local json = require("dkjson")
 local Parser = require("parser")
 local Ruleset = require("ruleset")
 
-local f = io.open("./ruleset1.json", "rb")
-local rs1 = f:read("*all")
-f:close()
 
-local data, pos, err = json.decode(rs1, 1, nil)
-mm(data)
+
 
 local p = Parser.new()
 
-local parsed = p:parseRuleSet(data)
+local parsed = p:parseFile("./ruleset1.json")
 
 local rs = Ruleset.new(parsed)
 

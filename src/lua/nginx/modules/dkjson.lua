@@ -1,10 +1,11 @@
 --David Kolf's JSON module for Lua 5.1/5.2
+--small hack to generate object and array metatables by slact
 
 local always_try_using_lpeg = false
 local register_global_module_table = false
 local global_module_name = 'json'
 
---[[
+--[==[
 
 David Kolf's JSON module for Lua 5.1/5.2
 
@@ -12,7 +13,7 @@ Version 2.5
 
 
 For the documentation see the corresponding readme.txt or visit
-http://dkolf.de/src/dkjson-lua.fsl/
+<http://dkolf.de/src/dkjson-lua.fsl/>.
 
 You can contact the author by sending an e-mail to 'david' at the
 domain 'dkolf.de'.
@@ -40,7 +41,7 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
---]]
+--]==]
 
 -- global dependencies:
 local pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset =
@@ -374,7 +375,7 @@ function json.encode (value, state)
   end
 end
 
-local function loc (str, where)
+local function loc(str, where)
   local line, pos, linepos = 1, 1, 0
   while true do
     pos = strfind (str, "\n", pos, true)
@@ -504,14 +505,24 @@ end
 
 local scanvalue -- forward declaration
 
+local function set_scantable_metatable (tbl, meta, str, pos)
+  if type(meta)=="function" then
+    meta = meta(str, pos)
+    if type(meta) ~= "table" then
+      return tbl
+    end
+  end
+  return setmetatable(tbl, meta)
+end
+
 local function scantable (what, closechar, str, startpos, nullval, objectmeta, arraymeta)
   local len = strlen (str)
   local tbl, n = {}, 0
   local pos = startpos + 1
   if what == 'object' then
-    setmetatable (tbl, objectmeta)
+    set_scantable_metatable(tbl, objectmeta, str, startpos)
   else
-    setmetatable (tbl, arraymeta)
+    set_scantable_metatable(tbl, arraymeta, str, startpos)
   end
   while true do
     pos = scanwhite (str, pos)

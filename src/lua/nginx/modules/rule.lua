@@ -7,10 +7,10 @@ end
 local function create_thing_storage(thing_name)
   local self = {table = setmetatable({}, {__index = ignore_leading_hash_key})}
   
-  local function unpack_thing(data)
+  local function unpack_thing(data, parser)
     local name, val = next(data)
     local thing = self.table[name]
-    assert(thing, ("Unknown %s \"%s\""):format(thing_name, name))
+    parser:assert(thing, ("Unknown %s \"%s\""):format(thing_name, name))
     return name, val
   end
   
@@ -42,13 +42,13 @@ local function create_thing_storage(thing_name)
   end
   
   function self.parse(data, parser)
-    local name, val = unpack_thing(data)
+    local name, val = unpack_thing(data, parser)
     val = self.table[name].parse(val, parser) or val
     return {[name]=val}
   end
   
   function self.new(data, ruleset)
-    local name, val = unpack_thing(data)
+    local name, val = unpack_thing(data, parser)
     local thing_preset = self.table[name]
     local thing = setmetatable({[name]=val, ["data"]=data}, thing_preset.meta)
     for _, init in ipairs(thing_preset.init) do
@@ -67,7 +67,7 @@ local rule = {
 
 --now let's add some basic conditions and actions
 rule.condition.add("any", {parse = function(data, parser)
-  assert(parser.jsontype(data)=="array", "\"any\" condition value must be an array of conditions")
+  parser:assert_jsontype(data, "array", "\"any\" condition value must be an array of conditions")
   for i, v in ipairs(data) do
     local condition = parser:parseCondition(v)
     data[i]=condition
@@ -75,7 +75,7 @@ rule.condition.add("any", {parse = function(data, parser)
 end})
 
 rule.condition.add("all", {parse = function(data, parser)
-  assert(parser.jsontype(data)=="array", "\"all\" condition value must be an array of conditions")
+  parser:assert_jsontype(data, "array", "\"all\" condition value must be an array of conditions")
   for i, v in ipairs(data) do
     local condition = parser:parseCondition(v)
     data[i]=condition
@@ -83,23 +83,22 @@ rule.condition.add("all", {parse = function(data, parser)
 end})
 
 rule.condition.add("true", {parse = function(data, parser)
-  assert(next(data) == nil, "\"true\" condition must have empty parameters")
+  parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
 end})
 
 rule.condition.add("false", {parse = function(data, parser)
-  assert(next(data) == nil, "\"false\" condition must have empty parameters")
+  parser:assert(next(data) == nil, "\"false\" condition must have empty parameters")
 end})
 
 rule.condition.add("tag-check", {parse = function(data, parser)
-  parser.assert_type(data, "string", "\"tag-check\" value must be a string")
+  parser:assert_type(data, "string", "\"tag-check\" value must be a string")
 end})
 
 rule.condition.add("match", {parse = function(data, parser)
-  parser.assert_jsontype(data, "array", "\"match\" value must be an array of strings")
+  parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
   for _, v in ipairs(data) do
-    parser.assert_jsontype(v, "string", "\"match\" value must be an array of strings")
+    parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
   end
 end})
-
 
 return rule
