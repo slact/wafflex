@@ -1,13 +1,18 @@
 local mm = require "mm"
 
-local ignore_leading_hash_key = function(self, key)
-  if key:sub(1,1)=="#" then
-    return self[key:sub(2)]
-  end
+local function ignore_leading_hash(str)
+  return str:sub(1,1)=="#" and str:sub(2) or str
 end
 
+local thingstorage_meta = {__index = function(self, key)
+  local unhashed = ignore_leading_hash(key)
+  if unhashed ~= key then
+    return self[ignore_leading_hash(key)]
+  end
+end}
+
 local function create_thing_storage(thing_name)
-  local self = {table = setmetatable({}, {__index = ignore_leading_hash_key})}
+  local self = {table = setmetatable({}, thingstorage_meta)}
   
   local function unpack_thing(data, parser)
     local name, val = next(data)
@@ -22,28 +27,15 @@ local function create_thing_storage(thing_name)
   
   function self.add(name, funcs, metaindex)
     assert(funcs.parse, ("%s missing parse callback"):format(thing_name))
-    -- funcs.init may be omitted
     assert(self.table[name] == nil, ("%s %s already exists"):format(thing_name, name))
     local added = {
       parse=funcs.parse,
-      init={}
+      init=funcs.init or function() end
     }
     if metaindex then
       added.meta={__index = metaindex}
     end
-    
-    if funcs.init then
-      table.insert(added.init, funcs.init)
-    end
     self.table[name]=added
-    
-    return true
-  end
-  
-  function self.addInitializer(name, init_func)
-    local thing_preset = self.table[name]
-    assert(thing_preset, ("Unknown %s \"%s\""):format(thing_name, name))
-    table.insert(thing_preset.init, init_func)
     return true
   end
   
@@ -56,10 +48,9 @@ local function create_thing_storage(thing_name)
   function self.new(data, ruleset)
     local name, val = unpack_thing(data)
     local thing_preset = self.table[name]
-    local thing = setmetatable({[thing_name]=name, ["data"]=val}, thing_preset.meta)
-    for _, init in ipairs(thing_preset.init) do
-      init(val, thing, ruleset)
-    end
+    local thing = setmetatable({[thing_name]=ignore_leading_hash(name), ["data"]=val}, thing_preset.meta)
+    thing_preset.init(val, thing, ruleset)
+    
     return thing
   end
   
