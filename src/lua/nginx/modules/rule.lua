@@ -1,4 +1,5 @@
 local mm = require "mm"
+local Binding = require "binding"
 
 local function ignore_leading_hash(str)
   return str:sub(1,1)=="#" and str:sub(2) or str
@@ -50,7 +51,7 @@ local function create_thing_storage(thing_name)
     local thing_preset = self.table[name]
     local thing = setmetatable({[thing_name]=ignore_leading_hash(name), ["data"]=val}, thing_preset.meta)
     thing_preset.init(val, thing, ruleset)
-    
+    Binding.call(thing_name, "create", thing)
     return thing
   end
   

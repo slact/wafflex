@@ -1,4 +1,5 @@
 local Rule = require "rule"
+local Binding = require "binding"
 
 local function assert_unique_name(what, tbl, data)
   assert(data.name, ("a %s must have a name"):format(what))
@@ -26,6 +27,7 @@ local ruleset_meta = { __index = {
     assert_unique_name("limiter", self.limiters, data)
     local limiter = setmetatable(data, self.__submeta.limiter)
     self.limiters[data.name]=limiter
+    Binding.call("limiter", "create", limiter)
     return self
   end,
   
@@ -53,7 +55,9 @@ local ruleset_meta = { __index = {
         data[clause]=actions
       end
     end
+    
     self.rules[data.name]=rule
+    Binding.call("rule", "create", rule)
     return rule
   end,
   
@@ -72,6 +76,7 @@ local ruleset_meta = { __index = {
     end
     local list = setmetatable(data, self.__submeta.list)
     self.lists[data.name] = list
+    Binding.call("list", "create", list)
     return list
   end,
   
@@ -129,7 +134,7 @@ local function newRuleset(data)
   }
 
   if not ruleset.name then ruleset.name = ruleset:uniqueName({}, "ruleset") end
-
+  
   if data then
     --load data
     for _, v in pairs(data.limiters) do
@@ -145,12 +150,12 @@ local function newRuleset(data)
     end
     
     ruleset:setTable(data.phases)
-    
   end
+  Binding.call("ruleset", "create", ruleset)
   return ruleset
 end
 
-local Ruleset = {new = newRuleset, hook}
+local Ruleset = {new = newRuleset}
 
 return Ruleset
 

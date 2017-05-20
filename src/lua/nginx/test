@@ -1,23 +1,46 @@
 #!/usr/bin/lua 
-
 package.path = "./modules/?.lua;"..package.path
-
 local mm = require "mm"
+local Parser = require "parser"
+local Ruleset = require "ruleset"
+local Binding = require "binding"
 
-local json = require("dkjson")
+Binding.set("rule", {
+  create = function(self)
+    print("got a new rule", self, " named", self.name)
+  end
+})
 
-local Parser = require("parser")
-local Ruleset = require("ruleset")
+Binding.set("list", {
+  create = function(self)
+    print("got a new list", self, " named", self.name)
+  end
+})
 
+Binding.set("limiter", {
+  create = function(self)
+    print("got a new limiter", self, " named", self.name)
+  end
+})
 
+Binding.set("condition", {
+  create = function(self)
+    print("got a new condition", self, " ", self.condition)
+  end
+})
 
+Binding.set("action", {
+  create = function(self)
+    print("got a new action", self, " ", self.action)
+  end
+})
 
 local p = Parser.new()
 
 local parsed = p:parseFile("./ruleset1.json")
 
-mm(parsed)
+--mm(parsed)
 
 local rs = Ruleset.new(parsed)
 
-mm(rs)
+--mm(rs)
