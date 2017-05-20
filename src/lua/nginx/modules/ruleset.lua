@@ -49,7 +49,7 @@ local function thing_name(thing)
   elseif type(thing) == "table" then
     return thing.name
   else
-    error(("a thing has no name (wrong type %s)"):format(type(thing)))
+    return thing
   end
 end
 
@@ -71,7 +71,11 @@ local ruleset_meta = inject_event_listeners({ __index = {
     return self.rules[thing_name(name)]
   end,
   addRule = function(self, data)
-    assert_unique_name("rule", self.rules, data)
+    if not data.name then
+      data.name = self:uniqueName(self.rules, "rule")
+    else
+      assert_unique_name("rule", self.rules, data)
+    end
     
     local rule =setmetatable(data, self.__submeta.rule)
     rule.ruleset = nil
@@ -81,6 +85,7 @@ local ruleset_meta = inject_event_listeners({ __index = {
     if data["then"] then
       local actions = {}
       for _,v in pairs(data["then"]) do
+        print("whoosh", v, self)
         table.insert(actions, Rule.action.new(v, self))
       end
       data["then"]=actions
@@ -93,12 +98,13 @@ local ruleset_meta = inject_event_listeners({ __index = {
     return self.lists[thing_name(name)]
   end,
   addList = function(self, data)
-    assert_unique_name("list", self.lists, data)
+    if not data.name then
+      data.name = self:uniqueName(self.lists, "list")
+    else
+      assert_unique_name("list", self.lists, data)
+    end
     
     for i, rule_data in ipairs(data.rules) do
-      if not rule_data.name then
-        rule_data.name = self:uniqueName()
-      end
       data.rules[i]= self:findRule(rule_data.name) or self:addRule(rule_data)
     end
     local list = setmetatable(data, self.__submeta.list)
@@ -117,13 +123,18 @@ local ruleset_meta = inject_event_listeners({ __index = {
     return self.table
   end,
   
-  uniqueName = function(self)
+  uniqueName = function(self, names_tbl, prefix)
     if not self.__n then
       self.__n = 0
     else
       self.__n = self.__n + 1
     end
-    return tostring(self.__n)
+    local name = ("%s%i"):format(prefix, self.__n)
+    if names_tbl[name] then --oh no it's not unique. try again
+      return self:uniqueName(names_tbl, prefix)
+    else
+      return name
+    end
   end
   
 }})
@@ -152,7 +163,7 @@ local function newRuleset(data)
     }}
   }
 
-  if not ruleset.name then ruleset.name = ruleset:uniqueName() end
+  if not ruleset.name then ruleset.name = ruleset:uniqueName({}, "ruleset") end
 
   if data then
     --load data

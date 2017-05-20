@@ -43,12 +43,15 @@ function class:jsontype(var)
 end
 function class:assert(cond, err)
   if not cond then self:error(err) end
+  return cond
 end
 function class:assert_type(var, expected_type, err)
-  self:assert(type(var) == expected_type, err or ("expected type '%s', got '%s'"):format(expected_type, type(var)))
+  return self:assert(type(var) == expected_type, err or ("expected type '%s', got '%s'"):format(expected_type, type(var)))
 end
 function class:assert_jsontype(var, expected_type, err)
-  self:assert(self:jsontype(var) == expected_type, err or ("expected JSON type '%s', got '%s'"):format(expected_type, self:jsontype(var)))
+  return self:assert(self:jsontype(var) == expected_type,
+    err or ("expected JSON type '%s', got '%s'"):format(expected_type, self:jsontype(var))
+  )
 end
 function class:assert_table_size(var, expected_size, err)
   self:assert_type(var, "table")
@@ -59,6 +62,7 @@ function class:assert_table_size(var, expected_size, err)
   if n ~= expected_size then
     self:error(err or ("wrong table size, expected %i, got %i"):format(expected_size, n))
   end
+  return var
 end
 function class:error(err)
   local getloc = function(str, where)
@@ -92,13 +96,18 @@ function class:error(err)
     if cur.name then table.insert(nested_names, cur.name) end
     local pos = getpos(cur.ctx)
     if pos then
+      if self.name then table.insert(nested_names, self.name) end
       error(("%s at %s: %s"):format(table.concat(nested_names, " in "), getloc(self.source, pos), err))
     end
-  end  
-  error(("%s: %s"):format(table.concat(nested_names, " in "), err))
+  end
+  if self.name then table.insert(nested_names, self.name) end
+  if #nested_names > 0 then
+    error(("%s: %s"):format(table.concat(nested_names, " in "), err))
+  else
+    error(err)
+  end
 end
 function class:pushContext(ctx, name)
-  local meta = getmetatable(ctx)
   table.insert(self.ctx_stack, {ctx=ctx, name=name})
   self.context = self.ctx_stack[#self.ctx_stack]
   return self
@@ -213,6 +222,18 @@ function class:parseRuleList(data, name)
   return {name=name, rules=rules}
 end
 
+local function clear_json_meta(data)
+  if type(data) == "table" then
+    local meta = getmetatable(data)
+    if meta and meta.__jsontype then
+      setmetatable(data, nil)
+    end
+    for _, v in pairs(data) do
+      clear_json_meta(v)
+    end
+  end
+end
+
 function class:parseRule(data, name)
   self:pushContext(data, "rule")
   local rule
@@ -242,18 +263,25 @@ function class:parseRule(data, name)
       local conditions = {}
       for _, v in ipairs(data["if-any"] or data["if-all"]) do
         condition = self:assert(self:parseCondition(v))
+        mm(condition)
         table.insert(conditions, condition)
       end
       condition = {[(data["if-any"] and "any" or "all")]=conditions}
+      mm(condition)
     end
     rule = {["if"]=condition, ["then"]=data["then"], name=data["name"] or name, key=data["key"]}
     
   elseif data["always"] then
-    rule = {["if"]={always={}}, ["then"]=data["always"], name=data["name"] or name, key=data["key"]}
+    rule = {["if"]={["true"]={}}, ["then"]=data["always"], name=data["name"] or name, key=data["key"]}
   else
     self:error("something went wrong parsing rule")
   end
+  if self:jsontype(rule["then"]) ~= "array" or (#rule["then"] == 0 and next(rule["then"]) ~= nil) then
+    rule["then"] = { rule["then"] }
+  end
+  
   self:popContext()
+  clear_json_meta(rule)
   return rule
 end
 

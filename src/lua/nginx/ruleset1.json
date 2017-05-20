@@ -6,12 +6,11 @@
   },
   "lists": {
     "list1": [
-      "rule1",
-      "rule2",
+      "fweep",
+      "fwoop",
       {
-        "name": "ratelimit",
         "info": "This rule rate-limits by ip",
-        "if": {"#limit-break" : {
+        "if": {"true" : {
           "name": "rate-limit",
           "key": "$request_real_ip"
         }},
@@ -23,10 +22,13 @@
     ]
   },
   "rules": {   //named rules
-    "rule1": {
+    "fweep": {
       "if": { "#tag-check": "foo"},
       "then": {"#tag":"yeah"}
     }, 
-    "rule2": { "always": { "#tag":"this is a tag yo" } }
+    "fwoop": { "always": { "#tag":"this is a tag yo" } },
+    "rule1": { 
+      "if-all": ["#true", "#true"],
+      "then": { "#tag":"this is a tag yo" } }
   }
 }

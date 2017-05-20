@@ -16,6 +16,8 @@ local p = Parser.new()
 
 local parsed = p:parseFile("./ruleset1.json")
 
+mm(parsed)
+
 local rs = Ruleset.new(parsed)
 
 mm(rs)
