@@ -76,14 +76,14 @@ local ruleset_meta = { __index = {
   end,
   
   setTable = function(self, data)
-    self.table = {}
+    self.phases = {}
     for k,v in pairs(data) do
       for i, list in pairs(v) do
         v[i]=self:findList(list) or self:addList(list)
       end
-      self.table[k]=v
+      self.phases[k]=v
     end
-    return self.table
+    return self.phases
   end,
   
   uniqueName = function(self, names_tbl, prefix)
@@ -144,7 +144,7 @@ local function newRuleset(data)
       ruleset:addList(v)
     end
     
-    ruleset:setTable(data.table)
+    ruleset:setTable(data.phases)
     
   end
   return ruleset

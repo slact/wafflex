@@ -166,17 +166,18 @@ function class:parseRuleSet(data, name)
     parser_method= self.parseRuleList
   })
   
-  self.ruleset.table = self:parseRuleTable(data.table)
+  self.ruleset.phases = self:parsePhaseTable(data.phases)
   return self.ruleset
 end
 
-function class:parseRuleTable(data)
-  self:pushContext(data, "ruletable")
-  self:assert_jsontype(data, "object", "rule table must be an object")
-  local rule_table = {}
+function class:parsePhaseTable(data)
+  self:assert(data ~= nil, "missing phase table (\"phases\" attribute)")
+  self:assert_jsontype(data, "object", "phase table must be an object")
+  self:pushContext(data, "phase table")
+  local phase_table = {}
   
   for k,v in pairs(data) do
-    self:assert_type(k, "string", "rule table entries must be strings")
+    self:assert_type(k, "string", "phase table entries must be strings")
     if self:jsontype(v) == "array" then
       --array of lists
       local lists = {}
@@ -187,27 +188,26 @@ function class:parseRuleTable(data)
           self:error(("invalid rule list type: %s"):format(self:jsontype(vv)))
         end
       end
-      rule_table[k]=lists
+      phase_table[k]=lists
     elseif type(v) == "string" then
       --singe named list
-      rule_table[k]={ self:parseRuleList(v) }
+      phase_table[k]={ self:parseRuleList(v) }
     elseif self:jsontype(v)=="object" then
       --single long-form list
-      rule_table[k]=self:parseRuleList(v)
+      phase_table[k]=self:parseRuleList(v)
     end
   end
   
   self:popContext()
-  return rule_table
+  return phase_table
 end
 
 function class:parseRuleList(data, name)
-  self:pushContext(data, "list")
   if type(data)=="string" then
     self:assert(self.ruleset.lists[data], ([[named list "%s" not found]]):format(data))
-    self:popContext()
     return self.ruleset.lists[data]
   end
+  self:pushContext(data, "list")
   
   if self:jsontype(data) == "object" then
     if name then

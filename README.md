@@ -8,48 +8,48 @@ An Nginx module for rule-based request filtering, rate-limiting, and access cont
 
 Rules can make use of [*limiters*](#limiters), which are pre-configured limits applied to named counters used for rate-limiting and flag checks.
 
-A *[rule list](#rule-list)* is a sequence of rules that keeps executing rules until the end of the list, unless a rule executes a *[final action](#actions)*. Rule lists are stored in *rule tables*. 
+A *[rule list](#rule-list)* is a sequence of rules that keeps executing rules until the end of the list, unless a rule executes a *[final action](#actions)*. Rule lists are stored in *phase tables*. 
 
-A *[rule table](#rule-table)* specifies lists of rule lists that are run at different phases in the HTTP request-response cycle (after headers, after request completion, after redirect, etc.). Each request phase can have one or more rule lists, which are executed in-order.
+A *[phase table](#phase-table)* specifies lists of rule lists that are run at different phases in the HTTP request-response cycle (after headers, after request completion, after redirect, etc.). Each request phase can have one or more rule lists, which are executed in-order.
 
 Finally, all of the above is stored in a [*rule set*](#rule-set).
 
 ## Syntax
 
 ### Rule Set
-The rule-set is the root-level structure that stores the [rule table](#rule-table), named [rule lists](#rule-list), named [rules](#rule) and [limits](#limits) for [limiters](#limiter).
+The rule-set is the root-level structure that stores the [phase table](#phase-table), named [rule lists](#rule-list), named [rules](#rule) and [limits](#limits) for [limiters](#limiter).
 
 ```js
 { //rule set
-  limits: { 
-    limiterName1: /*limiter*/,
-    limiterName2: /*limiter*/, 
+  "limits": { 
+    "limiterName1": /*limiter*/,
+    "limiterName2": /*limiter*/, 
     /*...*/
   }, 
-  table: /*rule table*/,
-  lists: {   //named lists
+  "phases": /*phase table*/,
+  "lists": {   //named lists
     listName1: /*rule list*/, 
     listName2: /*rule list*/, 
     /*...*/
   },
-  rules: {   //named rules
-    ruleName1: /*rule*/, 
-    ruleName2: /*rule*/,
+  "rules": {   //named rules
+    "ruleName1": /*rule*/, 
+    "ruleName2": /*rule*/,
     /*...*/
   }
 }
 ```
 
-A rule set **MUST** have a table, but **MAY NOT** have limiters and lists. The rule lists and named rules **MUST** be uniquely named and can be referenced by name in the rule table. Limiters **MUST** also be uniquely named.
+A rule set **MUST** have a phase table, but **MAY NOT** have named rules, limiters and lists. The rule lists and named rules **MUST** be uniquely named and can be referenced by name in the phase table. Limiters **MUST** also be uniquely named.
 
-### Rule Table
+### Phase Table
 
-The rule table keeps track of [rule lists](#rule-list) associated with HTTP request/response phases.
+The phase table keeps track of [rule lists](#rule-list) associated with HTTP request/response phases.
 ```js
 {
-  connect: [ /*rule-list*/, /*rule-list*/, /*...*/ ],
-  headers: [ /*rule-list*/, /*rule-list*/, /*...*/ ],
-  request: [ /*rule-list*/, /*rule-list*/, /*...*/ ]
+  "connect": [ /*rule-list*/, /*rule-list*/, /*...*/ ],
+  "headers": [ /*rule-list*/, /*rule-list*/, /*...*/ ],
+  "request": [ /*rule-list*/, /*rule-list*/, /*...*/ ]
 }
 ```
 
@@ -67,7 +67,7 @@ The possible HTTP request phases are:
 
 Note that initially, a subset of these phases will be implemented (`request`, `response`, and maybe a few more)
 
-Rule lists can be defined inside the rule table, or they can be referenced by name.
+Rule lists can be defined inside the phase table, or they can be referenced by name.
 
 ### Rule List
 An ordered list of rules.
@@ -77,23 +77,23 @@ An ordered list of rules.
 
 //long-form
 {
-  name: "my-rules", //optional globally unique list name
-  list: [ /*rule*/, /*rule*/, /*...*/ ]
+  "name": "my-rules", //optional globally unique list name
+  "rules": [ /*rule*/, /*rule*/, /*...*/ ]
 }
 ```
 Lists declared in the rule set's `lists` hash have their names set to their hash keys:
 ```js
 { //rule set
-  lists: {
-    myList: [ /*rules*/ ]
+  "lists": {
+    "myList": [ /*rules*/ ]
   },
   /*...*/
 }
 
 //this creates a named list:
 { // rule list
-  name: "myList",
-  rules: [ /*rules*/ ]
+  "name": "myList",
+  "rules": [ /*rules*/ ]
 }
 ```
 
@@ -102,15 +102,15 @@ All list names **MUST** be unique to the rule set.
 Lists could also be **unordered**, meaning rule execution order is up to the module. Unordered lists can be heavily optimized through adaptive reordering and partial condition evaluation trees. (This is an advanced execution engine feature, and will **not** be part of the MVP.)
 ```js
 {
-  list: [ /*rule*/, /*rule*/, /*...*/ ],
-  unordered: true
+  "rules": [ /*rule*/, /*rule*/, /*...*/ ],
+  "unordered": true
 }
 ```
 
 Rules can be define inside rule lists, and named rules can be referenced by the name:
 ```js
 { //rule list
-  list: [ "ruleName1", "ruleName2", {/*rule definition*/} ]
+  "rules": [ "ruleName1", "ruleName2", {/*rule definition*/} ]
 }
 ```
 
@@ -120,16 +120,16 @@ Rules are defined in JSON.
 ```js
 //example rule
 {
-  name: 'ratelimit',
-  info: "This rule rate-limits by ip",
+  "name": "ratelimit",
+  "info": "This rule rate-limits by ip",
 
-  if: {"#limit-break" : {
-    name: "rate-limit",
-    key: "$request_real_ip"
+  "if": {"#limit-break" : {
+    "name": "rate-limit",
+    "key": "$request_real_ip"
   }},
-  then: [
+  "then": [
     {"#tag": "slowdown"},
-    {"#reject": {status: 403, body: "Slow down!!!"}}
+    {"#reject": {"status": 403, "body": "Slow down!!!"}}
   ]
 }
 ```
@@ -139,21 +139,21 @@ Rules have 3 forms:
 ##### If-rule
 ```js
 {
-  'if': /*condition*/
-  'then': /*actions*/
-  'else': /*actions*/       //optional
+  "if": /*condition*/
+  "then": /*actions*/
+  "else": /*actions*/       //optional
 }
 
 {
-  'if-any': [ /*condition*/, /*condition*/, /*...*/ ],
-  'then': /*actions*/
-  'else': /*actions*/       //optional
+  "if-any": [ /*condition*/, /*condition*/, /*...*/ ],
+  "then": /*actions*/
+  "else": /*actions*/       //optional
 }
 
 {
-  'if-all': [ /*condition*/, /*condition*/, /*...*/ ],
-  'then': /*actions*/
-  'else': /*actions*/       //optional
+  "if-all": [ /*condition*/, /*condition*/, /*...*/ ],
+  "then": /*actions*/
+  "else": /*actions*/       //optional
 }
 ```
 
@@ -164,7 +164,7 @@ Rules have 3 forms:
 ##### Switch-rule
 ```js
 {
-  'switch': [
+  "switch": [
     [ /*condition*/, /*actions*/],
     [ /*condition*/, /*actions*/],
     /*...*/
@@ -174,7 +174,7 @@ Rules have 3 forms:
 ##### Unconditional rule
 ```js
 {
-  'do': /*actions*/  
+  "do": /*actions*/  
 }
 ```
 
@@ -220,26 +220,24 @@ As with [actions](#actions), strings in condition arguments are [interpolated](#
 ```
   
 ### Limiters
-Limiters are used to track a rate, and whether that rate exceeds some threshold. Limiters are defined outside of rules, rule lists, and rule tables.
+Limiters are used to track a rate, and whether that rate exceeds some threshold. Limiters are defined outside of rules, rule lists, and phase tables.
 
 ```js
 //limiter syntax
 {
-  name: "limiter-name" //globally unique
-  info: "optional limiter description",
-  interval: /*time-interval*/,
-  limit: number //maximum value for that interval
-  sync-steps: integer (default 4) //optional
-  burst: "burst-limiter-name", //optional
-  'burst-expire': /*time-interval*/ //optional
+  "name": "limiter-name" //globally unique
+  "info": "optional limiter description",
+  "interval": /*time-interval*/,
+  "limit": number //maximum value for that interval
+  "sync-steps": integer (default 4) //optional
+  "burst": "burst-limiter-name", //optional
+  "burst-expire": /*time-interval*/ //optional
 }
 
 /*time-interval*/ number (seconds) || nginx-time-range ("10s" /*10 seconds*/ || "1h" /*1 hour*/ || "5d" /*5 days*/ etc)
 ```
 
 All limiters must have names unique to the [rule set](#rule-set).
-
-
 
 
 <img align="right" src="https://media.giphy.com/media/3o7bu5A0GCRyvBZV2o/giphy.gif"  />
@@ -252,18 +250,18 @@ A Limiter is checked and the corresponding counter auto-incremented with the [`#
 
 ```js
 { //limit
-  name: "request-rate",
-  interval: 60, //seconds
-  limit: 100
+  "name": "request-rate",
+  "interval": 60, //seconds
+  "limit": 100
 }
 
 { //rule
-  if: {"#limit-break": {
-    name: "request-rate", //limiter name
-    key: "$request_real_ip", //key for current limiter rate value
+  "if": {"#limit-break": {
+    "name": "request-rate", //limiter name
+    "key": "$request_real_ip", //key for current limiter rate value
     //increment: 1 //increment current limit counter value by 1 by default
   }},
-  then: "#reject"
+  "then": "#reject"
 }
 ```
 
@@ -273,19 +271,19 @@ Each limiter has a limit and a *counter* which is stored for that limit at a spe
 
 ```js
 { //limit
-  name: "request-rate",
-  interval: 60, //seconds
-  limit: 100
+  "name": "request-rate",
+  "interval": 60, //seconds
+  "limit": 100
 }
 
 { //another limit
-  name: "weekly-allowance",
-  interval: '7d', //7 days
-  limit: 1000000 // a million requests a week
+  "name": "weekly-allowance",
+  "interval": '7d', //7 days
+  "limit": 1000000 // a million requests a week
 }
 
 { //rule
-  if-any: [
+  "if-any": [
     {"#limit-break": {
       name: "request-rate", //limiter name
       key: "$request_real_ip", //key for current limiter rate value
@@ -295,7 +293,7 @@ Each limiter has a limit and a *counter* which is stored for that limit at a spe
       key: "$request_real_ip" // same key as above, but tracking a different limiter's counter
     }}
   ],
-  then: "#reject"
+  "then": "#reject"
 }
 ```
  
@@ -303,25 +301,25 @@ Each limiter has a limit and a *counter* which is stored for that limit at a spe
  
 ```js
 { //limit
-  name: "request-rate",
-  interval: 60, //seconds
-  limit: 100
+  "name": "request-rate",
+  "interval": 60, //seconds
+  "limit": 100
 }
 
 { //another limit
-  name: "weekly-allowance",
-  interval: '7d', //7 days
-  limit: 1000000 // a million requests a week
+  "name": "weekly-allowance",
+  "interval": '7d', //7 days
+  "limit": 1000000 // a million requests a week
 }
 
 { //rule
-  key: "$request_real_ip", //default key for limiter counters
+  "key": "$request_real_ip", //default key for limiter counters
 
-  if-any: [
+  "if-any": [
     {"#limit-break": "request-rate"}, //uses default rule-level key
     {"#limit-break": "weekly-allowance"} //same as above
   ],
-  then: "#reject"
+  "then": "#reject"
 }
 ```
  
@@ -331,17 +329,17 @@ By default, the [`#limit-break`](#limit-break) [condition](#condition) auto-incr
 Two limiters can be combined to create a *limiter with a burst rate*:
 ```js 
 { //limit
-  name: "burstable-rate-limit",
-  interval: 60, //seconds
-  limit: 100,
-  burst: "burst-rate"
-  'burst-expire': '1h'
+  "name": "burstable-rate-limit",
+  "interval": 60, //seconds
+  "limit": 100,
+  "burst": "burst-rate"
+  "burst-expire": "1h"
 }
 
 { //burst rate
-  name: "burst-limit",
-  interval: '1h',
-  limit: 100000 // burst at 100K/hour
+  "name": "burst-limit",
+  "interval": "1h",
+  "limit": 100000 // burst at 100K/hour
 }
 
 { // rule using the bursty limit
@@ -372,20 +370,20 @@ Limiters with a `limit` of 1 can behave like shared boolean flags with an expira
 
 ```js
 {//limit
-  name: 'ip-ban',
-  limit: 1,
-  interval: '1d'
+  "name": "ip-ban",
+  "limit": 1,
+  "interval": "1d"
   //ban flag that stays active for 1 day
 }
 
 { //ban the ip when the request has a Ban-Me: 1 header
-  if: {"#match": ["$http_ban_me", "1"]},
-  then: {"#flag": {name: "ip-ban", key: "$request_real_ip"}} //flag this guy as banned
+  "if": {"#match": ["$http_ban_me", "1"]},
+  "then": {"#flag": {"name": "ip-ban", "key": "$request_real_ip"}} //flag this guy as banned
 }
 
 { //check if banned
-  if: {"#flag-check": {name: "ip-ban", key: "$request_real_ip"}},
-  then: "#reject" // you're banned, dude. go home.
+  "if": {"#flag-check": {name: "ip-ban", key: "$request_real_ip"}},
+  "then": "#reject" // you're banned, dude. go home.
 }
 ```
 
@@ -407,13 +405,13 @@ Limiters with a `limit` of 1 can behave like shared boolean flags with an expira
 #### `#match`
 match strings for equality
 ```js
-{'#match': [ string1, string2, /*...*/ ]} //must all be the same to be true
+{"#match": [ "string1", "string2", /*...*/ ]} //must all be the same to be true
 ```
    
 #### `#match-regex`
 match a string by regular expression
 ```js
-{'#match-regex': [ string, "/regular_expression.*/"]}
+{"#match-regex": [ "string", "/regular_expression.*/"]}
 ```
 Note that if the regular expression has any [interpolation](#string-interpolation) variables in it, it cannot be optimized and will need to be recompiled on every request.
 
@@ -422,10 +420,10 @@ Note that if the regular expression has any [interpolation](#string-interpolatio
 #### `#limit-break`
 Increment limiter counter, and check if a limit has been broken (exceeded)
 ```js
-{'#limit-break': {
-  name: 'limit-name',
-  key: "limiter-counter-key",
-  increment: 1 //default value
+{"#limit-break": {
+  "name": 'limit-name',
+  "key": "limiter-counter-key",
+  "increment": 1 //default value
 }}
 ```
 If `key` is absent, the [rule](#rule)'s default `key` is used.
@@ -439,7 +437,7 @@ Same as [`#limit-break`](#limit-break). Useful for Limiters with `limit: 1` that
 #### `#tag-check`
 Checks if a tag has been set for the request by the [`#tag`](#tag) command.
 ```js
-{'#tag-check': 'tag-name'}
+{"#tag-check": "tag-name"}
 ```
 
 
@@ -447,27 +445,27 @@ Checks if a tag has been set for the request by the [`#tag`](#tag) command.
 Perform a non-blocking subrequest to an Nginx location, and compare the response to a set of matching conditions.  
 *(NOT included for MVP)*
 ```js
-{'#match-subrequest': [/*subrequest*/, /*match_conditions*/]}
+{"#match-subrequest": [/*subrequest*/, /*match_conditions*/]}
 
 /*subrequest*/
 "/subrequest_path" //HTTP GET subrequest to this path
 
 { 
-  'path': '/subrequest_path',
-  'method': 'GET' // default
-  'forward-headers': true //default. use headers from incoming request,
-  'set-headers': {"Header-Name": "$http_header_name", "Other-Header-Name": "foobar"}
+  "path": "/subrequest_path",
+  "method": "GET" // default
+  "forward-headers": true //default. use headers from incoming request,
+  "set-headers": {"Header-Name": "$http_header_name", "Other-Header-Name": "foobar"}
 }
 
 /*match_conditions*/
 "ok" // response code 200-299
 number // match response code number
 {
-  code: number || [ code1, code2, code3 ],
-  headers: {
+  "code": number || [ code1, code2, code3 ],
+  "headers": {
     "Header-Name": "match-Header-Value"
   },
-  body: "match-body-value"
+  "body": "match-body-value"
 }
 ```
 
@@ -487,8 +485,8 @@ Reject a request. This is a [**final action**](#actions), after which no more [*
 
 //long-form
 {"#reject": {
-  status: number //HTTP response status code, default 403
-  body: response_body //HTTP response body, optinal
+  "status": number, //HTTP response status code, default 403
+  "body": "response_body" //HTTP response body, optinal
 }}
 ```
 
@@ -523,10 +521,10 @@ Increment limit counter
 {"#limit-increment": "limiter-name"}
 
 //long-form
-{'#limit-increment': {
-  name: 'limiter-name',
-  key: "limit-counter-key", //can be omitted if rule-level key given
-  increment: 1 //default
+{"#limit-increment": {
+  "name": "limiter-name",
+  "key": "limit-counter-key", //can be omitted if rule-level key given
+  "increment": 1 //default
 }}
 ```
   
@@ -537,10 +535,10 @@ Increment flag (limiter with `limit:1`) by 1. Same as `#limit-increment`
 {"#flag": "flag-name"}
 
 //long-form
-{'#flag': {
-  name: 'flag-name',
-  key: "flag-key", //can be omitted if rule-level key given
-  increment: 1 //default
+{"#flag": {
+  "name": "flag-name",
+  "key": "flag-key", //can be omitted if rule-level key given
+  "increment": 1 //default
 }}
 ```
     
@@ -548,12 +546,12 @@ Increment flag (limiter with `limit:1`) by 1. Same as `#limit-increment`
 Set limit counter back to 0.
 ```js
 //short form (if rule-wide default key is provided)
-{'#limit-reset': "limit-name"}
+{"#limit-reset": "limit-name"}
 
 //long-form
-{'#limit-reset': {
-  name: 'limit-name',
-  key: "limit-counter-key" //can be omitted if rule-level key given
+{"#limit-reset": {
+  "name": 'limit-name',
+  "key": "limit-counter-key" //can be omitted if rule-level key given
 }}
 ```
    
@@ -563,25 +561,25 @@ Set flag back to 0. Same as [`#limit-reset`](#limit-reset)
 #### `#tag`
 Set a string tag for the request. which adds a `RoF-Tag-<tagname>: 1` header to the request.
 ```js
-{'#tag': 'tag-name'}
+{"#tag": "tag-name"}
 ```
 
 #### `#tag-reset`
 Deletes the given string tag for the request. which also removes the `RoF-Tag-<tagname>: 1` header from the request. If tag is already absent, does nothing.
 ```js
-{'#tag-reset': 'tag-name'}
+{"#tag-reset": "tag-name"}
 ```
 
 #### `#subrequest`
 Perform a non-blocking subrequest to an Nginx location.  
 *(NOT included for MVP)*
 ```js
-{'#subrequest': '/subrequest_path'}
+{"#subrequest": "/subrequest_path"}
 
-{'#subrequest': {
-    path: '/subrequest_path',
-    'forward-headers': true //default. use headers from incoming request,
-    'set-headers': {"Header-Name": "$http_header_name", "Other-Header-Name": "foobar"}
+{"#subrequest": {
+    "path": "/subrequest_path",
+    "forward-headers": true //default. use headers from incoming request,
+    "set-headers": {"Header-Name": "$http_header_name", "Other-Header-Name": "foobar"}
   }
 }
 ```
@@ -599,14 +597,14 @@ Aggregate rule execution information will be available for logging through varia
 - `$rof_request_rules_percent` : percent of rules processed
 - `$rof_request_final_rule` : name/id of rule that either accepted or rejected the request (empty if neither)
 - `$rof_request_final_list` : name/id of list that contained the final rule (empty if none)
-- `$rof_request_final_phase` : name of phase in the [rule table](#rule-table)
+- `$rof_request_final_phase` : name of phase in the [phase table](#phase-table)
 
 Individual rule statistics are _not_ collected by default, but can be enabled on specific rules with the `track-stats` property:
 ```js
 {
-  if: /*condition*/,
-  then: /*action*/
-  track-stats: true
+  "if": /*condition*/,
+  "then": /*action*/
+  "track-stats": true
 }
 ```
 
@@ -617,9 +615,9 @@ With `track-stats` enabled, runtime statistics for the rule will be collected, i
 Specific rules' processing sequence can be enabled with the `log` property:
 ```js
 {
-  if: /*condition*/,
-  then: /*action*/
-  log: true
+  "if": /*condition*/,
+  "then": /*action*/
+  "log": true
 }
 ```
 

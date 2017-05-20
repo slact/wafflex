@@ -1,8 +1,8 @@
 {
   //is this allowed?
   "name": "ruleset1",
-  "table": {
-    "request": [ "list1" ]
+  "phases": {
+    "request": [ "list1", [], []]
   },
   "lists": {
     "list1": [
