@@ -17,7 +17,7 @@
 #define wfx_lua_module_loadscript(lua_state, name)   \
   __wfx_lua_loadscript(lua_state, name, wfx_module_lua_scripts)
 
-static ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
+ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
   size_t         data_sz;
   const char    *data = luaL_checklstring(L, n, &data_sz);
   

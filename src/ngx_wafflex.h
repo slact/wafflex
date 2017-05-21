@@ -27,5 +27,6 @@ extern ngx_module_t ngx_wafflex_module;
 void lua_ngxcall(lua_State *L, int nargs, int nresults);
 //debug stuff
 void lua_printstack(lua_State *L);
+ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str);
 
 #endif //NGX_WAFFLEX_H
