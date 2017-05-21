@@ -402,8 +402,9 @@ function class:parseLimiter(data, name)
   if data.burst then 
     self:assert_type(data.burst, "string", "invalid \"burst\" value type")
   end
-  if data.burst_expire then
-    data.burst_expire = self:parseTimeInterval(data.interval, "burst_expire value")
+  if data["burst-expire"] then
+    data.burst_expire = self:parseTimeInterval(data["burst-expire"], "burst_expire value")
+    data["burst-expire"] = nil
   end
   
   self:assert_type(data.name, "string", "invalid limiter name")
