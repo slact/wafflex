@@ -1,31 +1,10 @@
 #include <ngx_wafflex.h>
 #include <ipc.h>
-
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include <ruleset/ruleset.h>
 
 #include "ngx_wafflex_nginx_lua_scripts.h"
 
 #include <assert.h>
-
-//#define DEBUG_ON
-
-#define LOAD_SCRIPTS_AS_NAMED_CHUNKS
-
-#ifdef DEBUG_ON
-#define DBG(fmt, args...) ngx_log_error(NGX_LOG_WARN, ngx_cycle->log, 0, "wafflex:" fmt, ##args)
-#else
-#define DBG(fmt, args...) 
-#endif
-#define ERR(fmt, args...) ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "wafflex:" fmt, ##args)
-
-#ifndef container_of
-#define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
-#endif
-
 
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
   luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name); \
@@ -37,7 +16,7 @@
 #define wfx_lua_module_loadscript(lua_state, name)   \
   __wfx_lua_loadscript(lua_state, name, wfx_module_lua_scripts)
 
-ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
+static ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
   size_t         data_sz;
   const char    *data = luaL_checklstring(L, n, &data_sz);
   
@@ -48,8 +27,6 @@ ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
 
 static ipc_t        *ipc = NULL;
 static lua_State    *Lua = NULL;
-
-static int           lua_error_handler_position;
 
 static char *lua_dbgval(lua_State *L, int n) {
   static char buf[255];
@@ -77,7 +54,7 @@ static char *lua_dbgval(lua_State *L, int n) {
   return buf;
 }
 
-static void lua_printstack(lua_State *L) {
+void lua_printstack(lua_State *L) {
   int n, top = lua_gettop(L);
   ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "lua stack:");
   for(n=top; n>0; n--) {
@@ -140,6 +117,15 @@ static int wfx_require_module(lua_State *L) {
   return 1;
 }
 
+static int wfx_init_bind_lua(lua_State *L) {
+  //ruleset bindings
+  lua_pushcfunction(L, wfx_ruleset_bind_lua);
+  lua_pushvalue(L, 1);
+  lua_ngxcall(L, 1, 0);
+  
+  return 0;
+}
+
 static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
   
   Lua = luaL_newstate();
@@ -147,7 +133,9 @@ static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {
   
   wfx_lua_loadscript(Lua, init);  
   lua_pushcfunction(Lua, wfx_require_module);
-  lua_ngxcall(Lua, 1, 0);
+  lua_pushcfunction(Lua, wfx_init_bind_lua);
+  
+  lua_ngxcall(Lua, 2, 0);
   
   return NGX_OK;
 }

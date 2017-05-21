@@ -1,5 +1,5 @@
 --lua environs initializer
-return function(package_loader, initializers)
+return function(package_loader, init_bind_cfunc)
   package.path = ""
   package.cpath= ""
   setmetatable(package.preload, {__index = function(self, name)
@@ -19,22 +19,17 @@ return function(package_loader, initializers)
   local Ruleset = require "ruleset"
   local Binding = require "binding"
 
-  --import c bindings
-  if initializers then
-    for k,v in pairs(initializers) do
-      assert(type(v) == "table")
-      mm(v)
-      Binding.set(k, v)
-    end
+  if init_bind_cfunc then
+    init_bind_cfunc(Binding.set)
   end
   
   local p = Parser.new()
   
   local parsed = p:parseFile("/home/leop/sandbox/wafflex/src/lua/nginx/ruleset1.json")
 
-  mm(parsed)
+  --mm(parsed)
 
   local rs = Ruleset.new(parsed)
 
-  mm(rs)
+  --mm(rs)
 end

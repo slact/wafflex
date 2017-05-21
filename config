@@ -1,5 +1,16 @@
 ngx_addon_name=ngx_wafflex_module
 
+_NGX_WAFFLEX_SRCS="\
+  ${ngx_addon_dir}/src/ipc.c \
+  ${ngx_addon_dir}/src/ngx_wafflex.c \
+  ${ngx_addon_dir}/src/ruleset/rule.c \
+  ${ngx_addon_dir}/src/ruleset/condition.c \
+  ${ngx_addon_dir}/src/ruleset/action.c \
+  ${ngx_addon_dir}/src/ruleset/limiter.c \
+  ${ngx_addon_dir}/src/ruleset/list.c \
+  ${ngx_addon_dir}/src/ruleset/ruleset.c \
+"
+
 #taken from agentzh's lua-nginx-module
 ngx_feature="Lua library"
 ngx_feature_libs="-llua -lm"
@@ -307,11 +318,6 @@ fi
 
 
 #  ngx_feature_libs=""
-
-_NGX_WAFFLEX_SRCS="\
-  ${ngx_addon_dir}/src/ipc.c \
-  ${ngx_addon_dir}/src/ngx_wafflex.c \
-"
 
 ngx_module_incs=$ngx_addon_dir/src
 
