@@ -43,4 +43,4 @@ local parsed = p:parseFile("./ruleset1.json")
 
 local rs = Ruleset.new(parsed)
 
---mm(rs)
+mm(rs)

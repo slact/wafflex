@@ -17,26 +17,18 @@ return function(package_loader, initializers)
   local mm = require "mm"
   local Parser = require "parser"
   local Ruleset = require "ruleset"
-  local p = Parser.new()
+  local Binding = require "binding"
 
-  --[[
-  for k,v in pairs(initializers) do
-    if k == "conditions" then
-      for kk, vv in pairs(v) do
-        
-      end
-    elseif k=="actions" then
-      for kk, vv in pairs(v) do
-        
-      end
-    else
-      
+  --import c bindings
+  if initializers then
+    for k,v in pairs(initializers) do
+      assert(type(v) == "table")
+      mm(v)
+      Binding.set(k, v)
     end
-    
   end
-  ]]
   
-  
+  local p = Parser.new()
   
   local parsed = p:parseFile("/home/leop/sandbox/wafflex/src/lua/nginx/ruleset1.json")
 
