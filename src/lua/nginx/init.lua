@@ -31,5 +31,5 @@ return function(package_loader, init_bind_cfunc)
 
   local rs = Ruleset.new(parsed)
 
-  --mm(rs)
+  mm(rs)
 end

@@ -9,8 +9,15 @@
 
 
 static int ruleset_create(lua_State *L) {
-  ERR("ruleset create");
-  return 0;
+  ngx_str_t         *name;
+  wfx_ruleset_t     *ruleset;
+  
+  lua_pushvalue(L, 1); //lua-self
+  lua_getfield(L, -1, "name");
+  luaL_checklstring_as_ngx_str(L, -1, name);
+  
+  lua_pushlightuserdata (L, ruleset);
+  return 1;
 }
 static int ruleset_replace(lua_State *L) {
   ERR("ruleset replace");

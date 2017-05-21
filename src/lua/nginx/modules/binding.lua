@@ -7,12 +7,11 @@ local calls = {
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
     end
     local ref = callback(self, ...)
-    --[[
-    if type(ref) ~= "userdata" then
+    if ref and type(ref) ~= "userdata" then
       return nil, ("expected userdata, got %s"):format(type(ref))
+    elseif type(ref) == "userdata" then
+      self.__binding = ref
     end
-    self.__binding = ref
-    ]]
     return true
   end,
   update = function(callback, self, update_name, update_data)
@@ -53,9 +52,10 @@ local calls = {
   end
 }
 
-return {
+local Binding = {
   bindings = binds,
   set = function(name, create, replace, update, delete)
+    assert(type(name)=="string", "binding name must be a string, got " .. type(name))
     if type(create) == "table" and replace == nil and update == nil and delete == nil then
       local tbl = create
       create = tbl.create
@@ -91,3 +91,5 @@ return {
     return ok
   end
 }
+
+return Binding
