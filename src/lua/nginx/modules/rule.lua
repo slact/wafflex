@@ -27,6 +27,12 @@ local function create_thing_storage(thing_name)
   end
   
   function self.add(name, funcs, metaindex)
+    if type(name) == "table" then
+      for _,v in pairs(name) do
+        self.add(v, funcs, metaindex)
+      end
+      return true
+    end
     assert(funcs.parse, ("%s missing parse callback"):format(thing_name))
     assert(self.table[name] == nil, ("%s %s already exists"):format(thing_name, name))
     local added = {
@@ -94,12 +100,8 @@ Rule.condition.add("all", {
   end
 })
 
-Rule.condition.add("true", {parse = function(data, parser)
+Rule.condition.add({"true", "false"}, {parse = function(data, parser)
   --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
-end})
-
-Rule.condition.add("false", {parse = function(data, parser)
-  --parser:assert(next(data) == nil, "\"false\" condition must have empty parameters")
 end})
 
 Rule.condition.add("tag-check", {parse = function(data, parser)
@@ -111,6 +113,38 @@ Rule.condition.add("match", {parse = function(data, parser)
   for _, v in ipairs(data) do
     parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
   end
+end})
+
+--limiter conditions
+Rule.condition.add({"limit-break", "limit-check"}, {parse = function(data, parser)
+  if type(data) == "string" then
+    data = {name=data}
+  elseif type(data) == "table" then
+    
+  else
+    parser:error("invalid value type " .. type(data))
+  end
+  local condition_name = next(parser:getContext())
+  local rule = parser:getContext("rule")
+  
+  if not data.key then
+    data.key = rule.key
+  end
+  parser:assert(data.key, "limiter \"key\" missing, and no default \"key\" in rule")
+  parser:assert_type(data.key, "string", "invalid limiter \"key\" type")
+  
+  if not data.increment then
+    if condition_name == "limit-break" then
+      data.increment = 1
+    elseif condition_name == "limit-check" then
+      data.increment = 0
+    end
+  end
+  data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
+  
+  parser:assert(data.name, "name missing")
+  parser:assert_type(data.name, "string", "invalid \"name\" type")
+  return data
 end})
 
 --some actions, too
@@ -126,6 +160,5 @@ Rule.action.add("reject", {parse = function(data, parser)
   parser:assert_type(data, "table", "\"reject\" value must be an object")
   --parser:assert_table_size(data, 0, "\"reject\" value must be empty")
 end})
-
 
 return Rule

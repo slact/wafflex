@@ -115,6 +115,16 @@ function class:popContext()
   table.remove(self.ctx_stack, #self.ctx_stack)
   self.context = self.ctx_stack[#self.ctx_stack]
 end
+function class:getContext(name)
+  if not name then return self.context and self.context.ctx end
+  for i=#self.ctx_stack, 1, -1 do
+    local cur = self.ctx_stack[i]
+    if cur.name==name then
+      return cur.ctx
+    end
+  end
+  return nil
+end
 
 function class:parseFile(path)
   local file = assert(io.open(path, "rb")) -- r read mode and b binary mode
@@ -150,6 +160,7 @@ function class:parseRuleSet(data, name)
     thing="limiter", key="limiters", type="table",
     parser_method= self.parseLimiter
   })
+  self:checkLimiters(data.limiters)
   
   parseRulesetThing(self, data, {
     thing="rule", key="rules",  type="table",
@@ -301,6 +312,9 @@ function class:parseCondition(data)
   else
     self:error(("wrong type (%s) for condition"):format(type(data)))
   end
+  self:popContext()
+  -- be more specific with condition name
+  self:pushContext(data, "condition " .. (next(condition)))
   condition = Rule.condition.parse(condition, self)
   self:popContext()
   return condition
@@ -317,6 +331,9 @@ function class:parseAction(data)
   else
     self:error(("action must be string on 1-attribute object, but instead was a %s"):format(self:jsontype(data)))
   end
+  self:popContext()
+  --we can be more specific about the action name now
+  self:pushContext(data, "action " .. (next(action)))
   action = Rule.action.parse(action, self)
   self:popContext()
   return action
@@ -339,9 +356,70 @@ function class:parseActions(data)
   return actions
 end
 
+function class:parseTimeInterval(data, err)
+  if err then err = " for " .. err end
+  local typ = self:jsontype(data)
+  if typ == "number" then
+    return data
+  elseif typ == "string" then
+    local num, unit = data:match("^([%d.]+)(%w*)")
+    local scale
+    num = tonumber(num)
+    self:assert(num and unit, ("invalid time string \"%s\"%s"):format(data, err))
+    if unit == "ms" or unit:match("^millisec(ond(s?))?") then
+      scale = .01
+    elseif unit == "" or unit == "s" or unit:match("^sec(ond(s?))?") then
+      scale = 1
+    elseif unit == "m" or unit:match("^min(ute(s)?)?") then
+      scale = 60
+    elseif unit == "h" or unit:match("^hour(s?)") then
+      scale = 3600
+    elseif unit == "d" or unit:match("^day(s)?") then
+      scale = 86400
+    elseif unit == "w" or unit == "wk" or unit:match("^week(s)?") then
+      scale = 604800
+    elseif unit == "M" or unit:match("^month(s)?") then
+      scale = 2628001
+    else
+      self:error(("unknown time unit \"%s\"%s"):format(unit, err))
+    end
+    return num * scale
+  else
+    self:error(("invalid time inteval type \"%s\"%s"):format(self:jsontype(data), err))
+  end
+end
+
 function class:parseLimiter(data, name)
-  self:pushContext(data)
-  self:assert("limiters not yet implemented")
+  self:pushContext(data, "limiter")
+  
+  if not data.name then data.name = name end
+  data.interval = self:parseTimeInterval(data.interval, "interval value")
+  self:assert(data.limit, "missing \"limit\" value")
+  data.limit = self:assert(tonumber(data.limit), "invalid \"limit\" value, must be a number")
+  if data.sync_steps then
+    data.sync_steps = self:assert(tonumber(data.sync_steps), "invalid \"sync-steps\" value")
+  end
+  if data.burst then 
+    self:assert_type(data.burst, "string", "invalid \"burst\" value type")
+  end
+  if data.burst_expire then
+    data.burst_expire = self:parseTimeInterval(data.interval, "burst_expire value")
+  end
+  
+  self:assert_type(data.name, "string", "invalid limiter name")
+  self:popContext()
+  return data
+end
+function class:checkLimiters(data)
+  self:pushContext(data, "limiters")
+  for k, v in pairs(data) do
+    self:pushContext(v, ("limiter \"%s\""):format(v.name))
+    if v.burst then
+      --make sure the burst value refers to a known limiter
+      self:assert(data[v.burst], ("limiter references unknown burst limiter \"%s\""):format(v.burst))
+    end
+    self:popContext()
+  end
   self:popContext()
 end
 
