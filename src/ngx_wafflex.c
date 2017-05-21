@@ -1,5 +1,6 @@
 #include <ngx_wafflex.h>
-#include <ipc.h>
+#include <util/ipc.h>
+#include <util/shmem.h>
 #include <ruleset/ruleset.h>
 
 #include "ngx_wafflex_nginx_lua_scripts.h"

@@ -1,7 +1,13 @@
 ngx_addon_name=ngx_wafflex_module
 
+_NGX_WAFFLEX_UTIL_SRCS="\
+  ${ngx_addon_dir}/src/util/ipc.c \
+  ${ngx_addon_dir}/src/util/shmem.c \
+  ${ngx_addon_dir}/src/util/ngx_shmem_hacked_slab.c \
+"
+
 _NGX_WAFFLEX_SRCS="\
-  ${ngx_addon_dir}/src/ipc.c \
+  ${_NGX_WAFFLEX_UTIL_SRCS} \
   ${ngx_addon_dir}/src/ngx_wafflex.c \
   ${ngx_addon_dir}/src/ruleset/rule.c \
   ${ngx_addon_dir}/src/ruleset/condition.c \
