@@ -80,13 +80,15 @@ local ruleset_meta = { __index = {
     return list
   end,
   
-  setTable = function(self, data)
+  setPhaseTable = function(self, data)
     self.phases = {}
     for k,v in pairs(data) do
+      local phase = {name=k, lists={}}
       for i, list in pairs(v) do
-        v[i]=self:findList(list) or self:addList(list)
+        phase.lists[i]=self:findList(list) or self:addList(list)
       end
-      self.phases[k]=v
+      self.phases[k]=phase
+      Binding.call("phase", "create", phase)
     end
     return self.phases
   end,
@@ -119,17 +121,17 @@ local function newRuleset(data)
   ruleset.__submeta = {
     rule = {__index = {
       type="rule",
-      ruleset = ruleset,
-      in_lists = {},
+      --ruleset = ruleset,
+      --in_lists = {},
     }},
     list = {__index = {
       type="list",
-      ruleset = ruleset,
-      in_tables = {}
+      --ruleset = ruleset,
+      --in_tables = {}
     }},
     limiter = {__index = {
       type="limiter",
-      ruleset = ruleset
+      --ruleset = ruleset
     }}
   }
 
@@ -149,7 +151,7 @@ local function newRuleset(data)
       ruleset:addList(v)
     end
     
-    ruleset:setTable(data.phases)
+    ruleset:setPhaseTable(data.phases)
   end
   Binding.call("ruleset", "create", ruleset)
   return ruleset

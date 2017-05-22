@@ -4,7 +4,13 @@
 
 static int action_create(lua_State *L) {
   ERR("action create");
-  return 0;
+  wfx_action_t     *action;
+  action = ruleset_common_shm_alloc_init_item(wfx_action_t, 0, L, action);
+  
+  //TODO
+  
+  lua_pushlightuserdata (L, action);
+  return 1;
 }
 static int action_replace(lua_State *L) {
   ERR("action replace");
@@ -21,10 +27,10 @@ static int action_delete(lua_State *L) {
 
 int wfx_action_bind_lua(lua_State *L) {;
   lua_pushstring(L, "action");
-  lua_pushcfunction(L, action_create);
-  lua_pushcfunction(L, action_replace);
-  lua_pushcfunction(L, action_update);
-  lua_pushcfunction(L, action_delete);
+  wfx_lua_register(L, action_create);
+  wfx_lua_register(L, action_replace);
+  wfx_lua_register(L, action_update);
+  wfx_lua_register(L, action_delete);
   lua_ngxcall(L,5,0);
   return 0;
 }

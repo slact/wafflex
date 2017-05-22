@@ -8,15 +8,19 @@
 #include <assert.h>
 
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
-  luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name); \
+  wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \
   lua_ngxcall(lua_state, 0, LUA_MULTRET)
 
 #define wfx_lua_loadscript(lua_state, name)   \
   __wfx_lua_loadscript(lua_state, name, wfx_lua_scripts)
-  
-#define wfx_lua_module_loadscript(lua_state, name)   \
-  __wfx_lua_loadscript(lua_state, name, wfx_module_lua_scripts)
 
+static int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *name, const char *fmt) {
+  char     scriptname[512];
+  snprintf(scriptname, 512, "=%s.lua", name);
+  
+  return luaL_loadbuffer(L, buff, sz, scriptname);
+}
+  
 ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
   size_t         data_sz;
   const char    *data = luaL_checklstring(L, n, &data_sz);
@@ -26,8 +30,26 @@ ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
   return NGX_OK;
 }
 
+void lua_mm(lua_State *L, int index) {
+  index = lua_absindex(L, index);
+  lua_getfield(L, LUA_REGISTRYINDEX, "mm");
+  lua_pushvalue(L, index);
+  lua_call(L, 1, 0);
+}
+
 static ipc_t        *ipc = NULL;
 static lua_State    *Lua = NULL;
+shmem_t             *shm = NULL;
+
+void *wfx_shm_alloc(size_t sz) {
+  return ngx_alloc(sz, ngx_cycle->log);
+}
+void *wfx_shm_calloc(size_t sz) {
+  return ngx_calloc(sz, ngx_cycle->log);
+}
+void wfx_shm_free(void *ptr) {
+  ngx_free(ptr);
+}
 
 static char *lua_dbgval(lua_State *L, int n) {
   static char buf[255];
@@ -50,7 +72,12 @@ static char *lua_dbgval(lua_State *L, int n) {
       sprintf(buf, "%s: %.50s%s", typename, str, strlen(str) > 50 ? "..." : "");
       break;
     default:
-      sprintf(buf, "%s", typename);
+      lua_getglobal(L, "tostring");
+      lua_pushvalue(L, n);
+      lua_call(L, 1, 1);
+      str = lua_tostring(L, -1);
+      sprintf(buf, "%s", str);
+      lua_pop(L, 1);
   }
   return buf;
 }
@@ -86,7 +113,6 @@ static int wfx_lua_traceback(lua_State *L) {
   return 1;
 }
 
-
 void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   int rc;
   lua_pushcfunction(L, wfx_lua_traceback);
@@ -101,14 +127,15 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   lua_remove(L, 1);
 }
 
-
 static int wfx_require_module(lua_State *L) {
   wfx_module_lua_script_t *script;
+  char                     scriptname[255];
   ngx_str_t                name;
   luaL_checklstring_as_ngx_str(L, 1, &name);
   WFX_MODULE_LUA_SCRIPTS_EACH(script) {
     if(strcmp(script->name, (char *)name.data) == 0) {
-      luaL_loadbuffer(L, script->script, strlen(script->script), script->name);
+      snprintf(scriptname, 255, "=module %s.lua", script->name);
+      luaL_loadbuffer(L, script->script, strlen(script->script), scriptname);
       lua_ngxcall(L, 0, 1);
       return 1;
     }
@@ -120,7 +147,7 @@ static int wfx_require_module(lua_State *L) {
 
 static int wfx_init_bind_lua(lua_State *L) {
   //ruleset bindings
-  lua_pushcfunction(L, wfx_ruleset_bind_lua);
+  wfx_lua_register(L, wfx_ruleset_bind_lua);
   lua_pushvalue(L, 1);
   lua_ngxcall(L, 1, 0);
   
@@ -132,9 +159,10 @@ static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {
   Lua = luaL_newstate();
   luaL_openlibs(Lua);
   
-  wfx_lua_loadscript(Lua, init);  
-  lua_pushcfunction(Lua, wfx_require_module);
-  lua_pushcfunction(Lua, wfx_init_bind_lua);
+  wfx_lua_loadscript(Lua, init);
+  wfx_lua_register(Lua, wfx_require_module);
+  wfx_lua_register(Lua, wfx_init_bind_lua);
+  lua_printstack(Lua);
   
   lua_ngxcall(Lua, 2, 0);
   
@@ -163,11 +191,39 @@ static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
 }
 
 static void ngx_wafflex_exit_worker(ngx_cycle_t *cycle) {
+  lua_close(Lua);
   ipc_destroy(ipc);
 }
 
 static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
+  lua_close(Lua);
   ipc_destroy(ipc);
+}
+
+#if LUA_VERSION_NUM <= 501
+lua_Integer luaL_len (lua_State *L, int i);
+  lua_Integer res = 0;
+  int isnum = 0;
+  luaL_checkstack(L, 1, "not enough stack slots");
+  lua_len(L, i);
+  res = lua_tointegerx(L, -1, &isnum);
+  lua_pop(L, 1);
+  if (!isnum)
+    luaL_error(L, "object length is not an integer");
+  return res;
+}
+#endif
+
+size_t wfx_lua_tablesize(lua_State *L, int index) {
+  int n = 0;
+  index = lua_absindex(L, index);
+  lua_pushnil(L);  // first key 
+  while (lua_next(L, index) != 0) {
+    n++;
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  return n;
 }
 
 static ngx_command_t  ngx_wafflex_commands[] = {

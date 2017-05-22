@@ -18,7 +18,10 @@ return function(package_loader, init_bind_cfunc)
   local Parser = require "parser"
   local Ruleset = require "ruleset"
   local Binding = require "binding"
-
+  local registry = debug.getregistry()
+  registry["mm"] = mm
+  Binding.require_create_userdata = true
+  
   if init_bind_cfunc then
     init_bind_cfunc(Binding.set)
   end
