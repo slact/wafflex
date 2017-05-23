@@ -2,8 +2,14 @@ local mm = require "mm"
 local binds = {}
 local Binding = {
   bindings = binds,
-  require_create_userdata = false
+  require_create_userdata = false,
+  require_binding = false
 }
+setmetatable(binds, {__index = function(t,k)
+  if Binding.require_binding then
+    error("missing binding for " .. tostring(k))
+  end
+end})
 
 local calls = {
   create = function(create_callback, self, ...)
@@ -57,6 +63,7 @@ local calls = {
 }
 
 function Binding.set(name, create, replace, update, delete)
+  assert(not rawget(binds, name), ("binding %s already set"):format(name))
   assert(type(name)=="string", "binding name must be a string, got " .. type(name))
   if type(create) == "table" and replace == nil and update == nil and delete == nil then
     local tbl = create

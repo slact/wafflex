@@ -14,25 +14,15 @@ static int list_create(lua_State *L) {
   lua_pushlightuserdata (L, list);
   return 1;
 }
-static int list_replace(lua_State *L) {
-  ERR("list replace");
-  return 0;
-}
-static int list_update(lua_State *L) {
-  ERR("list update");
-  return 0;
-}
-static int list_delete(lua_State *L) {
-  ERR("list delete");
-  return 0;
-}
 
-int wfx_list_bind_lua(lua_State *L) {;
-  lua_pushstring(L, "list");
-  wfx_lua_register(L, list_create);
-  wfx_lua_register(L, list_replace);
-  wfx_lua_register(L, list_update);
-  wfx_lua_register(L, list_delete);
-  lua_ngxcall(L,5,0);
-  return 0;
+static wfx_binding_t wfx_list_binding = {
+  "list",
+  list_create,
+  NULL,
+  NULL,
+  NULL
+};
+
+void wfx_list_bindings_set(lua_State *L) {
+  wfx_lua_binding_set(L, &wfx_list_binding);
 }

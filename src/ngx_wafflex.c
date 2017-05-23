@@ -32,7 +32,7 @@ ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str) {
 
 void lua_mm(lua_State *L, int index) {
   index = lua_absindex(L, index);
-  lua_getfield(L, LUA_REGISTRYINDEX, "mm");
+  lua_getglobal (L, "mm");
   lua_pushvalue(L, index);
   lua_call(L, 1, 0);
 }
@@ -147,11 +147,49 @@ static int wfx_require_module(lua_State *L) {
 
 static int wfx_init_bind_lua(lua_State *L) {
   //ruleset bindings
-  wfx_lua_register(L, wfx_ruleset_bind_lua);
-  lua_pushvalue(L, 1);
-  lua_ngxcall(L, 1, 0);
-  
+  wfx_lua_register(L, wfx_ruleset_bindings_set);
+  lua_ngxcall(L, 0, 0);
   return 0;
+}
+
+void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding) {
+  char     buf[255];
+  
+  lua_getglobal(L, "Binding");
+  lua_getfield(L, -1, "set");
+  lua_remove(L, -2);
+  
+  lua_pushstring(L, binding->name);
+  if(binding->create) {
+    snprintf(buf, 255, "%s create", binding->name);
+    wfx_lua_register_named(L, binding->create, buf);
+  }
+  else {
+    lua_pushnil(L);
+  }
+  if(binding->replace) {
+    snprintf(buf, 255, "%s replace", binding->name);
+    wfx_lua_register_named(L, binding->replace, buf);
+  }
+  else {
+    lua_pushnil(L);
+  }
+  if(binding->update) {
+    snprintf(buf, 255, "%s update", binding->name);
+    wfx_lua_register_named(L, binding->update, buf);
+  }
+  else {
+    lua_pushnil(L);
+  }
+  if(binding->delete) {
+    snprintf(buf, 255, "%s delete", binding->name);
+    wfx_lua_register_named(L, binding->delete, buf);
+  }
+  else {
+    lua_pushnil(L);
+  }
+  
+  lua_ngxcall(L,5,0);
 }
 
 static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
@@ -162,8 +200,6 @@ static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {
   wfx_lua_loadscript(Lua, init);
   wfx_lua_register(Lua, wfx_require_module);
   wfx_lua_register(Lua, wfx_init_bind_lua);
-  lua_printstack(Lua);
-  
   lua_ngxcall(Lua, 2, 0);
   
   return NGX_OK;

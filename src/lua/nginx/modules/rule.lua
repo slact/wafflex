@@ -54,10 +54,11 @@ local function create_thing_storage(thing_name)
   
   function self.new(data, ruleset)
     local name, val = unpack_thing(data)
+    name = ignore_leading_hash(name)
     local thing_preset = self.table[name]
-    local thing = setmetatable({[thing_name]=ignore_leading_hash(name), ["data"]=val}, thing_preset.meta)
+    local thing = setmetatable({[thing_name]=name, ["data"]=val}, thing_preset.meta)
     thing_preset.init(val, thing, ruleset)
-    Binding.call(thing_name, "create", thing)
+    Binding.call(("%s:%s"):format(thing_name, name), "create", thing)
     return thing
   end
   

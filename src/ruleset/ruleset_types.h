@@ -98,6 +98,19 @@ typedef struct {
 } wfx_ruleset_t;
 
 
+/*
+typedef struct wfx_binding_chain_s wfx_binding_chain_t;
+struct wfx_binding_chain_s {
+  wfx_binding_t        binding;
+  wfx_binding_chain_t *next;
+}; //wfx_binding_chain_t
+
+void ruleset_subbinding_push(wfx_binding_chain_t **headptr, wfx_binding_t *binding);
+void ruleset_subbinding_bind(lua_State *L, const char *name, wfx_binding_chain_t **headptr);
+int ruleset_subbinding_call(lua_State *L,const char *binding_name, const char *subbinding_name, const char *call_name, void *ptr, int nargs);
+int ruleset_subbinding_getname_call(lua_State *L, const char *binding_name, const char *call_name, int nargs);
+*/
+
 #define ruleset_common_shm_alloc_init_item(type, extra_sz, L, name_key) \
   __ruleset_common_shm_alloc_init_item(L, sizeof(type) + extra_sz, #name_key, offsetof(type, name_key), offsetof(type, luaref))
   

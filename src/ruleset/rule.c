@@ -12,25 +12,15 @@ static int rule_create(lua_State *L) {
   lua_pushlightuserdata (L, rule);
   return 1;
 }
-static int rule_replace(lua_State *L) {
-  ERR("rule replace");
-  return 0;
-}
-static int rule_update(lua_State *L) {
-  ERR("rule update");
-  return 0;
-}
-static int rule_delete(lua_State *L) {
-  ERR("rule delete");
-  return 0;
-}
 
-int wfx_rule_bind_lua(lua_State *L) {;
-  lua_pushstring(L, "rule");
-  wfx_lua_register(L, rule_create);
-  wfx_lua_register(L, rule_replace);
-  wfx_lua_register(L, rule_update);
-  wfx_lua_register(L, rule_delete);
-  lua_ngxcall(L,5,0);
-  return 0;
+static wfx_binding_t wfx_rule_binding = {
+  "rule",
+  rule_create,
+  NULL,
+  NULL,
+  NULL
+};
+
+void wfx_rule_bindings_set(lua_State *L) {
+  wfx_lua_binding_set(L, &wfx_rule_binding);
 }

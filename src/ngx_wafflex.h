@@ -28,12 +28,21 @@ void  wfx_shm_free(void *ptr);
 
 extern ngx_module_t ngx_wafflex_module;
 
+typedef struct {
+  const char           *name;
+  lua_CFunction         create;
+  lua_CFunction         replace;
+  lua_CFunction         update;
+  lua_CFunction         delete;
+} wfx_binding_t;
+
 void lua_ngxcall(lua_State *L, int nargs, int nresults);
 //debug stuff
 void lua_printstack(lua_State *L);
 size_t wfx_lua_tablesize(lua_State *L, int index);
 ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str);
 void lua_mm(lua_State *L, int index);
+void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding);
 
 #define wfx_lua_register(L, func) \
   wfx_lua_register_named(L, func, #func)
