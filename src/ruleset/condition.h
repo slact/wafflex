@@ -2,7 +2,7 @@
 #define WFX_CONDITION_H
 
 void wfx_condition_bindings_set(lua_State *L);
-wfx_condition_t *condition_create(lua_State *L, size_t extra_sz, wfx_condition_eval_pt eval);
+wfx_condition_t *condition_create(lua_State *L, size_t data_sz, wfx_condition_eval_pt eval);
 
 typedef struct {
   const char    *name;

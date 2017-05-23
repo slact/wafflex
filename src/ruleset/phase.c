@@ -10,9 +10,9 @@ static int phase_create(lua_State *L) {
   wfx_phase_t     *phase;
   
   lua_getfield(L, 1, "lists");
-  len = luaL_len(L, -1); //number of rule lists for this phase
+  len = wfx_lua_len(L, -1); //number of rule lists for this phase
   lua_printstack(L);
-  phase = ruleset_common_shm_alloc_init_item(wfx_phase_t, sizeof(wfx_rule_list_t) * (len - 1), L, name);
+  phase = ruleset_common_shm_alloc_init_item(wfx_phase_t, sizeof(list) * (len - 1), L, name);
   lua_printstack(L);
   phase->len=len;
   for(i=0; i<len; i++) {

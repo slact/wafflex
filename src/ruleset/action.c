@@ -4,9 +4,10 @@
 
 static wfx_action_type_t action_types[];
 
-wfx_action_t *action_create(lua_State *L, size_t extra_sz) {
-  wfx_action_t *action = ruleset_common_shm_alloc_init_item(wfx_action_t, extra_sz, L, action);
-  
+wfx_action_t *action_create(lua_State *L, size_t data_sz, wfx_action_eval_pt eval) {
+  wfx_action_t *action = ruleset_common_shm_alloc_init_item(wfx_action_t, data_sz, L, action);
+  action->eval = eval;
+  action->data = data_sz == 0 ? NULL : &action[1];
   lua_pushlightuserdata(L, action);
   return action;
 }
@@ -39,11 +40,12 @@ void wfx_action_binding_add(lua_State *L, wfx_action_type_t *cond) {
 
 //accept
 static wfx_action_result_t action_accept_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  return WFX_ACTION_NEXT;
+  //TODO
+  return WFX_ACTION_FINISH;
 }
 static int action_accept_create(lua_State *L) {
-  wfx_action_t *action = action_create(L, 0);
-  action->eval = action_accept_eval;
+  wfx_action_t *action = action_create(L, 0, action_accept_eval);
+  action->data = action->data;
   //TODO
   return 1;
 }
@@ -51,21 +53,23 @@ static int action_accept_create(lua_State *L) {
 
 //reject
 static wfx_action_result_t action_reject_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  return WFX_ACTION_NEXT;
+  //TODO
+  return WFX_ACTION_FINISH;
 }
 static int action_reject_create(lua_State *L) {
-  wfx_action_t *action = action_create(L, 0);
-  action->eval = action_reject_eval;
+  wfx_action_t *action = action_create(L, 0, action_reject_eval);
+  action->data = action->data;
   //TODO
   return 1;
 }
 
 static wfx_action_result_t action_tag_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
+  //TODO
   return WFX_ACTION_NEXT;
 }
 static int action_tag_create(lua_State *L) {
-  wfx_action_t *action = action_create(L, 0);
-  action->eval = action_tag_eval;
+  wfx_action_t *action = action_create(L, 0, action_tag_eval);
+  action->data = action->data;
   //TODO
   return 1;
 }

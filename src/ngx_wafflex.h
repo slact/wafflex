@@ -44,15 +44,16 @@ ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str);
 void lua_mm(lua_State *L, int index);
 void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding);
 
+int wfx_lua_getref(lua_State *L, int index);
+size_t wfx_lua_len(lua_State *L, int index);
+
+ngx_str_t *wfx_get_interpolated_string(const char *str);
+
 #define wfx_lua_register(L, func) \
   wfx_lua_register_named(L, func, #func)
 
 #define wfx_lua_register_named(L, func, name) \
   (lua_pushcfunction(L, func), lua_pushvalue(L, -1), lua_setglobal(L, name))
 
-//possibly missing stuff
-#if LUA_VERSION_NUM <= 501
-lua_Integer luaL_len (lua_State *L, int i);
-#endif
 
 #endif //NGX_WAFFLEX_H

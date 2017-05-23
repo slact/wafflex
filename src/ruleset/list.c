@@ -3,15 +3,31 @@
 #include "list.h"
 
 static int list_create(lua_State *L) {
-  ERR("list create");
+  int                  i, rules_n;
   wfx_rule_list_t     *list;
+  wfx_rule_t          *rule;
   
+  ERR("list create");
   
-  list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, 0, L, name);
+  lua_getfield(L, -1, "rules");
+  rules_n = wfx_lua_len(L, -1);
+  lua_pop(L, 1);
   
-  //TODO
+  list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, (sizeof(rule)*(rules_n - 1)), L, name);
   
-  lua_pushlightuserdata (L, list);
+  list->len = rules_n;
+  
+  lua_getfield(L, -1, "rules");
+  for(i=0; i<rules_n; i++) {
+    lua_geti(L, -1, i+1);
+    lua_getfield(L, -1, "__binding");
+    rule = lua_touserdata(L, -1);
+    lua_pop(L, 2);
+    list->rules[i]=rule;
+  }
+  
+  lua_pushlightuserdata(L, list);
+  
   return 1;
 }
 

@@ -5,9 +5,46 @@
 static int rule_create(lua_State *L) {
   ERR("rule create");
   wfx_rule_t     *rule;
-  rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, 0, L, name);
+  wfx_action_t   *action;
+  int i, then_actions = 0, else_actions = 0;
   
-  //TODO
+  lua_getfield(L, -1, "then");
+  then_actions = wfx_lua_len(L, -1);
+  lua_pop(L, 1);
+  
+  lua_getfield(L, -1, "else");
+  else_actions = wfx_lua_len(L, -1);
+  lua_pop(L, 1);
+  
+  rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, (sizeof(action) * (then_actions + else_actions)), L, name);
+  
+  lua_getfield(L, -1, "if");
+  lua_getfield(L, -1, "__binding");
+  rule->condition=lua_touserdata(L, -1);
+  lua_pop(L, 2);
+  
+  rule->actions = (void *)&rule[1];
+  rule->else_actions = &rule->actions[then_actions];
+  rule->actions_len = then_actions;
+  rule->else_actions_len = else_actions;
+  
+  lua_getfield(L, -1, "then");
+  for(i=0; i<then_actions; i++) {
+    lua_geti(L, -1, i+1);
+    lua_getfield(L, -1, "__binding");
+    rule->actions[i] = lua_touserdata(L, -1);
+    lua_pop(L, 2);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, -1, "else");
+  for(i=0; i<else_actions; i++) {
+    lua_geti(L, -1, i+1);
+    lua_getfield(L, -1, "__binding");
+    rule->else_actions[i] = lua_touserdata(L, -1);
+    lua_pop(L, 2);
+  }
+  lua_pop(L, 1);
   
   lua_pushlightuserdata (L, rule);
   return 1;

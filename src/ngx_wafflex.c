@@ -127,6 +127,24 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   lua_remove(L, 1);
 }
 
+int wfx_lua_getref(lua_State *L, int index) {
+  lua_pushvalue(L, index);
+  return luaL_ref(L, LUA_REGISTRYINDEX);
+}
+
+size_t wfx_lua_len(lua_State *L, int index) {
+#if LUA_VERSION_NUM <= 501
+  return lua_objlen(L, index);
+#else
+  return luaL_len(L, index);
+#endif
+}
+
+ngx_str_t *wfx_get_interpolated_string(const char *str) {
+ //TODO
+  return NULL; 
+}
+
 static int wfx_require_module(lua_State *L) {
   wfx_module_lua_script_t *script;
   char                     scriptname[255];
@@ -235,20 +253,6 @@ static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
   lua_close(Lua);
   ipc_destroy(ipc);
 }
-
-#if LUA_VERSION_NUM <= 501
-lua_Integer luaL_len (lua_State *L, int i);
-  lua_Integer res = 0;
-  int isnum = 0;
-  luaL_checkstack(L, 1, "not enough stack slots");
-  lua_len(L, i);
-  res = lua_tointegerx(L, -1, &isnum);
-  lua_pop(L, 1);
-  if (!isnum)
-    luaL_error(L, "object length is not an integer");
-  return res;
-}
-#endif
 
 size_t wfx_lua_tablesize(lua_State *L, int index) {
   int n = 0;

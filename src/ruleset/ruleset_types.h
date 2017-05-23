@@ -17,8 +17,7 @@ struct wfx_limiter_s {
   ngx_int_t         sync_steps;
   struct {
     wfx_limiter_t    *limiter;
-    time_t            burst_expire;
-    unsigned          enabled:1;
+    time_t            expire;
   }                 burst;
 }; //wfx_limiter_t
 
@@ -41,7 +40,6 @@ struct wfx_action_s {
   char             *action;
   int               luaref;
   wfx_action_eval_pt eval;
-  wfx_action_t     *next;
   void             *data;
 }; //wfx_action_t
 
@@ -49,15 +47,17 @@ struct wfx_rule_s {
   char             *name;
   int               luaref;
   wfx_condition_t  *condition;
-  wfx_action_t     *action;
-  wfx_action_t     *else_action;
+  int               actions_len;
+  wfx_action_t     *(*actions);
+  int               else_actions_len;
+  wfx_action_t     *(*else_actions);
 }; //wfx_rule_t
 
 typedef struct {
   char             *name;
   int               luaref;
   size_t            len;
-  wfx_rule_t        rules[1];
+  wfx_rule_t       *rules[1];
 } wfx_rule_list_t;
 
 typedef struct {
