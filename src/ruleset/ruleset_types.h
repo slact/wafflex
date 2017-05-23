@@ -8,16 +8,6 @@ typedef enum{STRING, ARRAY, BANANA} wfx_data_type_t;
 typedef enum{WFX_ACTION_NEXT, WFX_ACTION_BREAK, WFX_ACTION_FINISH} wfx_action_result_t;
 
 
-typedef struct {
-  wfx_data_type_t   type;
-  union {
-    void             *ptr;
-    ngx_str_t         str;
-    float             num;
-    char              byte;
-  }                 data;
-} wfx_data_t;
-
 typedef struct wfx_limiter_s wfx_limiter_t;
 struct wfx_limiter_s {
   char             *name;
@@ -32,31 +22,36 @@ struct wfx_limiter_s {
   }                 burst;
 }; //wfx_limiter_t
 
+
+typedef struct wfx_rule_s wfx_rule_t;
+
 typedef struct wfx_condition_s wfx_condition_t;
+typedef int (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_rule_t *, ngx_connection_t *,ngx_http_request_t *);
 struct wfx_condition_s {
   char             *condition;
   int               luaref;
-  int              (*eval)(wfx_condition_t *self, ngx_connection_t *,ngx_http_request_t *);
+  wfx_condition_eval_pt eval;
   unsigned          negate:1;
-  wfx_data_t        data;
+  void             *data;
 }; //wfx_condition_t
 
 typedef struct wfx_action_s wfx_action_t;
+typedef wfx_action_result_t (*wfx_action_eval_pt)(wfx_action_t *, wfx_rule_t *, ngx_connection_t *,ngx_http_request_t *);
 struct wfx_action_s {
   char             *action;
   int               luaref;
-  wfx_action_result_t (*eval)(wfx_action_t *self, ngx_connection_t *,ngx_http_request_t *);
+  wfx_action_eval_pt eval;
   wfx_action_t     *next;
-  wfx_data_t        data;
+  void             *data;
 }; //wfx_action_t
 
-typedef struct {
+struct wfx_rule_s {
   char             *name;
   int               luaref;
   wfx_condition_t  *condition;
   wfx_action_t     *action;
   wfx_action_t     *else_action;
-} wfx_rule_t;
+}; //wfx_rule_t
 
 typedef struct {
   char             *name;

@@ -38,7 +38,7 @@ void wfx_action_binding_add(lua_State *L, wfx_action_type_t *cond) {
 //some actions
 
 //accept
-static wfx_action_result_t action_accept_eval(wfx_action_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static wfx_action_result_t action_accept_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return WFX_ACTION_NEXT;
 }
 static int action_accept_create(lua_State *L) {
@@ -50,7 +50,7 @@ static int action_accept_create(lua_State *L) {
 
 
 //reject
-static wfx_action_result_t action_reject_eval(wfx_action_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static wfx_action_result_t action_reject_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return WFX_ACTION_NEXT;
 }
 static int action_reject_create(lua_State *L) {
@@ -60,7 +60,7 @@ static int action_reject_create(lua_State *L) {
   return 1;
 }
 
-static wfx_action_result_t action_tag_eval(wfx_action_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static wfx_action_result_t action_tag_eval(wfx_action_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return WFX_ACTION_NEXT;
 }
 static int action_tag_create(lua_State *L) {

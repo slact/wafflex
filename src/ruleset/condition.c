@@ -4,9 +4,10 @@
 
 static wfx_condition_type_t condition_types[];
 
-wfx_condition_t *condition_create(lua_State *L, size_t extra_sz) {
-  wfx_condition_t *condition = ruleset_common_shm_alloc_init_item(wfx_condition_t, extra_sz, L, condition);
-  
+wfx_condition_t *condition_create(lua_State *L, size_t data_sz, wfx_condition_eval_pt eval) {
+  wfx_condition_t *condition = ruleset_common_shm_alloc_init_item(wfx_condition_t, data_sz, L, condition);
+  condition->eval = eval;
+  condition->data = data_sz == 0 ? NULL : &condition[1];
   lua_pushlightuserdata(L, condition);
   return condition;
 }
@@ -41,53 +42,51 @@ void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *cond) {
 
 
 //true
-static int condition_true_eval(wfx_condition_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_true_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return self->negate ? 0 : 1;
 }
 static int condition_true_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0);
-  condition->eval = condition_true_eval;
+  condition_create(L, 0, condition_true_eval);
   return 1;
 }
 
 //false
-static int condition_false_eval(wfx_condition_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_false_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return self->negate ? 1 : 0;
 }
 static int condition_false_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0);
-  condition->eval = condition_false_eval;
+  condition_create(L, 0, condition_false_eval);
   return 1;
 }
 
 
 //any
-static int condition_any_eval(wfx_condition_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_any_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return 1;
 }
 static int condition_any_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0);
-  condition->eval = condition_any_eval;
+  wfx_condition_t *condition = condition_create(L, 0, condition_any_eval);
+  condition->data = condition->data;
   return 1;
 }
 
 //all
-static int condition_all_eval(wfx_condition_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_all_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return 1;
 }
 static int condition_all_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0);
-  condition->eval = condition_all_eval;
+  wfx_condition_t *condition = condition_create(L, 0, condition_all_eval);
+  condition->data = condition->data;
   return 1;
 }
 
 //tag-check
-static int condition_tagcheck_eval(wfx_condition_t *self, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_tagcheck_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   return self->negate ? 1 : 0;
 }
 static int condition_tagcheck_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0);
-  condition->eval = condition_tagcheck_eval;
+  wfx_condition_t *condition = condition_create(L, 0, condition_tagcheck_eval);
+  condition->data = condition->data;
   return 1;
 }
 
