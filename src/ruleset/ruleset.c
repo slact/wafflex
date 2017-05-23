@@ -5,6 +5,7 @@
 #include "rule.h"
 #include "condition.h"
 #include "action.h"
+#include "tag.h"
 #include "limiter.h"
 #include "phase.h"
 
@@ -54,6 +55,8 @@ int wfx_ruleset_bindings_set(lua_State *L) {
   
   //rule action bindings
   wfx_action_bindings_set(L);
+  //tag bindings
+  wfx_tag_bindings_set(L);
   
   //list bindings
   wfx_list_bindings_set(L);
@@ -106,4 +109,3 @@ static wfx_binding_t wfx_ruleset_binding = {
   NULL,
   NULL
 };
-

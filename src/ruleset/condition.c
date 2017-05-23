@@ -69,7 +69,7 @@ typedef struct {
 static int condition_array_create(lua_State *L, wfx_condition_eval_pt eval) {
   size_t                  condition_count;
   condition_list_data_t  *condition_list;
-  int                     i;
+  unsigned                i;
   
   lua_getfield(L, -1, "data");
   condition_count = wfx_lua_len(L, -1);
@@ -89,17 +89,15 @@ static int condition_array_create(lua_State *L, wfx_condition_eval_pt eval) {
   }
   lua_pop(L, 1);
   
-  raise(SIGABRT);
-  
   return 1;
 }
 
-static int condition_list_eval(condition_list_data_t *list, int stop_on, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_list_eval(condition_list_data_t *list, wfx_rule_t *rule, int stop_on, ngx_connection_t *c, ngx_http_request_t *r) {
   wfx_condition_t        *cur;
-  int                     i, rc;
+  unsigned                i;
   for(i=0; i<list->len; i++) {
-    cur = list[i];
-    if(stop_on == cur->eval(cur, c, r) {
+    cur = list->conditions[i];
+    if(stop_on == cur->eval(cur, rule, c, r)) {
       return stop_on;
     }
   }
@@ -109,7 +107,7 @@ static int condition_list_eval(condition_list_data_t *list, int stop_on, ngx_con
 //any
 static int condition_any_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   condition_list_data_t  *list = self->data;
-  int                     rc = condition_list_eval(list, 1, c, r);
+  int                     rc = condition_list_eval(list, rule, 1, c, r);
   return self->negate ? !rc : rc;
 }
 static int condition_any_create(lua_State *L) {
@@ -119,21 +117,11 @@ static int condition_any_create(lua_State *L) {
 //all
 static int condition_all_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
   condition_list_data_t  *list = self->data;
-  int                     rc = condition_list_eval(list, 0, c, r);
+  int                     rc = condition_list_eval(list, rule, 0, c, r);
   return self->negate ? !rc : rc;
 }
 static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
-}
-
-//tag-check
-static int condition_tagcheck_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  return self->negate ? 1 : 0;
-}
-static int condition_tagcheck_create(lua_State *L) {
-  wfx_condition_t *condition = condition_create(L, 0, condition_tagcheck_eval);
-  condition->data = condition->data;
-  return 1;
 }
 
 static wfx_condition_type_t condition_types[] = {
@@ -141,7 +129,5 @@ static wfx_condition_type_t condition_types[] = {
   {"false", condition_false_create, NULL},
   {"any", condition_any_create, NULL},
   {"all", condition_all_create, NULL},
-  
-  {"tag-check", condition_tagcheck_create, NULL},
   {NULL, NULL, NULL}
 };
