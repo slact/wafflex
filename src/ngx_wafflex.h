@@ -3,9 +3,8 @@
 
 #include <nginx.h>
 #include <ngx_http.h>
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
+#include <ngx_wafflex_types.h>
+#include <util/wfx_lua.h>
 
 #define DEBUG_ON
 
@@ -28,32 +27,7 @@ void  wfx_shm_free(void *ptr);
 
 extern ngx_module_t ngx_wafflex_module;
 
-typedef struct {
-  const char           *name;
-  lua_CFunction         create;
-  lua_CFunction         replace;
-  lua_CFunction         update;
-  lua_CFunction         delete;
-} wfx_binding_t;
-
-void lua_ngxcall(lua_State *L, int nargs, int nresults);
-//debug stuff
-void lua_printstack(lua_State *L);
-size_t wfx_lua_tablesize(lua_State *L, int index);
-ngx_int_t luaL_checklstring_as_ngx_str(lua_State *L, int n, ngx_str_t *str);
-void lua_mm(lua_State *L, int index);
-void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding);
-
-int wfx_lua_getref(lua_State *L, int index);
-size_t wfx_lua_len(lua_State *L, int index);
-
 ngx_str_t *wfx_get_interpolated_string(const char *str);
-
-#define wfx_lua_register(L, func) \
-  wfx_lua_register_named(L, func, #func)
-
-#define wfx_lua_register_named(L, func, name) \
-  (lua_pushcfunction(L, func), lua_pushvalue(L, -1), lua_setglobal(L, name))
 
 
 #endif //NGX_WAFFLEX_H

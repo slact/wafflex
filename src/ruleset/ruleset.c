@@ -71,24 +71,25 @@ int wfx_ruleset_bindings_set(lua_State *L) {
 }
 
 void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *str_key, off_t str_offset, off_t luaref_offset) {
-  ngx_str_t  tmpstr;
-  int        tmpref;
-  void      *ptr;
-  char      *str;
-  char     **strptr;
-  int       *refptr;
+  const char *tmpstr;
+  size_t      tmpstrlen;
+  int         tmpref;
+  void       *ptr;
+  char       *str;
+  char      **strptr;
+  int        *refptr;
   
   lua_pushvalue(L, 1); //lua-self
   tmpref = luaL_ref(L, LUA_REGISTRYINDEX);
   
   lua_pushvalue(L, 1); //lua-self
   lua_getfield(L, -1, str_key);
-  luaL_checklstring_as_ngx_str(L, -1, &tmpstr);
+  tmpstr = lua_tolstring(L, -1, &tmpstrlen);
   
-  if((ptr = wfx_shm_calloc(item_sz + tmpstr.len + 1)) != NULL) {
+  if((ptr = wfx_shm_calloc(item_sz + tmpstrlen+1)) != NULL) {
     str = (char *)ptr + item_sz;
     strptr = (char **)((char *)ptr + str_offset);
-    strcpy((char *)ptr + item_sz, (char *)tmpstr.data);
+    strcpy((char *)ptr + item_sz, tmpstr);
     *strptr = str;
     refptr = (int *)((char *)ptr + luaref_offset);
     *refptr = tmpref;
