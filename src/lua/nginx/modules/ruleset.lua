@@ -23,12 +23,24 @@ local ruleset_meta = { __index = {
     return self.limiters[thing_name(name)]
   end,
   
-  addLimiter = function(self, data)
+  addLimiter = function(self, data, limiters_in)
+    if data.__already_loaded_as_burst_limiter then
+      data.__already_loaded_as_burst_limiter = nil
+      return nil
+    end
     assert_unique_name("limiter", self.limiters, data)
     local limiter = setmetatable(data, self.__submeta.limiter)
     self.limiters[data.name]=limiter
+    if limiter.burst then
+      local burst_limiter = self:findLimiter(limiter.burst)
+      if not burst_limiter then
+        burst_limiter = self:addLimiter(limiters_in[limiter.burst], limiters_in)
+        limiters_in[limiter.burst].__already_loaded_as_burst_limiter = true
+        limiter.burst = burst_limiter
+      end
+    end
     Binding.call("limiter", "create", limiter)
-    return self
+    return limiter
   end,
   
   findRule = function(self, name)
@@ -44,7 +56,7 @@ local ruleset_meta = { __index = {
     local rule =setmetatable(data, self.__submeta.rule)
     rule.ruleset = nil
     if data["if"] then
-      data["if"] = Rule.condition.new(rule["if"], rule)
+      data["if"] = Rule.condition.new(rule["if"], self)
     end
     for _,clause in pairs{"then", "else"} do
       if data[clause] then
@@ -140,7 +152,7 @@ local function newRuleset(data)
   if data then
     --load data
     for _, v in pairs(data.limiters) do
-      ruleset:addLimiter(v)
+      ruleset:addLimiter(v, data.limiters)
     end
     
     for _, v in pairs(data.rules) do

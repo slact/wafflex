@@ -56,8 +56,11 @@ local function create_thing_storage(thing_name)
     local name, val = unpack_thing(data)
     name = ignore_leading_hash(name)
     local thing_preset = self.table[name]
-    local thing = setmetatable({[thing_name]=name, ["data"]=val}, thing_preset.meta)
-    thing_preset.init(val, thing, ruleset)
+    local thing = setmetatable({[thing_name]=name, data=val}, thing_preset.meta)
+    local replacement_data = thing_preset.init(val, thing, ruleset)
+    if replacement_data then
+      thing.data = replacement_data
+    end
     Binding.call(("%s:%s"):format(thing_name, name), "create", thing)
     return thing
   end
@@ -117,36 +120,43 @@ Rule.condition.add("match", {parse = function(data, parser)
 end})
 
 --limiter conditions
-Rule.condition.add({"limit-break", "limit-check"}, {parse = function(data, parser)
-  if type(data) == "string" then
-    data = {name=data}
-  elseif type(data) == "table" then
-    
-  else
-    parser:error("invalid value type " .. type(data))
-  end
-  local condition_name = next(parser:getContext())
-  local rule = parser:getContext("rule")
-  
-  if not data.key then
-    data.key = rule.key
-  end
-  parser:assert(data.key, "limiter \"key\" missing, and no default \"key\" in rule")
-  parser:assert_type(data.key, "string", "invalid limiter \"key\" type")
-  
-  if not data.increment then
-    if condition_name == "limit-break" then
-      data.increment = 1
-    elseif condition_name == "limit-check" then
-      data.increment = 0
+Rule.condition.add({"limit-break", "limit-check"}, {
+  parse = function(data, parser)
+    if type(data) == "string" then
+      data = {name=data}
+    elseif type(data) == "table" then
+      
+    else
+      parser:error("invalid value type " .. type(data))
     end
+    local condition_name = next(parser:getContext())
+    local rule = parser:getContext("rule")
+    
+    if not data.key then
+      data.key = rule.key
+    end
+    parser:assert(data.key, "limiter \"key\" missing, and no default \"key\" in rule")
+    parser:assert_type(data.key, "string", "invalid limiter \"key\" type")
+    
+    if not data.increment then
+      if condition_name == "limit-break" then
+        data.increment = 1
+      elseif condition_name == "limit-check" then
+        data.increment = 0
+      end
+    end
+    data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
+    
+    parser:assert(data.name, "name missing")
+    parser:assert_type(data.name, "string", "invalid \"name\" type")
+    return data
+  end,
+  init = function(data, thing, ruleset) 
+    local limiter = assert(ruleset:findLimiter(data.name), "unknown limiter")
+    data.name = nil
+    data.limiter = limiter
   end
-  data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
-  
-  parser:assert(data.name, "name missing")
-  parser:assert_type(data.name, "string", "invalid \"name\" type")
-  return data
-end})
+})
 
 --some actions, too
 Rule.action.add("tag", {parse = function(data, parser)
