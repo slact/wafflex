@@ -24,9 +24,39 @@ local function parseRulesetThing(parser, data_in, opt)
   return true
 end
 
+local function inheritmetatable(dst, src)
+  if type(dst) == type(src) then
+    setmetatable(dst, getmetatable(src))
+  end
+end
+
+local getloc; do --location caching
+  local lc = setmetatable({}, {__mode="k"}) -- weak keys
+  getloc = function(str, where)
+    local line, pos, linepos = 1, 1, 0
+    local prev = lc[str]
+    if prev and prev.pos < where then
+      line = prev.line
+      pos = prev.pos
+    end
+    while true do
+      pos = str:find("\n", pos, true)
+      if pos and pos < where then
+        line = line + 1
+        linepos = pos
+        pos = pos + 1
+      else
+        break
+      end
+    end
+    return line, (where - linepos) -- line, column
+  end
+end
+
 local function jsonmeta(what)
   return function(str, where)
-    return {__pos=where, __jsontype = what}
+    local line, column = getloc(str, where)
+    return {__pos=where,__line=line, __column=column,  __jsontype = what, __jsonmeta = true}
   end
 end
 
@@ -63,22 +93,8 @@ function class:assert_table_size(var, expected_size, err)
   end
   return var
 end
+
 function class:error(err)
-  local getloc = function(str, where)
-    local line, pos, linepos = 1, 1, 0
-    while true do
-      pos = str:find("\n", pos, true)
-      if pos and pos < where then
-        line = line + 1
-        linepos = pos
-        pos = pos + 1
-      else
-        break
-      end
-    end
-    return "line " .. line .. ", column " .. (where - linepos)
-  end
-  
   local getpos = function(ctx)
     local meta = getmetatable(ctx)
     if meta then
@@ -96,7 +112,7 @@ function class:error(err)
     local pos = getpos(cur.ctx)
     if pos then
       if self.name then table.insert(nested_names, self.name) end
-      error(("%s at %s: %s"):format(table.concat(nested_names, " in "), getloc(self.source, pos), err))
+      error(("%s at line %i column %i: %s"):format(table.concat(nested_names, " in "), getloc(self.source, pos), err))
     end
   end
   if self.name then table.insert(nested_names, self.name) end
@@ -150,7 +166,7 @@ function class:parseRuleSet(data, name)
     limiters= {},
     rules= {},
     lists= {},
-    table= {},
+    phases={},
     name = name
   }
   self:pushContext(data, "ruleset")
@@ -178,6 +194,23 @@ function class:parseRuleSet(data, name)
   })
   
   self.ruleset.phases = self:parsePhaseTable(data.phases)
+  --convert debug metatable data to __dbg table whenever possible
+  local function move_dbg_data(tbl)
+    local meta = getmetatable(tbl)
+    if meta and meta.__jsonmeta then
+      if not meta.__line then
+        mm(tbl)
+      end
+      setmetatable(tbl, {line=meta.__line, col=meta.__column})
+    end
+    for _, v in pairs(tbl) do
+      if type(v) == "table" then
+        move_dbg_data(v)
+      end
+    end
+  end
+  move_dbg_data(self.ruleset)
+  
   return self.ruleset
 end
 
@@ -185,32 +218,29 @@ function class:parsePhaseTable(data)
   self:assert(data ~= nil, "missing phase table (\"phases\" attribute)")
   self:assert_jsontype(data, "object", "phase table must be an object")
   self:pushContext(data, "phase table")
-  local phase_table = {}
   
-  for k,v in pairs(data) do
-    self:assert_type(k, "string", "phase table entries must be strings")
-    if self:jsontype(v) == "array" then
-      --array of lists
-      local lists = {}
-      for _, vv in ipairs(v) do
-        if type(vv)=="string" or self:jsontype(vv) == "array" or self:jsontype(vv) == "object" then
-          table.insert(lists, self:parseRuleList(vv))
+  for phase_name, phase_data in pairs(data) do
+    self:assert_type(phase_name, "string", "phase table entries must be strings")
+    if self:jsontype(phase_data) == "array" then
+      for i, list in ipairs(phase_data) do
+        if type(list)=="string" or self:jsontype(list) == "array" or self:jsontype(list) == "object" then
+          phase_data[i]=self:parseRuleList(list)
         else
-          self:error(("invalid rule list type: %s"):format(self:jsontype(vv)))
+          self:error(("invalid rule list type: %s"):format(self:jsontype(list)))
         end
       end
-      phase_table[k]=lists
-    elseif type(v) == "string" then
+    elseif type(phase_data) == "string" then
       --singe named list
-      phase_table[k]={ self:parseRuleList(v) }
+      data[phase_name]={ self:parseRuleList(phase_data) }
     elseif self:jsontype(v)=="object" then
       --single long-form list
-      phase_table[k]=self:parseRuleList(v)
+      data[phase_name]=self:parseRuleList(v)
     end
   end
   
   self:popContext()
-  return phase_table
+  
+  return data
 end
 
 function class:parseRuleList(data, name)
@@ -234,19 +264,9 @@ function class:parseRuleList(data, name)
     table.insert(rules, self:parseRule(v))
   end
   self:popContext()
-  return {name=name, rules=rules}
-end
-
-local function clear_json_meta(data)
-  if type(data) == "table" then
-    local meta = getmetatable(data)
-    if meta and meta.__jsontype then
-      setmetatable(data, nil)
-    end
-    for _, v in pairs(data) do
-      clear_json_meta(v)
-    end
-  end
+  list = {name=name, rules=rules}
+  inheritmetatable(list, data)
+  return list
 end
 
 function class:parseRule(data, name)
@@ -281,6 +301,7 @@ function class:parseRule(data, name)
         table.insert(conditions, condition)
       end
       condition = {[(data["if-any"] and "any" or "all")]=conditions}
+      inheritmetatable(condition, data["if"] or data["if-any"] or data["if-all"])
     end
     rule = {["if"]=condition, ["then"]=data["then"], ["else"]=data["else"], name=data["name"] or name, info=data["info"], key=data["key"]}
   elseif data["always"] then
@@ -296,7 +317,8 @@ function class:parseRule(data, name)
   end
   
   self:popContext()
-  clear_json_meta(rule)
+  --reuse metatable for debugging purposes
+  inheritmetatable(rule, data)
   return rule
 end
 
@@ -317,6 +339,7 @@ function class:parseCondition(data)
   self:pushContext(data, "condition " .. (next(condition)))
   condition = Rule.condition.parse(condition, self)
   self:popContext()
+  inheritmetatable(condition, data)
   return condition
 end
   
@@ -334,6 +357,7 @@ function class:parseAction(data)
   self:popContext()
   --we can be more specific about the action name now
   self:pushContext(data, "action " .. (next(action)))
+  inheritmetatable(action, data)
   action = Rule.action.parse(action, self)
   self:popContext()
   return action
@@ -345,6 +369,7 @@ function class:parseActions(data)
   end
   self:pushContext(data) --no context name plz
   local actions = {}
+  inheritmetatable(actions, data)
   if self:jsontype(data) == "object" or type(data)=="string" or (#data == 0 and next(data) ~= nil) then
     table.insert(actions, self:parseAction(data))
   elseif type(data) == "table" then
