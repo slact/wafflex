@@ -6,15 +6,14 @@
 
 
 static int string_create(lua_State *L) {
-  ngx_str_t       str;
-  wfx_str_t      *wstr;
-  wfx_str_part_t *part;
-  int             parts_count = 0;
-  u_char         *cur, *ccur;
-  size_t          sz;
-  ngx_str_t       spart;
-  int n = 0;
-  lua_mm(L, -1);
+  ngx_str_t        str;
+  wfx_str_t       *wstr;
+  wfx_str_part_t  *part = NULL;
+  int              parts_count = 0;
+  u_char          *cur, *ccur;
+  size_t           sz;
+  ngx_str_t        spart;
+  int              i = 0;
   lua_getfield(L, -1, "string");
   str.data = (u_char *)luaL_tolstring(L, -1, &str.len);
   
@@ -29,13 +28,13 @@ static int string_create(lua_State *L) {
   wstr->str.len = str.len;
   wstr->str.data=(u_char *)&wstr[1];
   ngx_memcpy(wstr->str.data, str.data, str.len);
-  wstr->parts = (wfx_str_part_t *)&wstr->str.data[str.len];
-  part = wstr->parts;
   wstr->parts_count = parts_count;
+  wstr->parts = (void *)&wstr->str.data[str.len];
   
-  cur = (u_char *)wstr->str.data;
+  cur = wstr->str.data;
+  part = &wstr->parts[0];
+  
   while(wfx_str_each_part(&wstr->str, &cur, part)) {
-    n++;
     ccur = &wstr->str.data[part->start];
     spart.data = ccur;
     spart.len = part->end - part->start;
@@ -51,9 +50,8 @@ static int string_create(lua_State *L) {
       part->key = ngx_hash_key(spart.data, spart.len);
     }
     
-    ERR("part %i: %s%s key: %i str: \"%V\"", n, part->variable ? "var" : "raw", part->regex_capture ? " regex capture" : "", part->key, &spart);
-    
-    part++;
+    //DBG("part (%i): %s%s key: %i str: \"%V\"", i, part->variable ? "var" : "raw", part->regex_capture ? " regex capture" : "", part->key, &spart);
+    i++;
   }
   
   lua_pushlightuserdata(L, wstr);

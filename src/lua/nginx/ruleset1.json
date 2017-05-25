@@ -20,12 +20,15 @@
   "lists": {
     "list1": [
       "fweep",
-      "fwoop",
+      {
+        "if": {"match": ["foo", "bar", "$baz$foobar", "$thing"]},
+        "then": "reject"
+      },
       {
         "info": "This rule rate-limits by ip",
         "if": {"limit-break" : {
           "name": "rate-limit",
-          "key": "$request_real_ip"
+          "key": "hello $ISthis $it $request_real_ip banana ${1}"
         }},
         "then": [
           {"#tag": "slowdown"},

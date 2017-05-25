@@ -25,4 +25,18 @@ typedef struct {
   wfx_str_part_t  *parts;
 } wfx_str_t;
 
+typedef enum {WFX_DATA_INTEGER, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_STRING_ARRAY, WFX_DATA_PTR} wfx_data_type_t;
+
+typedef struct {
+  wfx_data_type_t   type;
+  int               count;
+  union {
+    void              *ptr;
+    wfx_str_t         *str;
+    wfx_str_t        *str_array[1];
+    ngx_int_t          integer;
+    float              floating_point;
+  }                 data;
+} wfx_data_t;
+
 #endif //NGX_WAFFLEX_TYPES_H

@@ -77,7 +77,7 @@ int wfx_ruleset_bindings_set(lua_State *L) {
   return 0;
 }
 
-void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, off_t luaref_offset) {
+void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, size_t data_sz, off_t luaref_offset) {
   int         tmpref;
   void       *ptr;
   int        *refptr;
@@ -85,7 +85,7 @@ void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz,
   lua_pushvalue(L, 1); //lua-self
   tmpref = luaL_ref(L, LUA_REGISTRYINDEX);
   
-  if((ptr = wfx_shm_calloc(item_sz)) != NULL) {
+  if((ptr = wfx_shm_calloc(item_sz + data_sz)) != NULL) {
     refptr = (int *)((char *)ptr + luaref_offset);
     *refptr = tmpref;
   }
@@ -94,7 +94,7 @@ void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz,
   return ptr;
 }
   
-void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *str_key, off_t str_offset, off_t luaref_offset) {
+void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t data_sz, char *str_key, off_t str_offset, off_t luaref_offset) {
   const char *tmpstr;
   size_t      tmpstrlen;
   int         tmpref;
@@ -110,10 +110,10 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *
   lua_getfield(L, -1, str_key);
   tmpstr = lua_tolstring(L, -1, &tmpstrlen);
   
-  if((ptr = wfx_shm_calloc(item_sz + tmpstrlen+1)) != NULL) {
-    str = (char *)ptr + item_sz;
+  if((ptr = wfx_shm_calloc(item_sz + data_sz + tmpstrlen+1)) != NULL) {
+    str = (char *)ptr + item_sz + data_sz;
     strptr = (char **)((char *)ptr + str_offset);
-    strcpy((char *)ptr + item_sz, tmpstr);
+    strcpy(str, tmpstr);
     *strptr = str;
     refptr = (int *)((char *)ptr + luaref_offset);
     *refptr = tmpref;

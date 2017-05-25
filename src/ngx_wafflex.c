@@ -48,11 +48,6 @@ void wfx_shm_free(void *ptr) {
   ngx_free(ptr);
 }
 
-ngx_str_t *wfx_get_interpolated_string(const char *str) {
- //TODO
-  return NULL; 
-}
-
 static int wfx_init_bind_lua(lua_State *L) {
   //ruleset bindings
   wfx_lua_register(L, wfx_ruleset_bindings_set);

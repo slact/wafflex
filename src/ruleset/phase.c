@@ -4,16 +4,14 @@
 #include "list.h"
 
 static int phase_create(lua_State *L) {
-  int              len, i;
-  wfx_rule_list_t *list;
+  int               len, i;
+  wfx_rule_list_t  *list;
   ERR("phase create");
   wfx_phase_t     *phase;
   
   lua_getfield(L, 1, "lists");
   len = wfx_lua_len(L, -1); //number of rule lists for this phase
-  lua_printstack(L);
   phase = ruleset_common_shm_alloc_init_item(wfx_phase_t, sizeof(list) * (len - 1), L, name);
-  lua_printstack(L);
   phase->len=len;
   for(i=0; i<len; i++) {
     lua_rawgeti(L, -1, i+1);

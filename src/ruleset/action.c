@@ -1,6 +1,7 @@
 #include <ngx_wafflex.h>
 #include "ruleset_types.h"
 #include "action.h"
+#include <util/wfx_str.h>
 
 static wfx_action_type_t action_types[];
 
@@ -68,8 +69,7 @@ static wfx_action_result_t action_tag_eval(wfx_action_t *self, wfx_rule_t *rule,
 }
 static int action_tag_create(lua_State *L) {
   wfx_action_t *action = action_create(L, 0, action_tag_eval);
-  action->data = action->data;
-  //TODO
+  wfx_lua_set_str_data(L, 1, &action->data);
   return 1;
 }
 

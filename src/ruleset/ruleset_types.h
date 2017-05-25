@@ -5,19 +5,6 @@
 #include <ngx_http.h>
 
 typedef enum{WFX_ACTION_NEXT, WFX_ACTION_BREAK, WFX_ACTION_FINISH} wfx_action_result_t;
-typedef enum {WFX_DATA_INTEGER, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_ARRAY, WFX_DATA_PTR, WFX_DATA_RAW} wfx_data_type_t;
-
-typedef struct {
-  wfx_data_type_t   type;
-  int               count;
-  union {
-    void              *ptr;
-    wfx_str_t          str;
-    ngx_int_t          integer;
-    float              floating_point;
-    char               raw[1];
-  }                 data;
-} wfx_data_t;
 
 typedef struct wfx_limiter_s wfx_limiter_t;
 struct wfx_limiter_s {
@@ -87,19 +74,6 @@ typedef struct {
 typedef struct {
   char             *name;
   int               luaref;
-  struct {
-    size_t            len;
-    wfx_limiter_t    *array;
-  }                 limiters;
-  struct {
-    size_t            len;
-    wfx_rule_list_t  *array;
-  }                 lists;
-  struct {
-    size_t            len;
-    wfx_rule_t       *array;
-  }                 rules;
-  
   wfx_phases_t      phase;
   
 } wfx_ruleset_t;
@@ -118,13 +92,13 @@ int ruleset_subbinding_call(lua_State *L,const char *binding_name, const char *s
 int ruleset_subbinding_getname_call(lua_State *L, const char *binding_name, const char *call_name, int nargs);
 */
 
-#define ruleset_common_shm_alloc_init_item(type, extra_sz, L, name_key) \
-  __ruleset_common_shm_alloc_init_item(L, sizeof(type) + extra_sz, #name_key, offsetof(type, name_key), offsetof(type, luaref))
+#define ruleset_common_shm_alloc_init_item(type, data_sz, L, name_key) \
+  __ruleset_common_shm_alloc_init_item(L, sizeof(type), data_sz, #name_key, offsetof(type, name_key), offsetof(type, luaref))
   
-#define ruleset_common_shm_alloc_init_item_noname(type, extra_sz, L) \
-  __ruleset_common_shm_alloc_init_item_noname(L, sizeof(type) + extra_sz, offsetof(type, luaref))
+#define ruleset_common_shm_alloc_init_item_noname(type, data_sz, L) \
+  __ruleset_common_shm_alloc_init_item_noname(L, sizeof(type), data_sz, offsetof(type, luaref))
   
-void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *str_key, off_t str_offset, off_t luaref_offset);
-void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, off_t luaref_offset);
+void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t data_sz, char *str_key, off_t str_offset, off_t luaref_offset);
+void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, size_t data_sz, off_t luaref_offset);
 
 #endif //WFX_RULESET_TYPES_H

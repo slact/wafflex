@@ -2,8 +2,7 @@
 #include "ruleset_types.h"
 #include "tag.h"
 #include "condition.h"
-
-
+#include <util/wfx_str.h>
 
 
 //tag-check
@@ -12,7 +11,7 @@ static int condition_tag_check_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx
 }
 static int condition_tag_check_create(lua_State *L) {
   wfx_condition_t *condition = condition_create(L, 0, condition_tag_check_eval);
-  condition->data = condition->data;
+  wfx_lua_set_str_data(L, 1, &condition->data);
   return 1;
 }
 static wfx_condition_type_t condition_tag_check = {

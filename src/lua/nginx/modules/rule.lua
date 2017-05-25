@@ -17,6 +17,11 @@ local function create_thing_storage(thing_name)
   
   local function unpack_thing(data, parser)
     local name, val = next(data)
+    if type(name) == "number" then
+      parser:error("invalid data value, expected {\"key\":value}, got {\"key\"}")
+    elseif type(name) ~= "string" then
+      parser:error("unexpected data type %s", type(name))
+    end
     local thing = self.table[name]
     if parser then
       parser:assert(thing, ("Unknown %s \"%s\""):format(thing_name, name))
@@ -121,9 +126,9 @@ Rule.condition.add("tag-check", {
 Rule.condition.add("match", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
-    for _, v in ipairs(data) do
+    for i, v in ipairs(data) do
       parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
-      data[v]=parser:parseInterpolatedString(v)
+      data[i]=parser:parseInterpolatedString(v)
     end
   end,
   init = function(data)
@@ -178,10 +183,15 @@ Rule.condition.add({"limit-break", "limit-check"}, {
 })
 
 --some actions, too
-Rule.action.add("tag", {parse = function(data, parser)
-  parser:assert_jsontype(data, "string", "\"tag\" value must be a string")
-  return parser:parseInterpolatedString(data)
-end})
+Rule.action.add("tag", {
+  parse = function(data, parser)
+    parser:assert_jsontype(data, "string", "\"tag\" value must be a string")
+    return parser:parseInterpolatedString(data)
+  end,
+  init = function(data)
+    Binding.call("string", "create", data)
+  end
+})
 
 Rule.action.add("accept", {parse = function(data, parser)
   parser:assert_type(data, "table", "\"accept\" value must be an object")

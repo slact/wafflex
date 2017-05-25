@@ -5,7 +5,6 @@
 static int rule_create(lua_State *L) {
   ERR("rule create");
   wfx_rule_t     *rule;
-  wfx_action_t   *action;
   int i, then_actions = 0, else_actions = 0;
   
   lua_getfield(L, -1, "then");
@@ -16,7 +15,7 @@ static int rule_create(lua_State *L) {
   else_actions = wfx_lua_len(L, -1);
   lua_pop(L, 1);
   
-  rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, (sizeof(action) * (then_actions + else_actions)), L, name);
+  rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, (sizeof(wfx_action_t *) * (then_actions + else_actions)), L, name);
   
   lua_getfield(L, -1, "if");
   lua_getfield(L, -1, "__binding");

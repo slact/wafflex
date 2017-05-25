@@ -27,7 +27,4 @@ void  wfx_shm_free(void *ptr);
 
 extern ngx_module_t ngx_wafflex_module;
 
-ngx_str_t *wfx_get_interpolated_string(const char *str);
-
-
 #endif //NGX_WAFFLEX_H

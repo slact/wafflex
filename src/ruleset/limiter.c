@@ -2,6 +2,7 @@
 #include "ruleset_types.h"
 #include "limiter.h"
 #include "condition.h"
+#include <util/wfx_str.h>
 
 #define DEFAULT_SYNC_STEPS 4
 
@@ -52,7 +53,7 @@ static wfx_binding_t wfx_limiter_binding = {
 //limiter conditions
 typedef struct {
   wfx_limiter_t   *limiter;
-  ngx_str_t       *key;
+  wfx_str_t       *key;
   int              increment;
 } limit_condition_data_t;
 static int condition_limit_break_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
@@ -61,9 +62,10 @@ static int condition_limit_break_eval(wfx_condition_t *self, wfx_rule_t *rule, n
 static int condition_limit_break_create(lua_State *L) {
   limit_condition_data_t *data;
   wfx_condition_t *limit_break = condition_create(L, sizeof(*data), condition_limit_break_eval);
-  limit_break->data.type = WFX_DATA_RAW;
+  limit_break->data.type = WFX_DATA_PTR;
   limit_break->data.count = 1;
-  data = (limit_condition_data_t *)&limit_break->data.data.raw;
+  limit_break->data.data.ptr = &limit_break[1];
+  data = limit_break->data.data.ptr;
   
   lua_getfield(L, -2, "data");
   
@@ -73,7 +75,7 @@ static int condition_limit_break_create(lua_State *L) {
   lua_pop(L, 2);
   
   lua_getfield(L, -1, "key");
-  data->key = wfx_get_interpolated_string(lua_tostring(L, -1));
+  data->key = wfx_lua_get_str_binding(L, -1);
   lua_pop(L, 1);
   
   lua_getfield(L, -1, "increment");
