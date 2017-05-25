@@ -56,7 +56,7 @@ typedef struct {
   wfx_str_t       *key;
   int              increment;
 } limit_condition_data_t;
-static int condition_limit_break_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_limit_break_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
   return 1;
 }
 static int condition_limit_break_create(lua_State *L) {

@@ -23,7 +23,7 @@ struct wfx_limiter_s {
 typedef struct wfx_rule_s wfx_rule_t;
 
 typedef struct wfx_condition_s wfx_condition_t;
-typedef int (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_rule_t *, ngx_connection_t *,ngx_http_request_t *);
+typedef int (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_evaldata_t *);
 struct wfx_condition_s {
   char             *condition;
   int               luaref;
@@ -34,7 +34,7 @@ struct wfx_condition_s {
 }; //wfx_condition_t
 
 typedef struct wfx_action_s wfx_action_t;
-typedef wfx_action_result_t (*wfx_action_eval_pt)(wfx_action_t *, wfx_rule_t *, ngx_connection_t *,ngx_http_request_t *);
+typedef wfx_action_result_t (*wfx_action_eval_pt)(wfx_action_t *, wfx_evaldata_t *);
 struct wfx_action_s {
   char             *action;
   int               luaref;

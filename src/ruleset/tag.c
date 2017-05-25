@@ -6,7 +6,7 @@
 
 
 //tag-check
-static int condition_tag_check_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_tag_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
   return self->negate ? 1 : 0;
 }
 static int condition_tag_check_create(lua_State *L) {

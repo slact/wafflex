@@ -44,7 +44,7 @@ void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *cond) {
 
 
 //true
-static int condition_true_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_true_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
   return self->negate ? 0 : 1;
 }
 static int condition_true_create(lua_State *L) {
@@ -53,7 +53,7 @@ static int condition_true_create(lua_State *L) {
 }
 
 //false
-static int condition_false_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_false_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
   return self->negate ? 1 : 0;
 }
 static int condition_false_create(lua_State *L) {
@@ -92,7 +92,7 @@ static int condition_array_create(lua_State *L, wfx_condition_eval_pt eval) {
   return 1;
 }
 
-static int condition_list_eval(wfx_data_t *data, wfx_rule_t *rule, int stop_on, ngx_connection_t *c, ngx_http_request_t *r) {
+static int condition_list_eval(wfx_data_t *data, int stop_on, wfx_evaldata_t *ed) {
   assert(data->type == WFX_DATA_PTR);
   wfx_condition_t       **conditions = (wfx_condition_t **)data->data.ptr;
   unsigned                len = data->count;
@@ -100,7 +100,7 @@ static int condition_list_eval(wfx_data_t *data, wfx_rule_t *rule, int stop_on, 
   unsigned                i;
   for(i=0; i<len; i++) {
     cur = conditions[i];
-    if(stop_on == cur->eval(cur, rule, c, r)) {
+    if(stop_on == cur->eval(cur, ed)) {
       return stop_on;
     }
   }
@@ -108,8 +108,8 @@ static int condition_list_eval(wfx_data_t *data, wfx_rule_t *rule, int stop_on, 
 }
 
 //any
-static int condition_any_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  int                     rc = condition_list_eval(&self->data, rule, 1, c, r);
+static int condition_any_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
+  int                     rc = condition_list_eval(&self->data, 1, ed);
   return self->negate ? !rc : rc;
 }
 static int condition_any_create(lua_State *L) {
@@ -117,19 +117,21 @@ static int condition_any_create(lua_State *L) {
 }
 
 //all
-static int condition_all_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  int                     rc = condition_list_eval(&self->data, rule, 0, c, r);
+static int condition_all_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
+  int                     rc = condition_list_eval(&self->data, 0, ed);
   return self->negate ? !rc : rc;
 }
 static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
 }
 
+  /*wfx_data_t     *data = &self->data;
+  ngx_str_t       str[32];
+  wfx_str_part_t *part;
+  wfx_str_t     **wstrs = data->data.str_array;
+  u_char         *cur;
+  int             n;
 
-
-//match
-static int condition_match_eval(wfx_condition_t *self, wfx_rule_t *rule, ngx_connection_t *c, ngx_http_request_t *r) {
-  int                     rc = condition_list_eval(&self->data, rule, 0, c, r);
   return self->negate ? !rc : rc;
 }
 static int condition_match_create(lua_State *L) {
