@@ -9,14 +9,13 @@ local function parseRulesetThing(parser, data_in, opt)
   local ruleset = parser.ruleset
   
   if data then
-    parser:assert_type(data, opt.type, ("wrong type for ruleset %s, expected %s, got %s"):format(opt.key, opt.type, parser:jsontype(data)))
+    parser:assert_type(data, opt.type, "wrong type for ruleset %s, expected %s, got %s", opt.key, opt.type, parser:jsontype(data))
     local ret, err
     for k,v in pairs(data) do
-      parser:assert_type(k, "string", ("wrong key type for %s, expected string, got %s %s"):format(opt.thing, parser:jsontype(k), tostring(k)))
+      parser:assert_type(k, "string", "wrong key type for %s, expected string, got %s %s", opt.thing, parser:jsontype(k), tostring(k))
       ret, err = opt.parser_method(parser, v, k)
       parser:assert(ret, err)
-      --assert(ret.id, ("failed to generate id for %s"):format(opt.thing))
-      parser:assert(ruleset[opt.key][ret.name] == nil, ("%s %s already exists"):format(opt.thing, ret.name))
+      parser:assert(ruleset[opt.key][ret.name] == nil, "%s %s already exists", opt.thing, ret.name)
       ruleset[opt.key][ret.name]=ret
     end
   end
@@ -70,49 +69,62 @@ function class:jsontype(var)
     return type(var)
   end
 end
-function class:assert(cond, err)
-  if not cond then self:error(err) end
+function class:assert(cond, err, ...)
+  if not cond then self:error(err, ...) end
   return cond
 end
-function class:assert_type(var, expected_type, err)
-  return self:assert(type(var) == expected_type, err or ("expected type '%s', got '%s'"):format(expected_type, type(var)))
+function class:assert_type(var, expected_type, err, ...)
+  if err then
+    return self:assert(type(var) == expected_type, err, ...)
+  else
+    return self:assert(type(var) == expected_type, "expected type '%s', got '%s'", expected_type, type(var))
+  end
 end
-function class:assert_jsontype(var, expected_type, err)
-  return self:assert(self:jsontype(var) == expected_type,
-    err or ("expected JSON type '%s', got '%s'"):format(expected_type, self:jsontype(var))
-  )
+function class:assert_jsontype(var, expected_type, err, ...)
+  if err then
+    return self:assert(self:jsontype(var) == expected_type, err, ...)
+  else
+    return self:assert(self:jsontype(var) == expected_type,"expected JSON type '%s', got '%s'", expected_type, self:jsontype(var))
+  end
 end
-function class:assert_table_size(var, expected_size, err)
+function class:assert_table_size(var, expected_size, err, ...)
   self:assert_type(var, "table")
   local n = 0
   for _, _ in pairs(var) do
     n = n + 1
   end
   if n ~= expected_size then
-    self:error(err or ("wrong table size, expected %i, got %i"):format(expected_size, n))
+    if err then
+      self:error(err, ...)
+    else
+      self:error("wrong table size, expected %i, got %i", expected_size, n)
+    end
   end
   return var
 end
 
-function class:error(err)
-  local getpos = function(ctx)
-    local meta = getmetatable(ctx)
-    if meta then
-      return meta.__pos
-    end
-  end
+function class:error(err, ...)
   
   if not err then err = "unknown error" end
+  if select("#", ...) > 0 then
+    err = err:format(...)
+  end
+  local function getlc(tbl)
+    local mt = getmetatable(tbl)
+    if mt.__line and mt.__column then
+      return mt.__line, mt.__column
+    end
+  end
   
   local nested_names = {}
   
   for i=#self.ctx_stack,1,-1 do
     local cur = self.ctx_stack[i]
     if cur.name then table.insert(nested_names, cur.name) end
-    local pos = getpos(cur.ctx)
-    if pos then
+    local line, column = getlc(cur.ctx)
+    if line and column then
       if self.name then table.insert(nested_names, self.name) end
-      error(("%s at line %i column %i: %s"):format(table.concat(nested_names, " in "), getloc(self.source, pos), err))
+      error(("%s at line %i column %i: %s"):format(table.concat(nested_names, " in "), line, column, err))
     end
   end
   if self.name then table.insert(nested_names, self.name) end
@@ -122,6 +134,17 @@ function class:error(err)
     error(err)
   end
 end
+
+function class:setInterpolationChecker(func)
+  self.interpolation_checker = func
+end
+function class:checkInterpolatedString(str)
+  if self.interpolation_checker then
+    self.interpolation_checker(str, self)
+  end
+  return true
+end
+
 function class:pushContext(ctx, name)
   table.insert(self.ctx_stack, {ctx=ctx, name=name})
   self.context = self.ctx_stack[#self.ctx_stack]
@@ -159,6 +182,33 @@ function class:parseJSON(json_str, json_name)
     self:error(err)
   end
   return self:parseRuleSet(data)
+end
+
+function class:parseInterpolatedString(str)
+  --validate the string
+  for sub in str:gmatch("%${?%w*}?") do
+    if sub:sub(2,2) == "{" then
+      if sub:sub(-1) ~="}" then --unterminated bracket
+        self:error("missing '}' in interpolated string")
+      end
+      sub=sub:sub(3, -2)
+      if sub == "" then
+        self:error("invalid variable ${} in interpolated string")
+      elseif sub:match("^%d%d+") then
+        self:error("invalid regex capture \"%s\" in interpolated string. 1-9 only (nginx quirk)", sub)
+      elseif sub:match("^%d.+") then
+        self:error("invalid variable \"%s\" in interpolated string. can't sart with a number (nginx quirk)", sub)
+      end
+    else
+      sub=sub:sub(2, -1)
+    end
+    if sub == "" then
+      self:error("invalid empty variable in interpolated string")
+    end
+    
+  end
+  
+  return {string = str}
 end
 
 function class:parseRuleSet(data, name)
@@ -226,15 +276,15 @@ function class:parsePhaseTable(data)
         if type(list)=="string" or self:jsontype(list) == "array" or self:jsontype(list) == "object" then
           phase_data[i]=self:parseRuleList(list)
         else
-          self:error(("invalid rule list type: %s"):format(self:jsontype(list)))
+          self:error("invalid rule list type: %s", self:jsontype(list))
         end
       end
     elseif type(phase_data) == "string" then
       --singe named list
       data[phase_name]={ self:parseRuleList(phase_data) }
-    elseif self:jsontype(v)=="object" then
+    elseif self:jsontype(phase_data)=="object" then
       --single long-form list
-      data[phase_name]=self:parseRuleList(v)
+      data[phase_name]=self:parseRuleList(phase_data)
     end
   end
   
@@ -249,7 +299,7 @@ function class:parseRuleList(data, name)
     return self.ruleset.lists[data]
   end
   self:pushContext(data, "list")
-  
+  local list
   if self:jsontype(data) == "object" then
     if name then
       self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
@@ -315,6 +365,9 @@ function class:parseRule(data, name)
     rule["then"] = self:parseActions(rule["then"])
     rule["else"] = self:parseActions(rule["else"])
   end
+  if rule.key then
+    rule.key = self:parseInterpolatedString(rule.key)
+  end
   
   self:popContext()
   --reuse metatable for debugging purposes
@@ -332,7 +385,7 @@ function class:parseCondition(data)
     self:assert_table_size(data, 1, "condition object must have exactly one attribute (the condition name)")
     condition = data
   else
-    self:error(("wrong type (%s) for condition"):format(type(data)))
+    self:error("wrong type (%s) for condition", type(data))
   end
   self:popContext()
   -- be more specific with condition name
@@ -352,7 +405,7 @@ function class:parseAction(data)
     self:assert(next(data, next(data)) == nil, "action object must have only 1 attribute -- the action name")
     action = data
   else
-    self:error(("action must be string on 1-attribute object, but instead was a %s"):format(self:jsontype(data)))
+    self:error("action must be string on 1-attribute object, but instead was a %s", self:jsontype(data))
   end
   self:popContext()
   --we can be more specific about the action name now
@@ -406,11 +459,11 @@ function class:parseTimeInterval(data, err)
     elseif unit == "M" or unit:match("^month(s)?") then
       scale = 2628001
     else
-      self:error(("unknown time unit \"%s\"%s"):format(unit, err))
+      self:error("unknown time unit \"%s\"%s", unit, err)
     end
     return num * scale
   else
-    self:error(("invalid time inteval type \"%s\"%s"):format(self:jsontype(data), err))
+    self:error("invalid time inteval type \"%s\"%s", self:jsontype(data), err)
   end
 end
 

@@ -3,6 +3,7 @@
 #include <util/shmem.h>
 #include <ruleset/ruleset.h>
 #include <ngx_wafflex_nginx_lua_scripts.h>
+#include <util/wfx_str.h>
 
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
   wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \
@@ -68,7 +69,6 @@ static ngx_int_t ngx_http_wafflex_body_filter(ngx_http_request_t *r, ngx_chain_t
 
 
 static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
-  
   Lua = luaL_newstate();
   luaL_openlibs(Lua);
   

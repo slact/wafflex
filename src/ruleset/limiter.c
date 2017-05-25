@@ -61,7 +61,9 @@ static int condition_limit_break_eval(wfx_condition_t *self, wfx_rule_t *rule, n
 static int condition_limit_break_create(lua_State *L) {
   limit_condition_data_t *data;
   wfx_condition_t *limit_break = condition_create(L, sizeof(*data), condition_limit_break_eval);
-  data = limit_break->data;
+  limit_break->data.type = WFX_DATA_RAW;
+  limit_break->data.count = 1;
+  data = (limit_condition_data_t *)&limit_break->data.data.raw;
   
   lua_getfield(L, -2, "data");
   

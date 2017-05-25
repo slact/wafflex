@@ -108,16 +108,30 @@ Rule.condition.add({"true", "false"}, {parse = function(data, parser)
   --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
 end})
 
-Rule.condition.add("tag-check", {parse = function(data, parser)
-  parser:assert_type(data, "string", "\"tag-check\" value must be a string")
-end})
-
-Rule.condition.add("match", {parse = function(data, parser)
-  parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
-  for _, v in ipairs(data) do
-    parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
+Rule.condition.add("tag-check", {
+  parse = function(data, parser)
+    parser:assert_type(data, "string", "\"tag-check\" value must be a string")
+    return parser:parseInterpolatedString(data)
+  end,
+  init = function(data)
+    Binding.call("string", "create", data)
   end
-end})
+})
+
+Rule.condition.add("match", {
+  parse = function(data, parser)
+    parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
+    for _, v in ipairs(data) do
+      parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
+      data[v]=parser:parseInterpolatedString(v)
+    end
+  end,
+  init = function(data)
+    for _, v in ipairs(data) do
+      Binding.call("string", "create", v)
+    end
+  end
+})
 
 --limiter conditions
 Rule.condition.add({"limit-break", "limit-check"}, {
@@ -125,9 +139,9 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     if type(data) == "string" then
       data = {name=data}
     elseif type(data) == "table" then
-      
+      --no problem
     else
-      parser:error("invalid value type " .. type(data))
+      parser:error("invalid value type %s", type(data))
     end
     local condition_name = next(parser:getContext())
     local rule = parser:getContext("rule")
@@ -137,6 +151,8 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     end
     parser:assert(data.key, "limiter \"key\" missing, and no default \"key\" in rule")
     parser:assert_type(data.key, "string", "invalid limiter \"key\" type")
+    
+    data.key = parser:parseInterpolatedString(data.key)
     
     if not data.increment then
       if condition_name == "limit-break" then
@@ -155,12 +171,16 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     local limiter = assert(ruleset:findLimiter(data.name), "unknown limiter")
     data.name = nil
     data.limiter = limiter
+    if data.key then
+      Binding.call("string", "create", data.key)
+    end
   end
 })
 
 --some actions, too
 Rule.action.add("tag", {parse = function(data, parser)
   parser:assert_jsontype(data, "string", "\"tag\" value must be a string")
+  return parser:parseInterpolatedString(data)
 end})
 
 Rule.action.add("accept", {parse = function(data, parser)

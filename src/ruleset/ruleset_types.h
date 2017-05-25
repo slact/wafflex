@@ -4,9 +4,20 @@
 #include <nginx.h>
 #include <ngx_http.h>
 
-typedef enum{STRING, ARRAY, BANANA} wfx_data_type_t;
 typedef enum{WFX_ACTION_NEXT, WFX_ACTION_BREAK, WFX_ACTION_FINISH} wfx_action_result_t;
+typedef enum {WFX_DATA_INTEGER, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_ARRAY, WFX_DATA_PTR, WFX_DATA_RAW} wfx_data_type_t;
 
+typedef struct {
+  wfx_data_type_t   type;
+  int               count;
+  union {
+    void              *ptr;
+    wfx_str_t          str;
+    ngx_int_t          integer;
+    float              floating_point;
+    char               raw[1];
+  }                 data;
+} wfx_data_t;
 
 typedef struct wfx_limiter_s wfx_limiter_t;
 struct wfx_limiter_s {
@@ -31,7 +42,8 @@ struct wfx_condition_s {
   int               luaref;
   wfx_condition_eval_pt eval;
   unsigned          negate:1;
-  void             *data;
+  
+  wfx_data_t        data;
 }; //wfx_condition_t
 
 typedef struct wfx_action_s wfx_action_t;
@@ -40,7 +52,7 @@ struct wfx_action_s {
   char             *action;
   int               luaref;
   wfx_action_eval_pt eval;
-  void             *data;
+  wfx_data_t        data;
 }; //wfx_action_t
 
 struct wfx_rule_s {
@@ -109,6 +121,10 @@ int ruleset_subbinding_getname_call(lua_State *L, const char *binding_name, cons
 #define ruleset_common_shm_alloc_init_item(type, extra_sz, L, name_key) \
   __ruleset_common_shm_alloc_init_item(L, sizeof(type) + extra_sz, #name_key, offsetof(type, name_key), offsetof(type, luaref))
   
+#define ruleset_common_shm_alloc_init_item_noname(type, extra_sz, L) \
+  __ruleset_common_shm_alloc_init_item_noname(L, sizeof(type) + extra_sz, offsetof(type, luaref))
+  
 void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *str_key, off_t str_offset, off_t luaref_offset);
+void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, off_t luaref_offset);
 
 #endif //WFX_RULESET_TYPES_H

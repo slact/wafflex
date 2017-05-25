@@ -8,6 +8,7 @@
 #include "tag.h"
 #include "limiter.h"
 #include "phase.h"
+#include "string.h"
 
 static wfx_binding_t wfx_ruleset_binding;
 
@@ -47,6 +48,9 @@ static int ruleset_create(lua_State *L) {
 }
 
 int wfx_ruleset_bindings_set(lua_State *L) {
+  //string interpolation
+  wfx_string_bindings_set(L);
+  
   //rule bindings
   wfx_rule_bindings_set(L);
   
@@ -73,6 +77,23 @@ int wfx_ruleset_bindings_set(lua_State *L) {
   return 0;
 }
 
+void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, off_t luaref_offset) {
+  int         tmpref;
+  void       *ptr;
+  int        *refptr;
+  
+  lua_pushvalue(L, 1); //lua-self
+  tmpref = luaL_ref(L, LUA_REGISTRYINDEX);
+  
+  if((ptr = wfx_shm_calloc(item_sz)) != NULL) {
+    refptr = (int *)((char *)ptr + luaref_offset);
+    *refptr = tmpref;
+  }
+  
+  lua_pop(L, 1);
+  return ptr;
+}
+  
 void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, char *str_key, off_t str_offset, off_t luaref_offset) {
   const char *tmpstr;
   size_t      tmpstrlen;
