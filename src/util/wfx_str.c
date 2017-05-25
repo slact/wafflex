@@ -105,6 +105,17 @@ int wfx_str_each_part(ngx_str_t *str, u_char **curptr, wfx_str_part_t *part) {
 }
 
 
+void wfx_str_get_part_value(wfx_str_t *wstr, wfx_str_part_t *part, ngx_str_t *out, wfx_evaldata_t *ed) {
+  switch(ed->type) {
+    case WFX_EVAL_HTTP:
+      wfx_str_http_get_part_value(wstr, part, out, ed->data.request);
+      break;
+    default:
+      ERR("don't know how to do this");
+      raise(SIGABRT);
+  }
+}
+
 void wfx_str_http_get_part_value(wfx_str_t *wstr, wfx_str_part_t *part, ngx_str_t *out, ngx_http_request_t *r) {
   u_char *start = &wstr->str.data[part->start];
   size_t  len = part->end - part->start;
