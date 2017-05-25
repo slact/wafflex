@@ -105,3 +105,45 @@ int wfx_str_each_part(ngx_str_t *str, u_char **curptr, wfx_str_part_t *part) {
 }
 
 
+void wfx_str_http_get_part_value(wfx_str_t *wstr, wfx_str_part_t *part, ngx_str_t *out, ngx_http_request_t *r) {
+  u_char *start = &wstr->str.data[part->start];
+  size_t  len = part->end - part->start;
+  
+  if(!part->variable) {
+    out->data = start;
+    out->len = len;
+  }
+  else if(part->regex_capture) {
+#if (NGX_PCRE)
+    int       *cap;
+    u_char    *p;
+    ngx_uint_t n = (ngx_uint_t) part->key * 2;
+    if (r->captures == NULL || r->captures_data == NULL || n >= r->ncaptures) {
+      out->data = &wstr->str.data[part->start];
+      out->len = 0;
+    }
+    else {
+      cap = r->captures;
+      p = r->captures_data;
+      out->data = &p[cap[n]];
+      out->len = (size_t) (cap[n + 1] - cap[n]);
+    }
+#endif
+  }
+  else {
+    ngx_http_variable_value_t *vv;
+    ngx_str_t                  varname;
+    varname.data = start;
+    varname.len = len;
+    vv = ngx_http_get_variable(r, &varname, part->key);
+    if (vv == NULL || vv->not_found) {
+      out->data = &wstr->str.data[part->start];
+      out->len = 0;
+    }
+    else {
+      out->data = vv->data;
+      out->len = (size_t) vv->len;
+    }
+  }
+}
+
