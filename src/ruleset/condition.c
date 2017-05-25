@@ -125,14 +125,81 @@ static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
 }
 
-  /*wfx_data_t     *data = &self->data;
+static int condition_match_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
+  wfx_data_t     *data = &self->data;
   ngx_str_t       str[32];
-  wfx_str_part_t *part;
+  
+  ngx_str_t       scur;
+  ngx_str_t       ccur;
+  
+  wfx_str_part_t *parts;
   wfx_str_t     **wstrs = data->data.str_array;
-  u_char         *cur;
-  int             n;
+  int             i, smax, cmax, si, ci;
+  
+  int             negate = self->negate;
+  int             cmp;
 
-  return self->negate ? !rc : rc;
+  
+  if(data->count == 0)
+    return 0;
+  else if(data->count == 1) //1 string always matches
+    return 1; 
+  
+  smax = wstrs[0]->parts_count;
+  parts = wstrs[0]->parts;
+  
+  for(si=0; si < smax; si++) {
+    //build first (simplest) string
+    wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
+  }
+  
+  //there's room for optimization here, guys. just not prematurely.
+  
+  for(i=1; i < data->count; i++) {
+    //compare piecemeal against others
+    si = 0;
+    scur = str[si];
+
+    ci = 0;
+    cmax = wstrs[i]->parts_count;
+    parts = wstrs[i]->parts;
+    wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
+    
+    while(1) {
+      if(scur.len < ccur.len) {
+        cmp = memcmp(scur.data, ccur.data, scur.len);
+        ccur.data+=scur.len;
+        ccur.len -=scur.len;
+        
+        if(cmp == 0 && !negate)
+          return 0;
+        if(cmp != 0 && negate)
+          return 1;
+        
+        if(++si < smax)
+          scur = str[si];
+        else
+          break;
+      }
+      else {
+        cmp = memcmp(scur.data, ccur.data, ccur.len);
+        scur.data+=ccur.len;
+        scur.len -=ccur.len;
+        
+        if(cmp == 0 && !negate)
+          return 0;
+        if(cmp != 0 && negate)
+          return 1;
+        
+        if(++ci < cmax)
+          wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
+        else
+          break;
+      }
+    }
+  }
+  
+  return !negate;
 }
 static int condition_match_create(lua_State *L) {
   wfx_condition_t *condition;
