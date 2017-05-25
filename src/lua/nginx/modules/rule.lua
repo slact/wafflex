@@ -132,6 +132,18 @@ Rule.condition.add("match", {
     end
   end,
   init = function(data)
+    local complexity = function(str)
+      local n = 0
+      mm(str)
+      for match in str.string:gmatch("%$") do 
+        n=n+1
+      end
+      return n
+    end
+    local simplefirst = function(str1, str2)
+      return complexity(str1) < complexity(str2)
+    end
+    table.sort(data, simplefirst)
     for _, v in ipairs(data) do
       Binding.call("string", "create", v)
     end

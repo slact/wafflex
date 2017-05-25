@@ -21,7 +21,7 @@
     "list1": [
       "fweep",
       {
-        "if": {"match": ["foo", "bar", "$baz$foobar", "$thing"]},
+        "if": {"match": ["$foo", "$bar", "$baz$foobar", "phno", "$thing"]},
         "then": "reject"
       },
       {
