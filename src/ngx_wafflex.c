@@ -2,7 +2,6 @@
 #include <util/ipc.h>
 #include <util/shmem.h>
 #include <ruleset/ruleset.h>
-#include <ruleset/ruleset_types.h>
 #include <util/wfx_str.h>
 #include <ngx_wafflex_nginx_lua_scripts.h>
 
