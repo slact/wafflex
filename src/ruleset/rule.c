@@ -1,5 +1,5 @@
 #include <ngx_wafflex.h>
-#include "ruleset_types.h"
+#include "common.h"
 #include "rule.h"
 
 wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {

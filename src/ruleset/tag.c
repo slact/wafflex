@@ -1,10 +1,9 @@
 #include <ngx_wafflex.h>
-#include "ruleset_types.h"
+#include "common.h"
 #include "tag.h"
 #include "condition.h"
 #include "action.h"
 #include <util/wfx_str.h>
-
 
 //tag-check
 static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {

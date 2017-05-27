@@ -1,5 +1,5 @@
 #include <ngx_wafflex.h>
-#include "ruleset_types.h"
+#include "common.h"
 #include "string.h"
 #include <util/wfx_str.h>
 
