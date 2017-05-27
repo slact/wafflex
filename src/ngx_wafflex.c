@@ -2,8 +2,8 @@
 #include <util/ipc.h>
 #include <util/shmem.h>
 #include <ruleset/ruleset.h>
-#include <ngx_wafflex_nginx_lua_scripts.h>
 #include <util/wfx_str.h>
+#include <ngx_wafflex_nginx_lua_scripts.h>
 
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
   wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \
@@ -34,9 +34,9 @@ int wfx_lua_require_module(lua_State *L) {
 }
 
 
-static ipc_t        *ipc = NULL;
-static lua_State    *Lua = NULL;
-shmem_t             *shm = NULL;
+ipc_t        *wfx_ipc = NULL;
+lua_State    *wfx_Lua = NULL;
+shmem_t      *wfx_shm = NULL;
 
 void *wfx_shm_alloc(size_t sz) {
   return ngx_alloc(sz, ngx_cycle->log);
@@ -56,90 +56,64 @@ static int wfx_init_bind_lua(lua_State *L) {
 }
 
 static ngx_int_t ngx_http_wafflex_header_filter(ngx_http_request_t *r) {
+  wfx_loc_conf_t       *cf = ngx_http_get_module_loc_conf(r, ngx_wafflex_module);
+  wfx_ruleset_conf_t   *rcf;
+  ERR("header filter");
+  
+  for(rcf = cf->ruleset; rcf != NULL; rcf = rcf->next) {
+    ERR("do a ruleset for the headers");
+  }
+  
   return ngx_http_next_header_filter(r);
 }
 static ngx_int_t ngx_http_wafflex_body_filter(ngx_http_request_t *r, ngx_chain_t *in) {
+  wfx_loc_conf_t       *cf = ngx_http_get_module_loc_conf(r, ngx_wafflex_module);
+  wfx_ruleset_conf_t   *rcf;
+  ERR("body filter");
+  for(rcf = cf->ruleset; rcf != NULL; rcf = rcf->next) {
+    ERR("do a ruleset for the body");
+  }
+  
   return ngx_http_next_body_filter(r, in);
 }
 
+static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
+  wfx_ruleset_conf_t *rcf = lua_touserdata(L, 2);
+  lua_getfield(L, 1, "__binding");
+  rcf->ptr = lua_touserdata(L, -1);
+  return 0;
+}
 
-static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
-  Lua = luaL_newstate();
-  luaL_openlibs(Lua);
+ngx_int_t ngx_wafflex_init_lua(void) {  
+  wfx_Lua = luaL_newstate();
+  luaL_openlibs(wfx_Lua);
   
+  wfx_lua_loadscript(wfx_Lua, init);
+  wfx_lua_register(wfx_Lua, wfx_lua_require_module);
+  wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
+  wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
+  lua_ngxcall(wfx_Lua, 3, 0);
+  
+  return NGX_OK;
+}
+ngx_int_t ngx_wafflex_shutdown_lua(void) {
+  lua_close(wfx_Lua);
+  wfx_Lua = NULL;
+  return NGX_OK;
+}
+
+ngx_int_t ngx_wafflex_inject_http_filters(void) {
   ngx_http_next_header_filter = ngx_http_top_header_filter;
   ngx_http_top_header_filter = ngx_http_wafflex_header_filter;
 
   ngx_http_next_body_filter = ngx_http_top_body_filter;
   ngx_http_top_body_filter = ngx_http_wafflex_body_filter;
   
-  wfx_lua_loadscript(Lua, init);
-  wfx_lua_register(Lua, wfx_lua_require_module);
-  wfx_lua_register(Lua, wfx_init_bind_lua);
-  lua_ngxcall(Lua, 2, 0);
+  ERR("injected filters");
   
   return NGX_OK;
 }
 
-static void ngx_wafflex_ipc_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
+void ngx_wafflex_ipc_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
   //do nothing -- for now
 }
-
-
-static ngx_int_t ngx_wafflex_init_module(ngx_cycle_t *cycle) {
-  
-  if(ipc) { //ipc already exists. destroy it!
-    ipc_destroy(ipc);
-  }
-  ipc = ipc_init_module("wafflex", cycle);
-  //ipc->track_stats = 1;
-  ipc_set_alert_handler(ipc, ngx_wafflex_ipc_alert_handler);
-  
-  return NGX_OK;
-}
-
-static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
-  return ipc_init_worker(ipc, cycle);
-}
-
-static void ngx_wafflex_exit_worker(ngx_cycle_t *cycle) {
-  lua_close(Lua);
-  ipc_destroy(ipc);
-}
-
-static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
-  lua_close(Lua);
-  ipc_destroy(ipc);
-}
-
-
-
-static ngx_command_t  ngx_wafflex_commands[] = {
-  ngx_null_command
-};
-
-static ngx_http_module_t  ngx_wafflex_ctx = {
-  NULL,                          /* preconfiguration */
-  ngx_wafflex_init_postconfig,   /* postconfiguration */
-  NULL,                          /* create main configuration */
-  NULL,                          /* init main configuration */
-  NULL,                          /* create server configuration */
-  NULL,                          /* merge server configuration */
-  NULL,                          /* create location configuration */
-  NULL,                          /* merge location configuration */
-};
-
-ngx_module_t  ngx_wafflex_module = {
-  NGX_MODULE_V1,
-  &ngx_wafflex_ctx,              /* module context */
-  ngx_wafflex_commands,          /* module directives */
-  NGX_HTTP_MODULE,               /* module type */
-  NULL,                          /* init master */
-  ngx_wafflex_init_module,       /* init module */
-  ngx_wafflex_init_worker,       /* init process */
-  NULL,                          /* init thread */
-  NULL,                          /* exit thread */
-  ngx_wafflex_exit_worker,       /* exit process */
-  ngx_wafflex_exit_master,       /* exit master */
-  NGX_MODULE_V1_PADDING
-};

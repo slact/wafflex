@@ -57,6 +57,7 @@ typedef struct {
   int              increment;
 } limit_condition_data_t;
 static int condition_limit_break_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
+  
   return 1;
 }
 static int condition_limit_break_create(lua_State *L) {

@@ -46,4 +46,30 @@ typedef struct {
   }                 data;
 } wfx_data_t;
 
+typedef struct {
+  ngx_atomic_uint_t shmem_pages_used;
+} wfx_shm_data_t;
+
+typedef struct wfx_ruleset_conf_s wfx_ruleset_conf_t;
+struct wfx_ruleset_conf_s {
+  ngx_str_t           name;
+  void               *ptr; //points to shared memory
+  wfx_ruleset_conf_t *next;
+}; //wfx_ruleset_conf_t
+
+typedef struct {
+  size_t              shm_size;
+  wfx_ruleset_conf_t *ruleset;
+} wfx_main_conf_t;
+
+typedef struct {
+  ngx_int_t           something;
+  wfx_ruleset_conf_t *ruleset;
+} wfx_srv_conf_t;
+
+typedef struct {
+  ngx_int_t           something;
+  wfx_ruleset_conf_t *ruleset;
+} wfx_loc_conf_t;
+
 #endif //NGX_WAFFLEX_TYPES_H

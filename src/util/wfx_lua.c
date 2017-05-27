@@ -42,6 +42,7 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   lua_remove(L, 1);
 }
 
+
 int wfx_lua_getref(lua_State *L, int index) {
   lua_pushvalue(L, index);
   return luaL_ref(L, LUA_REGISTRYINDEX);

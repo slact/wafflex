@@ -37,10 +37,10 @@ Binding.set("action", {
 
 local p = Parser.new()
 
-local parsed = p:parseFile("./ruleset1.json")
+local parsed = p:parseFile("../../../dev/ruleset1.json")
 
 mm(parsed)
 
 local rs = Ruleset.new(parsed)
 
---mm(rs)
+mm(rs)

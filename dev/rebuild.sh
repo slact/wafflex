@@ -206,11 +206,11 @@ export OPTIMIZE_LEVEL=$optimize_level
 
 if [[ -z $NO_MAKE ]]; then
   
-  #./gen_config_commands.rb
-  #if ! [ $? -eq 0 ]; then; 
-  #  echo "failed generating nginx directives"; 
-  #  exit 1
-  #fi
+  ./gen_config_commands.rb
+  if ! [ $? -eq 0 ]; then; 
+    echo "failed generating nginx directives"; 
+    exit 1
+  fi
   
   #if [[ -n $RELEASE ]]; then
   #  ./redocument.rb --release $RELEASE
