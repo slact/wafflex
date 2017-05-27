@@ -149,6 +149,7 @@ typedef struct {
 
 typedef struct {
   size_t              shm_size;
+  unsigned            enabled:1;
 } wfx_main_conf_t;
 
 typedef struct {

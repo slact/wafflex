@@ -7,10 +7,6 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
   wfx_action_t       **actions;
   wfx_rc_t             rc = WFX_OK;
   
-  lua_geti(wfx_Lua, LUA_REGISTRYINDEX, self->luaref);
-  lua_mm(wfx_Lua, -1);
-  lua_pop(wfx_Lua, 1);
-  
   if(self->condition->eval(self->condition, ed, &ctx->rule.condition_stack)) {
     actions = self->actions;
     n = self->actions_len;

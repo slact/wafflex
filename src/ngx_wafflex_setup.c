@@ -3,7 +3,7 @@
   static char                   errbuf[512];
 
 static ngx_int_t ngx_wafflex_init_preconfig(ngx_conf_t *cf) {  
-  ngx_wafflex_init_lua();
+  ngx_wafflex_init_lua(1);
   return NGX_OK;
 }
 
@@ -37,15 +37,48 @@ static ngx_int_t initialize_shm(ngx_shm_zone_t *zone, void *data) {
   return NGX_OK;
 }
 
+static ngx_msec_t wfx_cache_manager(void *data) {
+  ERR("managing ze cache");
+  return 2;
+}
+
+static ngx_int_t ngx_wafflex_setup_cachemanager_process(ngx_conf_t *cf) {
+  ngx_path_t     *path;
+  path = ngx_pcalloc(cf->pool, sizeof(ngx_path_t));
+  if(path == NULL)
+    return NGX_ERROR;
+  ngx_str_set(&path->name, "wafflex::ruleset:manager");
+  path->manager = (ngx_path_manager_pt )&wfx_cache_manager;
+  if(ngx_add_path(cf, &path) != NGX_OK)
+    return NGX_ERROR;
+  return NGX_OK;
+}
+
 static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {  
   static ngx_str_t   shm_name = ngx_string("wafflex shared data");
   wfx_main_conf_t   *mcf = ngx_http_conf_get_module_main_conf(cf, ngx_wafflex_module);
   if(mcf->shm_size==NGX_CONF_UNSET_SIZE) {
     mcf->shm_size=WAFFLEX_DEFAULT_SHM_SIZE;
   }
-  wfx_shm = shm_create(&shm_name, &ngx_wafflex_module, cf, mcf->shm_size, initialize_shm, NULL);
   
-  ngx_wafflex_setup_http_request_hooks(cf);
+  if(!mcf->enabled) {
+    ERR("wafflex not enabled");
+    return NGX_OK;
+  }
+  wfx_shm = shm_create(&shm_name, &ngx_wafflex_module, cf, mcf->shm_size, initialize_shm, NULL);
+  if(!wfx_shm) {
+    ERR("unable to create shared memory wrapper");
+    return NGX_ERROR;
+  }
+  if(ngx_wafflex_setup_http_request_hooks(cf) != NGX_OK) {
+    ERR("unable to attach http request hooks");
+    return NGX_ERROR;
+  }
+  //ensure the cache manager process runs
+  if(ngx_wafflex_setup_cachemanager_process(cf) != NGX_OK) {
+    ERR("unable to setup cache manager process");
+    return NGX_ERROR;
+  }
   
   return NGX_OK;
 }
@@ -102,9 +135,19 @@ static ngx_int_t ngx_wafflex_init_module(ngx_cycle_t *cycle) {
 }
 
 static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
-  return ipc_init_worker(wfx_ipc, cycle);
+  ngx_int_t rc = ipc_init_worker(wfx_ipc, cycle);
+  if (rc != NGX_OK) {
+    ERR("error initializing ipc worker");
+    return rc;
+  }
+  
+  if(ngx_process == NGX_PROCESS_WORKER) {
+    //reset lua
+    ngx_wafflex_shutdown_lua();
+    ngx_wafflex_init_lua(0);
+  }
+  return NGX_OK;
 }
-
 
 static void ngx_wafflex_exit_worker(ngx_cycle_t *cycle) {
   ngx_wafflex_shutdown_lua();
@@ -240,11 +283,12 @@ static char *wfx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *co
 
 
 static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-  const char                   *errstr;
-  lua_State                    *L = wfx_Lua;
-  ngx_str_t                    *val = cf->args->elts;
-  ngx_int_t                     n = cf->args->nelts;
-  ngx_str_t                    *path, *name;
+  const char        *errstr;
+  wfx_main_conf_t   *mcf = ngx_http_conf_get_module_main_conf(cf, ngx_wafflex_module);
+  lua_State         *L = wfx_Lua;
+  ngx_str_t         *val = cf->args->elts;
+  ngx_int_t          n = cf->args->nelts;
+  ngx_str_t         *path, *name;
   if(n==2) { //just the path
     name = NULL;
     path = &val[1];
@@ -274,6 +318,7 @@ static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *con
   else {
     lua_pop(L, 2);
   } 
+  mcf->enabled = 1;
   return NGX_CONF_OK;
 }
 
