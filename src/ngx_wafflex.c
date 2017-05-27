@@ -40,13 +40,13 @@ lua_State    *wfx_Lua = NULL;
 shmem_t      *wfx_shm = NULL;
 
 void *wfx_shm_alloc(size_t sz) {
-  return ngx_alloc(sz, ngx_cycle->log);
+  return shm_alloc(wfx_shm, sz, "wafflex item");
 }
 void *wfx_shm_calloc(size_t sz) {
-  return ngx_calloc(sz, ngx_cycle->log);
+  return shm_calloc(wfx_shm, sz, "wafflex item");
 }
 void wfx_shm_free(void *ptr) {
-  ngx_free(ptr);
+  shm_free(wfx_shm, ptr);
 }
 
 static int wfx_init_bind_lua(lua_State *L) {
