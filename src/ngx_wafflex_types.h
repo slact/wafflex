@@ -25,7 +25,8 @@ typedef struct {
   wfx_str_part_t  *parts;
 } wfx_str_t;
 
-typedef enum {WFX_OK, WFX_ACCEPT, WFX_REJECT, WFX_SKIP, WFX_SUSPEND, WFX_ERROR} wfx_rc_t;
+typedef enum {WFX_COND_FALSE=0, WFX_COND_TRUE, WFX_COND_SUSPEND, WFX_COND_ERROR} wfx_condition_rc_t;
+typedef enum {WFX_REJECT=0, WFX_ACCEPT, WFX_OK, WFX_SKIP, WFX_DEFER, WFX_ERROR} wfx_rc_t;
 
 typedef enum {WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
 typedef enum{WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
@@ -68,11 +69,22 @@ struct wfx_limiter_s {
   }                 burst;
 }; //wfx_limiter_t
 
-
 typedef struct wfx_rule_s wfx_rule_t;
 
 typedef struct wfx_condition_s wfx_condition_t;
-typedef int (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_evaldata_t *);
+
+typedef struct wfx_condition_stack_el_s wfx_condition_stack_el_t;
+struct wfx_condition_stack_el_s {
+  void                     *pd;
+  wfx_condition_stack_el_t *next;
+}; //wfx_condition_stack_el_t
+
+typedef struct {
+  wfx_condition_stack_el_t *head;
+  wfx_condition_stack_el_t *tail;
+} wfx_condition_stack_t;
+
+typedef wfx_condition_rc_t (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_evaldata_t *, wfx_condition_stack_t *stack);
 struct wfx_condition_s {
   char             *condition;
   int               luaref;
@@ -94,6 +106,7 @@ struct wfx_action_s {
 struct wfx_rule_s {
   char             *name;
   int               luaref;
+  int               gen;
   wfx_condition_t  *condition;
   int               actions_len;
   wfx_action_t     *(*actions);
@@ -105,12 +118,14 @@ typedef struct {
   char             *name;
   int               luaref;
   size_t            len;
+  int               gen;
   wfx_rule_t       *rules[1];
 } wfx_rule_list_t;
 
 typedef struct {
   char             *name;
   int               luaref;
+  int               gen;
   size_t            len;
   wfx_rule_list_t  *lists[1];
 } wfx_phase_t;
@@ -118,6 +133,7 @@ typedef struct {
 typedef struct {
   char             *name;
   int               luaref;
+  int               gen;
   wfx_phase_t      *phase[WFX_PHASE_INVALID];
 } wfx_ruleset_t;
 
@@ -139,5 +155,30 @@ typedef struct {
   ngx_array_t        *rulesets;
 } wfx_loc_conf_t;
 
+//request context
+typedef struct {
+  struct {
+    int                 i;
+    int                 gen; //current ruleset generation
+  }                   ruleset;
+  struct {
+    int                 gen;
+    wfx_phase_type_t    phase;
+  }                   phase;
+  struct {
+    int                 i;
+    int                 gen;
+  }                   list;
+  struct {
+    int                 i;
+    int                 gen;
+    wfx_condition_stack_t condition_stack;
+    struct {
+      int                 i;
+      unsigned            else_action:1;
+    }                   action;
+  }                   rule;
+  unsigned            nocheck:1;
+} wfx_request_ctx_t;
 
 #endif //NGX_WAFFLEX_TYPES_H

@@ -7,11 +7,37 @@
 
 static wfx_condition_type_t condition_types[];
 
-wfx_condition_t *condition_create(lua_State *L, size_t data_sz,  wfx_condition_eval_pt eval) {
+wfx_condition_t *condition_create(lua_State *L, size_t data_sz, wfx_condition_eval_pt eval) {
   wfx_condition_t *condition = ruleset_common_shm_alloc_init_item(wfx_condition_t, data_sz, L, condition);
   condition->eval = eval;
   lua_pushlightuserdata(L, condition);
   return condition;
+}
+
+int condition_stack_append(wfx_condition_stack_t *stack, void *d) {
+  wfx_condition_stack_el_t *el = ngx_alloc(sizeof(*el), ngx_cycle->log);
+  if(!el)
+    return 0;
+  if(stack->tail)
+    stack->tail->next = el;
+  if(!stack->head)
+    stack->head = el;
+  stack->tail = el;
+  el->next = NULL;
+  el->pd = d;
+  return 1;
+}
+void *condition_stack_pop(wfx_condition_stack_t *stack) {
+  wfx_condition_stack_el_t *el = stack->head;
+  void                     *d;
+  if(!el)
+    return NULL;
+  d = el->pd;
+  stack->head = el->next;
+  if(stack->tail == el)
+    stack->tail = NULL;
+  ngx_free(el);
+  return d;
 }
 
 #define condition_to_binding(cond, binding, buf) \
@@ -44,8 +70,8 @@ void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *cond) {
 
 
 //true
-static int condition_true_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
-  return self->negate ? 0 : 1;
+static wfx_condition_rc_t condition_true_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  return !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
 static int condition_true_create(lua_State *L) {
   condition_create(L, 0, condition_true_eval);
@@ -53,8 +79,8 @@ static int condition_true_create(lua_State *L) {
 }
 
 //false
-static int condition_false_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
-  return self->negate ? 1 : 0;
+static wfx_condition_rc_t condition_false_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  return self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
 static int condition_false_create(lua_State *L) {
   condition_create(L, 0, condition_false_eval);
@@ -92,40 +118,78 @@ static int condition_array_create(lua_State *L, wfx_condition_eval_pt eval) {
   return 1;
 }
 
-static int condition_list_eval(wfx_data_t *data, int stop_on, wfx_evaldata_t *ed) {
-  assert(data->type == WFX_DATA_PTR);
+static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc_t stop_on, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   wfx_condition_t       **conditions = (wfx_condition_t **)data->data.ptr;
   unsigned                len = data->count;
   wfx_condition_t        *cur;
-  unsigned                i;
-  for(i=0; i<len; i++) {
+  uintptr_t                start, i;
+  wfx_condition_rc_t      rc;
+  if(condition_stack_empty(stack)) {
+    start = 0;
+  }
+  else {
+    start = (uintptr_t )(char *)condition_stack_pop(stack);
+  }
+  
+  for(i=start; i<len; i++) {
     cur = conditions[i];
-    if(stop_on == cur->eval(cur, ed)) {
+    rc = cur->eval(cur, ed, stack);
+    if(rc == stop_on) {
       return stop_on;
     }
+    else if(rc == WFX_COND_SUSPEND) {
+      condition_stack_append(stack, (void *)i);
+      return rc;
+    }
+    else if(rc == WFX_COND_ERROR) {
+      return rc;
+    }
   }
-  return !stop_on;
+  if(stop_on == WFX_COND_FALSE) {
+    return WFX_COND_TRUE;
+  }
+  else if(stop_on == WFX_COND_TRUE) {
+    return WFX_COND_FALSE;
+  }
+  else {
+    return rc;
+  }
 }
 
 //any
-static int condition_any_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
-  int                     rc = condition_list_eval(&self->data, 1, ed);
-  return self->negate ? !rc : rc;
+static wfx_condition_rc_t condition_any_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_TRUE, ed, stack);
+  switch(rc) {
+    case WFX_COND_FALSE:
+    case WFX_COND_TRUE:
+      return self->negate ? !rc : rc;
+    case WFX_COND_SUSPEND:
+    case WFX_COND_ERROR:
+      return rc;
+  }
 }
 static int condition_any_create(lua_State *L) {
   return condition_array_create(L, condition_any_eval);
 }
 
 //all
-static int condition_all_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
-  int                     rc = condition_list_eval(&self->data, 0, ed);
-  return self->negate ? !rc : rc;
+static wfx_condition_rc_t condition_all_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_FALSE, ed, stack);
+  switch(rc) {
+    case WFX_COND_FALSE:
+    case WFX_COND_TRUE:
+      return self->negate ? !rc : rc;
+    case WFX_COND_SUSPEND:
+    case WFX_COND_ERROR:
+      return rc;
+  }
+  
 }
 static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
 }
 
-static int condition_match_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
+static wfx_condition_rc_t condition_match_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   wfx_data_t     *data = &self->data;
   ngx_str_t       str[32];
   

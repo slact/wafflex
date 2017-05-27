@@ -3,17 +3,27 @@
 #include "list.h"
 #include "rule.h"
 
-wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed) {
-  int                  i, n = self->len;
+wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
+  int                  start, i, len = self->len;
   wfx_rule_t         **rule = self->rules;
   wfx_rc_t             rc;
-  for(i=0; i < n; i++) {
-    rc = wfx_rule_eval(rule[i], ed);
+  if(ctx->nocheck || ctx->list.gen != self->gen) {
+    start = 0;
+  }
+  else {
+    start = ctx->rule.i;
+  }
+  for(i=0; i < len; i++) {
+    rc = wfx_rule_eval(rule[i], ed, ctx);
     switch(rc) {
       case WFX_OK:
         continue;
       case WFX_SKIP: //next list
         return WFX_OK;
+      case WFX_DEFER:
+        ctx->list.gen = self->gen;
+        ctx->rule.i = i;
+        return rc;
       default:
         return rc;
     }
@@ -35,6 +45,7 @@ static int list_create(lua_State *L) {
   list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, (sizeof(rule)*(rules_n - 1)), L, name);
   
   list->len = rules_n;
+  list->gen = 0;
   
   lua_getfield(L, -1, "rules");
   for(i=0; i<rules_n; i++) {

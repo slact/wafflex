@@ -58,12 +58,12 @@ static int wfx_init_bind_lua(lua_State *L) {
 
 static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   wfx_loc_conf_t       *cf = ngx_http_get_module_loc_conf(r, ngx_wafflex_module);
-  int                   i, n;
+  int                   start, i, n;
   wfx_ruleset_conf_t   *rcf;
   wfx_ruleset_t        *ruleset;
   wfx_evaldata_t        ed;
   wfx_rc_t              rc;
-
+  wfx_request_ctx_t    *ctx, tmpctx;
   if(!cf->rulesets) {
     return NGX_DECLINED;
   }
@@ -72,11 +72,25 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   ed.type = WFX_EVAL_HTTP_REQUEST;
   ed.phase = WFX_PHASE_HTTP_REQUEST_HEADERS;
   
+  tmpctx.nocheck = 1;
+  tmpctx.rule.condition_stack.head = NULL;
+  tmpctx.rule.condition_stack.tail = NULL;
+  
   n = cf->rulesets->nelts;
   rcf = cf->rulesets->elts;
-  for(i=0; i<n; i++) {
+  
+  ctx = ngx_http_get_module_ctx(r, ngx_wafflex_module);
+  if(ctx && !ctx->nocheck && ctx->ruleset.gen == rcf->ruleset[ctx->ruleset.i].gen) {
+    //resume ruleset execution
+    start = ctx->ruleset.i;
+  }
+  else {
+    start = 0;
+  }
+  
+  for(i=start; i<n; i++) {
     ruleset = &rcf->ruleset[i];
-    rc = wfx_ruleset_eval(ruleset, &ed);
+    rc = wfx_ruleset_eval(ruleset, &ed, ctx == NULL ? &tmpctx : ctx);
     //raise(SIGSTOP);
     switch(rc) {
       case WFX_OK:
@@ -87,7 +101,16 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
         return NGX_OK;
       case WFX_REJECT:
         return NGX_ABORT;
-      case WFX_SUSPEND:
+      case WFX_DEFER:
+        if(ctx == NULL) {
+          ctx = ngx_palloc(r->pool, sizeof(*ctx));
+          if (ctx == NULL)
+            return NGX_ERROR;
+          *ctx = tmpctx;
+          ctx->nocheck = 0;
+          ngx_http_set_ctx(r, ctx, ngx_wafflex_module);
+        }
+        ctx->ruleset.i = i;
         return NGX_DONE;
       case WFX_ERROR:
         return NGX_ERROR;

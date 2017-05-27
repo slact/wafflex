@@ -2,16 +2,16 @@
 #include "ruleset_types.h"
 #include "rule.h"
 
-wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed) {
+wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int                  i, n;
   wfx_action_t       **actions;
-  wfx_rc_t             rc;
+  wfx_rc_t             rc = WFX_OK;
   
   lua_geti(wfx_Lua, LUA_REGISTRYINDEX, self->luaref);
   lua_mm(wfx_Lua, -1);
   lua_pop(wfx_Lua, 1);
   
-  if(self->condition->eval(self->condition, ed)) {
+  if(self->condition->eval(self->condition, ed, &ctx->rule.condition_stack)) {
     actions = self->actions;
     n = self->actions_len;
   }
@@ -47,6 +47,10 @@ static int rule_create(lua_State *L) {
   lua_pop(L, 1);
   
   rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, (sizeof(wfx_action_t *) * (then_actions + else_actions)), L, name);
+  if(rule == NULL) {
+    return 0;
+  }
+  rule->gen = 0;
   
   lua_getfield(L, -1, "if");
   lua_getfield(L, -1, "__binding");

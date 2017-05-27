@@ -12,15 +12,15 @@ _NGX_WAFFLEX_SRCS="\
   ${_NGX_WAFFLEX_UTIL_SRCS} \
   ${ngx_addon_dir}/src/ngx_wafflex_setup.c \
   ${ngx_addon_dir}/src/ngx_wafflex.c \
-  ${ngx_addon_dir}/src/ruleset/string.c \
+  ${ngx_addon_dir}/src/ruleset/ruleset.c \
+  ${ngx_addon_dir}/src/ruleset/phase.c \
+  ${ngx_addon_dir}/src/ruleset/list.c \
   ${ngx_addon_dir}/src/ruleset/rule.c \
   ${ngx_addon_dir}/src/ruleset/condition.c \
   ${ngx_addon_dir}/src/ruleset/action.c \
+  ${ngx_addon_dir}/src/ruleset/string.c \
   ${ngx_addon_dir}/src/ruleset/tag.c \
   ${ngx_addon_dir}/src/ruleset/limiter.c \
-  ${ngx_addon_dir}/src/ruleset/list.c \
-  ${ngx_addon_dir}/src/ruleset/phase.c \
-  ${ngx_addon_dir}/src/ruleset/ruleset.c \
 "
 
 #taken from agentzh's lua-nginx-module

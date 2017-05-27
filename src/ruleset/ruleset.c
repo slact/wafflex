@@ -13,9 +13,13 @@
 static wfx_binding_t wfx_ruleset_binding;
 
 
-wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed) {
+wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   wfx_phase_t  *phase = self->phase[ed->phase];
-  return wfx_phase_eval(phase, ed);
+  wfx_rc_t      rc = wfx_phase_eval(phase, ed, ctx);
+  if(rc == WFX_DEFER) {
+    ctx->ruleset.gen = self->gen;
+  }
+  return rc;
 }
 
 static int ruleset_create(lua_State *L) {
@@ -28,6 +32,7 @@ static int ruleset_create(lua_State *L) {
   if(ruleset == NULL) {
     ERR("failed to initialize ruleset: out of memory");
   }
+  ruleset->gen = 0;
   
   lua_getfield(L, -1, "phases");
   lua_pushnil(L);  // first key 

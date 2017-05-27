@@ -12,4 +12,8 @@ typedef struct {
 
 void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *conditiontype);
 
+#define condition_stack_empty(stack) (stack->head == NULL)
+void *condition_stack_pop(wfx_condition_stack_t *stack);
+int condition_stack_push(wfx_condition_stack_t *stack, void *pd);
+
 #endif //WFX_CONDITION_H

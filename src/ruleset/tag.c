@@ -7,8 +7,8 @@
 
 
 //tag-check
-static int condition_tag_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed) {
-  return self->negate ? 1 : 0;
+static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  return !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
 static int condition_tag_check_create(lua_State *L) {
   wfx_condition_t *condition = condition_create(L, 0, condition_tag_check_eval);
