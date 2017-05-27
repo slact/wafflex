@@ -1,6 +1,25 @@
 #include <ngx_wafflex.h>
 #include "ruleset_types.h"
 #include "list.h"
+#include "rule.h"
+
+wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed) {
+  int                  i, n = self->len;
+  wfx_rule_t         **rule = self->rules;
+  wfx_rc_t             rc;
+  for(i=0; i < n; i++) {
+    rc = wfx_rule_eval(rule[i], ed);
+    switch(rc) {
+      case WFX_OK:
+        continue;
+      case WFX_SKIP: //next list
+        return WFX_OK;
+      default:
+        return rc;
+    }
+  }
+  return rc;
+}
 
 static int list_create(lua_State *L) {
   int                  i, rules_n;

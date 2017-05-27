@@ -38,7 +38,7 @@ void  wfx_shm_free(void *ptr);
 
 ngx_int_t ngx_wafflex_init_lua(void);
 ngx_int_t ngx_wafflex_shutdown_lua(void);
-ngx_int_t ngx_wafflex_inject_http_filters(void);
+ngx_int_t ngx_wafflex_setup_http_request_hooks(ngx_conf_t *cf);
 
 void ngx_wafflex_ipc_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data);
 

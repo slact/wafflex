@@ -12,6 +12,12 @@
 
 static wfx_binding_t wfx_ruleset_binding;
 
+
+wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed) {
+  wfx_phase_t  *phase = self->phase[ed->phase];
+  return wfx_phase_eval(phase, ed);
+}
+
 static int ruleset_create(lua_State *L) {
   const char        *str;
   
@@ -33,7 +39,7 @@ static int ruleset_create(lua_State *L) {
     str = lua_tostring(L, -2);
     
     if(strcmp(str, "request") == 0) {
-      ruleset->phase.request = phase;
+      ruleset->phase[WFX_PHASE_HTTP_REQUEST_HEADERS] = phase;
     }
     else {
       ERR("unknown phase %s", str);
@@ -122,6 +128,7 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t
   lua_pop(L, 2);
   return ptr;
 }
+
 
 static wfx_binding_t wfx_ruleset_binding = {
   "ruleset",

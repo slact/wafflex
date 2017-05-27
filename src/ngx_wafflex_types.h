@@ -25,15 +25,19 @@ typedef struct {
   wfx_str_part_t  *parts;
 } wfx_str_t;
 
-typedef enum {WFX_EVAL_ACCEPT, WFX_EVAL_HTTP} wfx_evaldata_type_t;
+typedef enum {WFX_OK, WFX_ACCEPT, WFX_REJECT, WFX_SKIP, WFX_SUSPEND, WFX_ERROR} wfx_rc_t;
+
+typedef enum {WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
+typedef enum{WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
 typedef struct {
   wfx_evaldata_type_t  type;
+  wfx_phase_type_t     phase;
   union {
     ngx_http_request_t   *request;
   }                     data;
 } wfx_evaldata_t;
 
-typedef enum {WFX_DATA_INTEGER, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_STRING_ARRAY, WFX_DATA_PTR} wfx_data_type_t;
+typedef enum {WFX_DATA_INTEGER = 0, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_STRING_ARRAY, WFX_DATA_PTR} wfx_data_type_t;
 typedef struct {
   wfx_data_type_t   type;
   int               count;
@@ -50,26 +54,90 @@ typedef struct {
   ngx_atomic_uint_t shmem_pages_used;
 } wfx_shm_data_t;
 
-typedef struct wfx_ruleset_conf_s wfx_ruleset_conf_t;
-struct wfx_ruleset_conf_s {
+
+typedef struct wfx_limiter_s wfx_limiter_t;
+struct wfx_limiter_s {
+  char             *name;
+  int               luaref;
+  time_t            interval;
+  ngx_int_t         limit;
+  ngx_int_t         sync_steps;
+  struct {
+    wfx_limiter_t    *limiter;
+    time_t            expire;
+  }                 burst;
+}; //wfx_limiter_t
+
+
+typedef struct wfx_rule_s wfx_rule_t;
+
+typedef struct wfx_condition_s wfx_condition_t;
+typedef int (*wfx_condition_eval_pt)(wfx_condition_t *, wfx_evaldata_t *);
+struct wfx_condition_s {
+  char             *condition;
+  int               luaref;
+  wfx_condition_eval_pt eval;
+  unsigned          negate:1;
+  
+  wfx_data_t        data;
+}; //wfx_condition_t
+
+typedef struct wfx_action_s wfx_action_t;
+typedef wfx_rc_t (*wfx_action_eval_pt)(wfx_action_t *, wfx_evaldata_t *);
+struct wfx_action_s {
+  char             *action;
+  int               luaref;
+  wfx_action_eval_pt eval;
+  wfx_data_t        data;
+}; //wfx_action_t
+
+struct wfx_rule_s {
+  char             *name;
+  int               luaref;
+  wfx_condition_t  *condition;
+  int               actions_len;
+  wfx_action_t     *(*actions);
+  int               else_actions_len;
+  wfx_action_t     *(*else_actions);
+}; //wfx_rule_t
+
+typedef struct {
+  char             *name;
+  int               luaref;
+  size_t            len;
+  wfx_rule_t       *rules[1];
+} wfx_rule_list_t;
+
+typedef struct {
+  char             *name;
+  int               luaref;
+  size_t            len;
+  wfx_rule_list_t  *lists[1];
+} wfx_phase_t;
+
+typedef struct {
+  char             *name;
+  int               luaref;
+  wfx_phase_t      *phase[WFX_PHASE_INVALID];
+} wfx_ruleset_t;
+
+//config stuff
+typedef struct {
   ngx_str_t           name;
-  void               *ptr; //points to shared memory
-  wfx_ruleset_conf_t *next;
-}; //wfx_ruleset_conf_t
+  wfx_ruleset_t      *ruleset; //points to shared memory
+} wfx_ruleset_conf_t;
 
 typedef struct {
   size_t              shm_size;
-  wfx_ruleset_conf_t *ruleset;
 } wfx_main_conf_t;
 
 typedef struct {
-  ngx_int_t           something;
-  wfx_ruleset_conf_t *ruleset;
+  ngx_array_t        *rulesets;
 } wfx_srv_conf_t;
 
 typedef struct {
-  ngx_int_t           something;
-  wfx_ruleset_conf_t *ruleset;
+  ngx_array_t        *rulesets;
 } wfx_loc_conf_t;
+
 
 #endif //NGX_WAFFLEX_TYPES_H

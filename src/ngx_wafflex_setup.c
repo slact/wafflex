@@ -45,7 +45,7 @@ static ngx_int_t ngx_wafflex_init_postconfig(ngx_conf_t *cf) {
   }
   wfx_shm = shm_create(&shm_name, &ngx_wafflex_module, cf, mcf->shm_size, initialize_shm, NULL);
   
-  ngx_wafflex_inject_http_filters();
+  ngx_wafflex_setup_http_request_hooks(cf);
   
   return NGX_OK;
 }
@@ -77,9 +77,15 @@ static void *ngx_wafflex_create_loc_conf(ngx_conf_t *cf) {
   if(lcf == NULL) {
     return NGX_CONF_ERROR;
   }
+  
   return lcf;
 }
 static char *ngx_wafflex_merge_loc_conf(ngx_conf_t *cf, void *prev, void *conf) {
+  wfx_loc_conf_t      *lcf = conf;
+  wfx_loc_conf_t      *prev_lcf = prev;
+  if(lcf->rulesets == NULL) {
+    lcf->rulesets = prev_lcf->rulesets;
+  }
   return NGX_CONF_OK;
 }
 
@@ -274,19 +280,21 @@ static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *con
 static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   const char           *errstr;
   wfx_loc_conf_t       *lcf = conf;
-  wfx_ruleset_conf_t   *rcf, *last_rcf = NULL;
+  wfx_ruleset_conf_t   *rcf;
   ngx_str_t            *name = cf->args->elts;
   ngx_int_t             i, n = cf->args->nelts;
-  
-  
-  ERR("hey what?!?!");
-  
-  for(rcf = lcf->ruleset; rcf!=NULL; rcf = last_rcf->next) {
-    last_rcf=rcf;
+
+  if(!lcf->rulesets) {
+    lcf->rulesets = ngx_array_create(cf->pool, 4, sizeof(*rcf));
+  }
+  if(!lcf->rulesets) {
+    return "couldn't allocate memory for ruleset array";
   }
   
   for(i=1; i<n; i++) {
-    rcf = ngx_palloc(cf->pool, sizeof(*rcf));
+    if((rcf = ngx_array_push(lcf->rulesets)) == NULL) {
+      return "couldn't allocate memory for ruleset data";
+    }
     lua_getglobal(wfx_Lua, "deferRulesetCreation");
     lua_pushlstring(wfx_Lua, (const char *)name[i].data, name[i].len);
     lua_pushlightuserdata(wfx_Lua, rcf);
@@ -298,18 +306,10 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
       return errbuf;
     }
     lua_pop(wfx_Lua, 2);
-    if(last_rcf == NULL) {
-      lcf->ruleset = rcf;
-    }
-    else {
-      last_rcf->next = rcf;
-    }
-    last_rcf = rcf;
+    
     rcf->name = *name;
-    rcf->next = NULL;
-    rcf->ptr = NULL;
+    rcf->ruleset = NULL;
   }
-  ERR("hey what.");
   
   return NGX_CONF_OK; 
 }

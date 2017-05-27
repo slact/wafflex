@@ -126,7 +126,7 @@ local function newRuleset(data)
     rules={},
     lists={},
     limiters={},
-    table={},
+    phases={},
     name = data and data.name or nil
   }, ruleset_meta)
   

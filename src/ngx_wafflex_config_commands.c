@@ -18,7 +18,7 @@ static ngx_command_t  wafflex_commands[] = {
     NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1|NGX_CONF_TAKE2|NGX_CONF_TAKE3|NGX_CONF_TAKE4|NGX_CONF_TAKE5,
     wfx_conf_ruleset,
     NGX_HTTP_LOC_CONF_OFFSET,
-    offsetof(wfx_loc_conf_t, ruleset),
+    0,
     NULL } ,
 
 

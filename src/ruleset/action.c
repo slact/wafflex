@@ -39,9 +39,9 @@ void wfx_action_binding_add(lua_State *L, wfx_action_type_t *cond) {
 //some actions
 
 //accept
-static wfx_action_result_t action_accept_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
+static wfx_rc_t action_accept_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   //TODO
-  return WFX_ACTION_FINISH;
+  return WFX_ACCEPT;
 }
 static int action_accept_create(lua_State *L) {
   wfx_action_t *action = action_create(L, 0, action_accept_eval);
@@ -52,24 +52,14 @@ static int action_accept_create(lua_State *L) {
 
 
 //reject
-static wfx_action_result_t action_reject_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
+static wfx_rc_t action_reject_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   //TODO
-  return WFX_ACTION_FINISH;
+  return WFX_REJECT;
 }
 static int action_reject_create(lua_State *L) {
   wfx_action_t *action = action_create(L, 0, action_reject_eval);
-  action->data = action->data;
+  action->data.count = 0;
   //TODO
-  return 1;
-}
-
-static wfx_action_result_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
-  //TODO
-  return WFX_ACTION_NEXT;
-}
-static int action_tag_create(lua_State *L) {
-  wfx_action_t *action = action_create(L, 0, action_tag_eval);
-  wfx_lua_set_str_data(L, 1, &action->data);
   return 1;
 }
 
@@ -77,6 +67,5 @@ static int action_tag_create(lua_State *L) {
 static wfx_action_type_t action_types[] = {
   {"accept", action_accept_create, NULL},
   {"reject", action_reject_create, NULL},
-  {"tag", action_tag_create, NULL},
   {NULL, NULL, NULL}
 };

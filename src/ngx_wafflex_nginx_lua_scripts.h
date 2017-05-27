@@ -2541,7 +2541,7 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "    rules={},\n"
    "    lists={},\n"
    "    limiters={},\n"
-   "    table={},\n"
+   "    phases={},\n"
    "    name = data and data.name or nil\n"
    "  }, ruleset_meta)\n"
    "  \n"

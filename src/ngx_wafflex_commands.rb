@@ -17,9 +17,8 @@ CfCmd.new do
   
   wafflex_ruleset [:main, :srv, :loc],
       :wfx_conf_ruleset,
-      [:loc_conf, :ruleset],
+      :loc_conf,
       args: 1..5,
-      value: "[<ruleset_name>] </path/to/ruleset.json>",
-      info: "Use this ruleset here."
-  
+      value: "ruleset_name ruleset_name2 ruleset_name3",
+      info: "Use these rulesets here."
 end

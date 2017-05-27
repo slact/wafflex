@@ -2,6 +2,37 @@
 #include "ruleset_types.h"
 #include "rule.h"
 
+wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed) {
+  int                  i, n;
+  wfx_action_t       **actions;
+  wfx_rc_t             rc;
+  
+  lua_geti(wfx_Lua, LUA_REGISTRYINDEX, self->luaref);
+  lua_mm(wfx_Lua, -1);
+  lua_pop(wfx_Lua, 1);
+  
+  if(self->condition->eval(self->condition, ed)) {
+    actions = self->actions;
+    n = self->actions_len;
+  }
+  else {
+    actions = self->else_actions;
+    n = self->else_actions_len;
+  }
+  
+  for(i=0; i<n; i++) {
+    rc = actions[i]->eval(actions[i], ed);
+    switch(rc) {
+      case WFX_OK:
+        continue;
+      default:
+        return rc;
+    }
+  }
+  
+  return rc;
+}
+
 static int rule_create(lua_State *L) {
   ERR("rule create");
   wfx_rule_t     *rule;

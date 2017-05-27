@@ -3,6 +3,25 @@
 #include "phase.h"
 #include "list.h"
 
+wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed) {
+  int        len, i;
+  wfx_rc_t   rc;
+  len = self->len;
+  
+  for(i=0; i<len; i++) {
+    rc = wfx_list_eval(self->lists[i], ed);
+    switch(rc) {
+      case WFX_OK:
+        continue;
+      case WFX_SKIP:
+        return WFX_OK;
+      default:
+        return rc;
+    }
+  }
+  return rc;
+}
+
 static int phase_create(lua_State *L) {
   int               len, i;
   wfx_rule_list_t  *list;
