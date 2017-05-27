@@ -64,6 +64,10 @@ struct wfx_limiter_s {
   ngx_int_t         limit;
   ngx_int_t         sync_steps;
   struct {
+    ngx_atomic_uint_t count;
+    ngx_atomic_int_t  time;
+  }                runtime; //runtime data
+  struct {
     wfx_limiter_t    *limiter;
     time_t            expire;
   }                 burst;
