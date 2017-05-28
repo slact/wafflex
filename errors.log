@@ -1,0 +1,15 @@
+2017/05/26 18:26:18 [error] 19171#0: wafflex:helloooo /home/leop/sandbox/wafflex/dev/
+2017/05/26 18:26:18 [emerg] 19171#0: "wafflex_load_ruleset" directive error: ruleset1.json: No such file or directory in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:29:18 [error] 20534#0: wafflex:helloooo /home/leop/sandbox/wafflex/dev/../
+2017/05/26 18:29:18 [emerg] 20534#0: "wafflex_load_ruleset" directive error: ruleset1.json: No such file or directory in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:30:01 [emerg] 21211#0: "wafflex_load_ruleset" directive  in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:30:03 [emerg] 21216#0: "wafflex_load_ruleset" directive  in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:30:11 [emerg] 21857#0: "wafflex_load_ruleset" directive  in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:30:32 [emerg] 22553#0: "wafflex_load_ruleset" directive helloooo /home/leop/sandbox/wafflex/dev/../ in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:36:31 [error] 23290#0: <wafflex:lua>: init.lua:36: malformed pattern (ends with '%')
+stack traceback:
+	[C]: in function 'string.match'
+	init.lua:36: in function 'parseRulesetFile'
+2017/05/26 18:36:44 [emerg] 23932#0: "wafflex_load_ruleset" directive error: /home/leop/sandbox/wafflex/dev/../ruleset1.json: No such file or directory in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:48:26 [emerg] 24837#0: "wafflex_load_ruleset" directive error: /home/leop/sandbox/wafflex/dev/../ruleset1.json: No such file or directory in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24
+2017/05/26 18:48:36 [emerg] 25474#0: "wafflex_load_ruleset" directive error: /home/leop/sandbox/wafflex/dev/../ruleset1: No such file or directory in /home/leop/sandbox/wafflex/dev/.nginx.thisrun.conf:24

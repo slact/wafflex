@@ -203,8 +203,17 @@ attach_ddd_vgdb() {
   echo "$1 at $debugger_pids"
 }
 
+if [[ ! -f ./nginx ]]; then
+  echo "./nginx not found"
+  exit 1
+fi
+
 if [[ $debugger == 1 ]]; then
   ./nginx $NGINX_OPT
+  if ! [ $? -eq 0 ]; then; 
+    echo "failed to start nginx"; 
+    exit 1
+  fi
   sleep 0.2
   attach_debugger "$DEBUGGER_NAME" "$DEBUGGER_CMD"
   wait $debugger_pids
