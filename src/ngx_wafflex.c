@@ -3,6 +3,7 @@
 #include <util/shmem.h>
 #include <ruleset/ruleset.h>
 #include <util/wfx_str.h>
+#include <ruleset/condition.h>
 #include <ngx_wafflex_nginx_lua_scripts.h>
 
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
@@ -55,6 +56,12 @@ static int wfx_init_bind_lua(lua_State *L) {
   return 0;
 }
 
+static void ngx_wfx_request_ctx_cleanup(wfx_request_ctx_t *ctx) {
+  if(ctx) {
+    condition_stack_clear(&ctx->rule.condition_stack);
+  }
+}
+
 static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   wfx_loc_conf_t       *cf = ngx_http_get_module_loc_conf(r, ngx_wafflex_module);
   int                   start, i, n;
@@ -63,6 +70,7 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   wfx_evaldata_t        ed;
   wfx_rc_t              rc;
   wfx_request_ctx_t    *ctx, tmpctx;
+  ngx_http_cleanup_t   *cln;
   if(!cf->rulesets) {
     return NGX_DECLINED;
   }
@@ -102,9 +110,14 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
         return NGX_ABORT;
       case WFX_DEFER:
         if(ctx == NULL) {
+          cln = ngx_http_cleanup_add(r, 0);
           ctx = ngx_palloc(r->pool, sizeof(*ctx));
-          if (ctx == NULL)
+          if (ctx == NULL || ctx == NULL)
             return NGX_ERROR;
+          
+          cln->handler = (ngx_http_cleanup_pt )ngx_wfx_request_ctx_cleanup;
+          cln->data = ctx;
+          
           *ctx = tmpctx;
           ctx->nocheck = 0;
           ngx_http_set_ctx(r, ctx, ngx_wafflex_module);
@@ -140,9 +153,10 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   return 0;
 }
 
-ngx_int_t ngx_wafflex_init_lua(int loadstuff) {
+ngx_int_t ngx_wafflex_init_lua(int loadstuff) {  
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
+  
   if(loadstuff) {
     wfx_lua_loadscript(wfx_Lua, init);
     wfx_lua_register(wfx_Lua, wfx_lua_require_module);

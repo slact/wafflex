@@ -39,6 +39,15 @@ void *condition_stack_pop(wfx_condition_stack_t *stack) {
   ngx_free(el);
   return d;
 }
+void condition_stack_clear(wfx_condition_stack_t *stack) {
+  wfx_condition_stack_el_t *el, *nextel;
+  for(el = stack->head; el != NULL; el = nextel) {
+    nextel = el->next;
+    ngx_free(el);
+  }
+  stack->head = NULL;
+  stack->tail = NULL;
+}
 
 #define condition_to_binding(cond, binding, buf) \
   snprintf(buf, 255, "condition:%s", cond->name); \
