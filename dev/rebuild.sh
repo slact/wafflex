@@ -223,23 +223,27 @@ if [[ -z $NO_MAKE ]]; then
   #fi
 
   #generate nginx script embeds
-  bundle exec hsss --format whole \
-    --no-hashes --no-each --no-count --no-static \
-    --prefix wfx_ \
+  _hsss_opt=("--format=whole" "--no-hashes" "--no-count" "--no-static")
+  bundle exec hsss --header-only $_hsss_opt --prefix wfx_ \
     "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
     echo "failed generating nginx lua scripts";
     exit 1
   fi
+
+  echo "#include <ngx_wafflex_nginx_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+  bundle exec hsss --data-only $_hsss_opt --prefix wfx_ \
+    "${_src_dir}"/lua/nginx/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
   
-  bundle exec hsss --format whole\
-    --no-hashes --no-name --no-static \
-    --prefix wfx_module_ \
+  bundle exec hsss --header-only $_hsss_opt --prefix wfx_module_ \
     "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
     echo "failed generating nginx lua module scripts";
     exit 1
-  fi  
+  fi
+  bundle exec hsss --data-only $_hsss_opt --prefix wfx_module_ \
+    "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+
   
   pushd $pkg_path >/dev/null
   

@@ -45,7 +45,7 @@ typedef struct {
   union {
     void              *ptr;
     wfx_str_t         *str;
-    wfx_str_t        *str_array[1];
+    wfx_str_t         *str_array[1];
     ngx_int_t          integer;
     float              floating_point;
   }                 data;

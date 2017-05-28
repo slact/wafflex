@@ -1,5 +1,4 @@
 #include <ngx_wafflex.h>
-
   static char                   errbuf[512];
 
 static ngx_int_t ngx_wafflex_init_preconfig(ngx_conf_t *cf) {  

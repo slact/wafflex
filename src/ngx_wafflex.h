@@ -7,6 +7,14 @@
 #include <util/wfx_lua.h>
 #include <util/ipc.h>
 #include <util/shmem.h>
+#include <ngx_wafflex_nginx_lua_scripts.h>
+#define __wfx_lua_loadscript(lua_state, name, wherefrom) \
+  wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \
+  lua_ngxcall(lua_state, 0, LUA_MULTRET)
+
+#define wfx_lua_loadscript(lua_state, name)   \
+  __wfx_lua_loadscript(lua_state, name, wfx_lua_scripts)
+
 
 #define WAFFLEX_DEFAULT_SHM_SIZE 33554432  //"32 megs will do", they said...
 

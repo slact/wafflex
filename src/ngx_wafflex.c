@@ -4,14 +4,6 @@
 #include <ruleset/ruleset.h>
 #include <util/wfx_str.h>
 #include <ruleset/condition.h>
-#include <ngx_wafflex_nginx_lua_scripts.h>
-
-#define __wfx_lua_loadscript(lua_state, name, wherefrom) \
-  wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \
-  lua_ngxcall(lua_state, 0, LUA_MULTRET)
-
-#define wfx_lua_loadscript(lua_state, name)   \
-  __wfx_lua_loadscript(lua_state, name, wfx_lua_scripts)
 
 static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
@@ -153,16 +145,19 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   return 0;
 }
 
-ngx_int_t ngx_wafflex_init_lua(int loadstuff) {  
+ngx_int_t ngx_wafflex_init_lua(int loader) {  
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
   
-  if(loadstuff) {
+  if(loader) {
     wfx_lua_loadscript(wfx_Lua, init);
     wfx_lua_register(wfx_Lua, wfx_lua_require_module);
     wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
     wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
     lua_ngxcall(wfx_Lua, 3, 0);
+  }
+  else {
+    wfx_lua_loadscript(wfx_Lua, tag);
   }
   
   return NGX_OK;
