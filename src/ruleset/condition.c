@@ -48,8 +48,16 @@ void condition_stack_clear(wfx_condition_stack_t *stack) {
   stack->tail = NULL;
 }
 
-void condition_stack_set_tail_data(wfx_condition_stack_t *stack, void *d) {
-  stack->tail->pd = d;
+void condition_stack_set_tail_data(wfx_evaldata_t *ed, void *d) {
+  wfx_request_ctx_t  *ctx;
+  switch(ed->type) {
+    case WFX_EVAL_HTTP_REQUEST:
+      ctx = ngx_http_get_module_ctx(ed->data.request, ngx_wafflex_module);
+      ctx->rule.condition_stack.tail->pd = d;
+    default:
+      ERR("don't know how to do that yet");
+      raise(SIGABRT);
+  }
 }
 
 #define condition_to_binding(cond, binding, buf) \
