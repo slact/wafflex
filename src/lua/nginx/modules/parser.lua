@@ -103,17 +103,27 @@ function class:assert_table_size(var, expected_size, err, ...)
   return var
 end
 
+local function getlc(tbl)
+  local mt = getmetatable(tbl)
+  if mt.__line and mt.__column then
+    return mt.__line, mt.__column
+  end
+end
+
+local function getlc_str(tbl)
+  local line, col = getlc(tbl)
+  if line and col then
+    return ("line %s column %i"):format(line, col)
+  else
+    return nil
+  end
+end
+
 function class:error(err, ...)
   
   if not err then err = "unknown error" end
   if select("#", ...) > 0 then
     err = err:format(...)
-  end
-  local function getlc(tbl)
-    local mt = getmetatable(tbl)
-    if mt.__line and mt.__column then
-      return mt.__line, mt.__column
-    end
   end
   
   local nested_names = {}
@@ -121,10 +131,10 @@ function class:error(err, ...)
   for i=#self.ctx_stack,1,-1 do
     local cur = self.ctx_stack[i]
     if cur.name then table.insert(nested_names, cur.name) end
-    local line, column = getlc(cur.ctx)
-    if line and column then
+    local lc_str = getlc_str(cur.ctx)
+    if lc_str then
       if self.name then table.insert(nested_names, self.name) end
-      error(("%s at line %i column %i: %s"):format(table.concat(nested_names, " in "), line, column, err))
+      error(("%s at %s: %s"):format(table.concat(nested_names, " in "), lc_str, err))
     end
   end
   if self.name then table.insert(nested_names, self.name) end
@@ -163,6 +173,12 @@ function class:getContext(name)
     end
   end
   return nil
+end
+function class:printContext()
+  for i=#self.ctx_stack, 1, -1 do
+    local cur = self.ctx_stack[i]
+    print(cur.name or "<?>", self:jsontype(cur.ctx) or "<?>", getlc_str(cur.ctx) or "")
+  end
 end
 
 function class:parseFile(path)
@@ -362,8 +378,8 @@ function class:parseRule(data, name)
     self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")
   end
   if rule["if"] then
-    rule["then"] = self:parseActions(rule["then"])
-    rule["else"] = self:parseActions(rule["else"])
+    rule["then"] = self:parseActions(rule["then"], "then")
+    rule["else"] = self:parseActions(rule["else"], "else")
   end
   if rule.key then
     rule.key = self:parseInterpolatedString(rule.key)
@@ -409,18 +425,18 @@ function class:parseAction(data)
   end
   self:popContext()
   --we can be more specific about the action name now
-  self:pushContext(data, "action " .. (next(action)))
+  self:pushContext(data, ("\"%s\" action"):format(next(action)))
   inheritmetatable(action, data)
   action = Rule.action.parse(action, self)
   self:popContext()
   return action
 end
 
-function class:parseActions(data)
+function class:parseActions(data, name)
   if data == nil then
     return {}
   end
-  self:pushContext(data) --no context name plz
+  self:pushContext(data, name and ("\"%s\" actions"):format(name) or nil)
   local actions = {}
   inheritmetatable(actions, data)
   if self:jsontype(data) == "object" or type(data)=="string" or (#data == 0 and next(data) ~= nil) then
