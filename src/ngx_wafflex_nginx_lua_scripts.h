@@ -10,6 +10,8 @@ typedef struct {
   //lua environs initializer
   wfx_lua_script_t init;
 
+  wfx_lua_script_t limiter;
+
   wfx_lua_script_t tag;
 
 } wfx_lua_scripts_t;
