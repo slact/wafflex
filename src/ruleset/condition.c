@@ -14,19 +14,18 @@ wfx_condition_t *condition_create(lua_State *L, size_t data_sz, wfx_condition_ev
   return condition;
 }
 
-int condition_stack_append(wfx_condition_stack_t *stack, void *d) {
+int condition_stack_push(wfx_condition_stack_t *stack, void *d) {
   wfx_condition_stack_el_t *el = ngx_alloc(sizeof(*el), ngx_cycle->log);
   if(!el)
     return 0;
-  if(stack->tail)
-    stack->tail->next = el;
-  if(!stack->head)
-    stack->head = el;
-  stack->tail = el;
-  el->next = NULL;
+  if(!stack->tail)
+    stack->tail = el;
+  el->next = stack->head;
   el->pd = d;
+  stack->head = el;
   return 1;
 }
+
 void *condition_stack_pop(wfx_condition_stack_t *stack) {
   wfx_condition_stack_el_t *el = stack->head;
   void                     *d;
@@ -47,6 +46,10 @@ void condition_stack_clear(wfx_condition_stack_t *stack) {
   }
   stack->head = NULL;
   stack->tail = NULL;
+}
+
+void condition_stack_set_tail_data(wfx_condition_stack_t *stack, void *d) {
+  stack->tail->pd = d;
 }
 
 #define condition_to_binding(cond, binding, buf) \
@@ -95,8 +98,6 @@ static int condition_false_create(lua_State *L) {
   condition_create(L, 0, condition_false_eval);
   return 1;
 }
-
-
 
 //any and all
 static int condition_array_create(lua_State *L, wfx_condition_eval_pt eval) {
@@ -147,7 +148,7 @@ static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc
       return stop_on;
     }
     else if(rc == WFX_COND_DEFER) {
-      condition_stack_append(stack, (void *)i);
+      condition_stack_push(stack, (void *)i);
       return rc;
     }
     else if(rc == WFX_COND_ERROR) {
@@ -172,7 +173,7 @@ static wfx_condition_rc_t condition_any_eval(wfx_condition_t *self, wfx_evaldata
     case WFX_COND_FALSE:
     case WFX_COND_TRUE:
       return self->negate ? !rc : rc;
-    case WFX_COND_SUSPEND:
+    case WFX_COND_DEFER:
     case WFX_COND_ERROR:
       return rc;
   }
@@ -188,7 +189,7 @@ static wfx_condition_rc_t condition_all_eval(wfx_condition_t *self, wfx_evaldata
     case WFX_COND_FALSE:
     case WFX_COND_TRUE:
       return self->negate ? !rc : rc;
-    case WFX_COND_SUSPEND:
+    case WFX_COND_DEFER:
     case WFX_COND_ERROR:
       return rc;
   }
@@ -303,11 +304,68 @@ static int condition_match_create(lua_State *L) {
   return 1;
 }
 
+//all
+typedef struct {
+  ngx_http_request_t *r;
+  ngx_event_t         ev;
+} delay_request_data_t;
+
+static void delay_cleanup(void *d) {
+  delay_request_data_t  *delay_data = d;
+  if(delay_data->r) {
+    ngx_del_timer(&delay_data->ev);
+  }
+}
+
+static void delay_timer_callback(ngx_event_t *ev) {
+  delay_request_data_t  *delay_data = ev->data;
+  ngx_http_request_t    *r = delay_data->r;
+  delay_data->r = NULL;
+  ngx_http_core_run_phases(r);
+}
+
+static wfx_condition_rc_t condition_delay_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  ngx_http_request_t    *r = ed->data.request;
+  ngx_http_cleanup_t    *cln;
+  if(condition_stack_empty(stack)) {
+    cln = ngx_http_cleanup_add(r, sizeof(delay_request_data_t));
+    delay_request_data_t  *delay_data = cln->data;
+    delay_data->r = r;
+    cln->handler = delay_cleanup;
+    
+    ngx_memzero(&delay_data->ev, sizeof(delay_data->ev));
+    wfx_init_timer(&delay_data->ev, delay_timer_callback, delay_data);
+    ngx_add_timer(&delay_data->ev, self->data.data.integer);
+    
+    condition_stack_push(stack, NULL);
+    return WFX_COND_DEFER;
+  }
+  else {
+    return WFX_COND_TRUE;
+  }
+}
+static int condition_delay_create(lua_State *L) {
+  int wait_msec;
+  wfx_condition_t *delay;
+  lua_getfield(L, 1, "data");
+  wait_msec = lua_tonumber(L, -1);
+  lua_pop(L, 1);
+  
+  delay = condition_create(L, 0, condition_delay_eval);
+  delay->data.type = WFX_DATA_INTEGER;
+  delay->data.count = 1;
+  delay->data.data.integer = wait_msec;
+  
+  return 1;
+}
+
+
 static wfx_condition_type_t condition_types[] = {
   {"true", condition_true_create, NULL},
   {"false", condition_false_create, NULL},
   {"any", condition_any_create, NULL},
   {"match", condition_match_create, NULL},
   {"all", condition_all_create, NULL},
+  {".delay", condition_delay_create, NULL},
   {NULL, NULL, NULL}
 };

@@ -2477,6 +2477,12 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "  --parser:assert_table_size(data, 0, \"\\\"reject\\\" value must be empty\")\n"
    "end})\n"
    "\n"
+   "Rule.action.add(\"wait\", {\n"
+   "  parse = function(data, parser)\n"
+   "    parser:assert_jsontype(data, \"number\", \"\\\"wait\\\" value must be a number\")\n"
+   "  end\n"
+   "})\n"
+   "\n"
    "return Rule\n"},
 
   {"ruleset", 

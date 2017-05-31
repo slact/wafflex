@@ -220,4 +220,10 @@ Rule.action.add("reject", {parse = function(data, parser)
   --parser:assert_table_size(data, 0, "\"reject\" value must be empty")
 end})
 
+Rule.action.add("wait", {
+  parse = function(data, parser)
+    parser:assert_jsontype(data, "number", "\"wait\" value must be a number")
+  end
+})
+
 return Rule

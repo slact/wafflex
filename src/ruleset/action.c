@@ -64,8 +64,73 @@ static int action_reject_create(lua_State *L) {
 }
 
 
+//wait
+typedef struct {
+  ngx_http_request_t *r;
+  ngx_event_t         ev;
+} wait_request_data_t;
+
+static void wait_cleanup(void *d) {
+  wait_request_data_t  *wait_data = d;
+  if(wait_data->r) {
+    ngx_del_timer(&wait_data->ev);
+  }
+}
+
+static void wait_timer_callback(ngx_event_t *ev) {
+  wait_request_data_t  *wait_data = ev->data;
+  ngx_http_request_t    *r = wait_data->r;
+  wfx_request_ctx_t     *ctx = ngx_http_get_module_ctx(r, ngx_wafflex_module);
+  ctx->rule.action.data = (void *)(uintptr_t )1;
+  wait_data->r = NULL;
+  ngx_http_core_run_phases(r);
+}
+
+static wfx_rc_t action_wait_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
+  ngx_http_request_t    *r = ed->data.request;
+  wfx_request_ctx_t     *ctx = ngx_http_get_module_ctx(r, ngx_wafflex_module);
+  ngx_http_cleanup_t    *cln;
+  
+  if(!ctx || ctx->nocheck || !ctx->rule.action.data) {
+    //ERR("wait %i msec...", self->data.data.integer);
+    cln = ngx_http_cleanup_add(r, sizeof(wait_request_data_t));
+    wait_request_data_t  *wait_data = cln->data;
+    wait_data->r = r;
+    cln->handler = wait_cleanup;
+    
+    ngx_memzero(&wait_data->ev, sizeof(wait_data->ev));
+    wfx_init_timer(&wait_data->ev, wait_timer_callback, wait_data);
+    ngx_add_timer(&wait_data->ev, self->data.data.integer);
+    
+    return WFX_DEFER;
+  }
+  else {
+    //ERR("no more waiting!");
+    ctx->rule.action.data = (void *)0;
+    return WFX_OK;
+  }
+}
+static int action_wait_create(lua_State *L) {
+  int           wait_msec;
+  wfx_action_t *action;
+  
+  lua_getfield(L, 1, "data");
+  wait_msec = lua_tonumber(L, -1);
+  lua_pop(L, 1);
+  
+  action = action_create(L, 0, action_wait_eval);
+  
+  action->data.type = WFX_DATA_INTEGER;
+  action->data.count = 1;
+  action->data.data.integer = wait_msec;
+  
+  return 1;
+}
+
+
 static wfx_action_type_t action_types[] = {
   {"accept", action_accept_create, NULL},
   {"reject", action_reject_create, NULL},
+  {"wait", action_wait_create, NULL},
   {NULL, NULL, NULL}
 };

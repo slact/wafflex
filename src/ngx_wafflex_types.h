@@ -178,9 +178,11 @@ typedef struct {
     int                 i;
     int                 gen;
     wfx_condition_stack_t condition_stack;
+    unsigned              condition_done:1;
+    unsigned              condition_true:1;
     struct {
       int                 i;
-      unsigned            else_action:1;
+      void               *data;
     }                   action;
   }                   rule;
   unsigned            nocheck:1;

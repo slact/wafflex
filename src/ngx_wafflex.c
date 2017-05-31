@@ -72,8 +72,7 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   ed.phase = WFX_PHASE_HTTP_REQUEST_HEADERS;
   
   tmpctx.nocheck = 1;
-  tmpctx.rule.condition_stack.head = NULL;
-  tmpctx.rule.condition_stack.tail = NULL;
+  ngx_memzero(&tmpctx.rule, sizeof(tmpctx.rule));
   
   n = cf->rulesets->nelts;
   rcf = cf->rulesets->elts;
