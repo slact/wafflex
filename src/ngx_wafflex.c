@@ -167,6 +167,11 @@ ngx_int_t ngx_wafflex_shutdown_lua(void) {
   return NGX_OK;
 }
 
+ngx_int_t ngx_wafflex_init_runtime(int manager) {
+  wfx_ruleset_init_runtime(wfx_Lua, manager);
+  return NGX_OK;
+}
+
 ngx_int_t ngx_wafflex_setup_http_request_hooks(ngx_conf_t *cf) {
   
   ngx_http_handler_pt        *h;

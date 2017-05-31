@@ -142,3 +142,7 @@ static wfx_binding_t wfx_ruleset_binding = {
   NULL,
   NULL
 };
+
+ngx_int_t wfx_ruleset_init_runtime(lua_State *L, int manager) {
+  return NGX_OK;
+}
