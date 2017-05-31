@@ -146,7 +146,7 @@ static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc
     if(rc == stop_on) {
       return stop_on;
     }
-    else if(rc == WFX_COND_SUSPEND) {
+    else if(rc == WFX_COND_DEFER) {
       condition_stack_append(stack, (void *)i);
       return rc;
     }

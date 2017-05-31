@@ -25,7 +25,7 @@ typedef struct {
   wfx_str_part_t  *parts;
 } wfx_str_t;
 
-typedef enum {WFX_COND_FALSE=0, WFX_COND_TRUE, WFX_COND_SUSPEND, WFX_COND_ERROR} wfx_condition_rc_t;
+typedef enum {WFX_COND_FALSE=0, WFX_COND_TRUE, WFX_COND_DEFER, WFX_COND_ERROR} wfx_condition_rc_t;
 typedef enum {WFX_REJECT=0, WFX_ACCEPT, WFX_OK, WFX_SKIP, WFX_DEFER, WFX_ERROR} wfx_rc_t;
 
 typedef enum {WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
