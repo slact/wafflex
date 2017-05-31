@@ -194,6 +194,12 @@ Rule.condition.add({"limit-break", "limit-check"}, {
   end
 })
 
+Rule.condition.add(".delay", {
+  parse = function(data, parser)
+    parser:assert_jsontype(data, "number", "delay by <number> please")
+  end
+})
+
 --some actions, too
 Rule.action.add("tag", {
   parse = function(data, parser)
