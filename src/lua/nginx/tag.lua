@@ -1,18 +1,24 @@
 local tags = {}
-local rawget = table.rawget
-local rawset = table.rawset
-function _G.getTag(ref, tag)
+local tconcat = table.concat
+local join = function(...)
+  return tconcat({...})
+end
+local function wholetag(part1, part2, ...)
+  if not part2 then return part1 end
+  return join(part1, part2, ...)
+end
+function _G.findTag(ref, ...)
   local mytags = rawget(tags, ref)
-  return mytags and rawget(mytags, tag)
+  return mytags and rawget(mytags, wholetag(...))
 end
 
-function _G.setTag(ref, tag)
+function _G.setTag(ref, ...)
   local mytags = rawget(tags, ref)
   if not mytags then
-    rawset(tags, {[tag]=true})
+    rawset(tags, ref, {[wholetag(...)]=true})
     return true
   else
-    rawset(mytags, tag, true)
+    rawset(mytags, wholetag(...), true)
     return nil
   end
 end
