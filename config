@@ -1,6 +1,7 @@
 ngx_addon_name=ngx_wafflex_module
 
 _NGX_WAFFLEX_UTIL_SRCS="\
+  ${ngx_addon_dir}/src/util/wfx_util.c \
   ${ngx_addon_dir}/src/util/wfx_str.c \
   ${ngx_addon_dir}/src/util/wfx_lua.c \
   ${ngx_addon_dir}/src/util/ipc.c \

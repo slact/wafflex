@@ -490,6 +490,7 @@ function class:parseLimiter(data, name)
   return data
 end
 function class:checkLimiters(data)
+  if not data then return true end
   self:pushContext(data, "limiters")
   for k, v in pairs(data) do
     self:pushContext(v, ("limiter \"%s\""):format(v.name))
