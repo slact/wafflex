@@ -1,5 +1,5 @@
-#include <nginx.h>
 #include <ngx_wafflex.h>
+#include <ngx_sha1.h>
 #include "wfx_str.h"
 #include <assert.h>
 
@@ -39,6 +39,20 @@ wfx_str_t *wfx_lua_get_str_binding(lua_State *L, int index) {
   wstr = lua_touserdata(L, -1);
   lua_pop(L, 1);
   return wstr;
+}
+
+int wfx_str_sha1(wfx_str_t *wstr, wfx_evaldata_t *ed, u_char *out) {
+  wfx_str_part_t *parts = wstr->parts;
+  ngx_str_t       str;
+  ngx_sha1_t      sha1_ctx;
+  int             i, n = wstr->parts_count;
+  ngx_sha1_init(&sha1_ctx);
+  for(i=0; i < n; i++) {
+    wfx_str_get_part_value(wstr, &parts[i], &str, ed);
+    ngx_sha1_update(&sha1_ctx, str.data, str.len);
+  }
+  ngx_sha1_final(out, &sha1_ctx);
+  return 1;
 }
 
 int wfx_str_each_part(ngx_str_t *str, u_char **curptr, wfx_str_part_t *part) {
