@@ -19,6 +19,7 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults);
 int wfx_lua_getref(lua_State *L, int index);
 size_t wfx_lua_len(lua_State *L, int index);
 int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *name, const char *fmt);
+#define lua_pushngxstr(L, str) lua_pushlstring(L, (const char *)str->data, str->len)
 
 //wafflex-specific lua stuff
 int wfx_lua_require_module(lua_State *L);
