@@ -179,6 +179,7 @@ Rule.condition.add({"limit-break", "limit-check"}, {
       end
     end
     data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
+    parser:assert(data.increment >= 0, "\"increment\" must be >= 0")
     
     parser:assert(data.name, "name missing")
     parser:assert_type(data.name, "string", "invalid \"name\" type")

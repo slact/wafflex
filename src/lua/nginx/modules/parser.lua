@@ -488,8 +488,11 @@ function class:parseLimiter(data, name)
   
   if not data.name then data.name = name end
   data.interval = self:parseTimeInterval(data.interval, "interval value")
+  self:assert(data.interval >= 60, "\"interval\" value must be >= 60 seconds")
   self:assert(data.limit, "missing \"limit\" value")
   data.limit = self:assert(tonumber(data.limit), "invalid \"limit\" value, must be a number")
+  self:assert(data.limit >= 0, "\"limit\" value must be >= 0")
+  
   if data.sync_steps then
     data.sync_steps = self:assert(tonumber(data.sync_steps), "invalid \"sync-steps\" value")
   end
