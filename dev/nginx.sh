@@ -97,6 +97,18 @@ for opt in $*; do
       NGINX_DAEMON="on"
       debugger=1
       ;;
+    debug=*)
+      debug_what="${opt:6}"
+      if [[ $debug_what == "master" ]]; then
+        WORKERS=1
+        debug_master=1
+        NGINX_DAEMON="off"
+      else
+        NGINX_DAEMON="on"
+        debugger=1
+        child_text_match=$debug_what
+      fi
+      ;;
     altport)
       ALTPORT=1
       ;;
@@ -172,7 +184,11 @@ TRAPINT() {
 attach_debugger() {
   master_pid=`cat /tmp/nchan-test-nginx.pid`
   while [[ -z $child_pids ]]; do
-    child_pids=`pgrep -P $master_pid`
+    if [[ -z $child_text_match ]]; then
+      child_pids=`pgrep -P $master_pid`
+    else
+      child_pids=`pgrep -P $master_pid -f $child_text_match`
+    fi
     sleep 0.1
   done
   while read -r line; do
