@@ -146,6 +146,9 @@ static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
     ngx_wafflex_init_lua(0);
     ngx_wafflex_init_runtime(0);
   }
+  else {
+    ngx_wafflex_init_runtime(1);
+  }
   return NGX_OK;
 }
 
