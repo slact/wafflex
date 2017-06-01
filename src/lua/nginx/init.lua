@@ -1,5 +1,5 @@
 --lua environs initializer
-return function(package_loader, init_bind_cfunc, ruleset_confset_cfunc)
+return function(package_loader, manager, init_bind_cfunc, ruleset_confset_cfunc)
   package.path = ""
   package.cpath= ""
   setmetatable(package.preload, {__index = function(self, name)

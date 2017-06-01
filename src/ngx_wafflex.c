@@ -199,5 +199,11 @@ ngx_int_t ngx_wafflex_setup_http_request_hooks(ngx_conf_t *cf) {
 }
 
 void ngx_wafflex_ipc_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
-  //do nothing -- for now
+  ipc_alert_handler_pt handler;
+  lua_getglobal(wfx_Lua, "getAlertHandler");
+  lua_pushngxstr(wfx_Lua, name);
+  lua_ngxcall(wfx_Lua, 1, 1);
+  handler = lua_touserdata(wfx_Lua, -1);
+  lua_pop(wfx_Lua, 1);
+  handler(sender_pid, sender, name, data);
 }
