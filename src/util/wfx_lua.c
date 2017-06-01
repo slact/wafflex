@@ -29,7 +29,11 @@ static int wfx_lua_traceback(lua_State *L) {
 
 void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   int rc;
-  assert(lua_isfunction(L, -(nargs+1)));
+  if(!lua_isfunction(L, -(nargs+1))) {
+    lua_printstack(L);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "nargs: %i", nargs);
+    assert(lua_isfunction(L, -(nargs+1)));
+  }
   
   lua_pushcfunction(L, wfx_lua_traceback);
   lua_insert(L, 1);
