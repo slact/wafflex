@@ -60,11 +60,9 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
   else if(ctx->rule.condition_done) {
     return wfx_rule_actions_eval(self, ed, ctx);
   }
-  else {
-    ERR("not supposed to happen");
-    raise(SIGABRT);
-    return WFX_ERROR;
-  }
+  ERR("not supposed to happen");
+  raise(SIGABRT);
+  return WFX_ERROR;
 }
 
 static int rule_create(lua_State *L) {

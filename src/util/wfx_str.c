@@ -73,7 +73,7 @@ ngx_str_t *wfx_str_as_dbg_ngx_str(wfx_str_t *wstr, wfx_evaldata_t *ed) {
   int             i, n = wstr->parts_count;
   for(i=0; i < n && cur < end; i++) {
     wfx_str_get_part_value(wstr, &parts[i], &pstr, ed);
-    thislen = MIN(pstr.len, end - cur);
+    thislen = MIN(pstr.len, (size_t )(end - cur));
     ngx_memcpy(cur, pstr.data, thislen);
     cur += thislen;
   }
