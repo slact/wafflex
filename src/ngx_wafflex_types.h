@@ -1,6 +1,7 @@
 #ifndef NGX_WAFFLEX_TYPES_H
 #define NGX_WAFFLEX_TYPES_H
 #include <lua.h>
+#include <util/reaper.h>
 
 typedef struct {
   const char           *name;
@@ -55,6 +56,16 @@ typedef struct {
   ngx_atomic_uint_t shmem_pages_used;
 } wfx_shm_data_t;
 
+typedef struct wfx_limiter_value_s wfx_limiter_value_t;
+struct wfx_limiter_value_s {
+  u_char            key[20];
+  ngx_atomic_int_t  count;
+  time_t            time;
+  wfx_limiter_value_t *prev;
+  wfx_limiter_value_t *next;
+
+  int               refcount; //handled strictly by the manager
+}; //wfx_limiter_value_t
 
 typedef struct wfx_limiter_s wfx_limiter_t;
 struct wfx_limiter_s {
@@ -63,10 +74,7 @@ struct wfx_limiter_s {
   time_t            interval;
   ngx_int_t         limit;
   ngx_int_t         sync_steps;
-  struct {
-    ngx_atomic_uint_t count;
-    ngx_atomic_int_t  time;
-  }                runtime; //runtime data
+  reaper_t         *values;
   struct {
     wfx_limiter_t    *limiter;
     time_t            expire;
@@ -185,6 +193,9 @@ typedef struct {
       void               *data;
     }                   action;
   }                   rule;
+  struct {
+    ngx_http_cleanup_t *cln;
+  }                   limiter;
   unsigned            nocheck:1;
 } wfx_request_ctx_t;
 

@@ -8,6 +8,7 @@
 #include <util/ipc.h>
 #include <util/shmem.h>
 #include <util/wfx_util.h>
+#include <util/reaper.h>
 #include <ngx_wafflex_nginx_lua_scripts.h>
 #define __wfx_lua_loadscript(lua_state, name, wherefrom) \
   wfx_luaL_loadbuffer(lua_state, wherefrom.name.script, strlen(wherefrom.name.script), #name, "=%s.lua"); \

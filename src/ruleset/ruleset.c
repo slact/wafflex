@@ -144,6 +144,7 @@ static wfx_binding_t wfx_ruleset_binding = {
 };
 
 ngx_int_t wfx_ruleset_init_runtime(lua_State *L, int manager) {
+  wfx_limiter_init_runtime(L, manager);
   wfx_tag_init_runtime(L, manager);
   return NGX_OK;
 }
