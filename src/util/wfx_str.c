@@ -55,6 +55,33 @@ int wfx_str_sha1(wfx_str_t *wstr, wfx_evaldata_t *ed, u_char *out) {
   return 1;
 }
 
+#if !defined MIN
+#define MIN(a, b) (((a) < (b))? (a) : (b))
+#endif
+
+ngx_str_t *wfx_str_as_dbg_ngx_str(wfx_str_t *wstr, wfx_evaldata_t *ed) {
+  static ngx_str_t  str;
+  static u_char     buf[2048];
+  wfx_str_part_t   *parts = wstr->parts;
+  u_char          *cur, *end = &buf[2048];
+  
+  str.data = buf;
+  cur = buf;
+  
+  ngx_str_t       pstr;
+  int             thislen;
+  int             i, n = wstr->parts_count;
+  for(i=0; i < n && cur < end; i++) {
+    wfx_str_get_part_value(wstr, &parts[i], &pstr, ed);
+    thislen = MIN(pstr.len, end - cur);
+    ngx_memcpy(cur, pstr.data, thislen);
+    cur += thislen;
+  }
+  str.len = cur - str.data;
+  
+  return &str;
+}
+
 int wfx_str_each_part(ngx_str_t *str, u_char **curptr, wfx_str_part_t *part) {
   u_char *cur = *curptr;
   u_char *first;

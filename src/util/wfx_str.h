@@ -10,5 +10,7 @@ int wfx_str_sha1(wfx_str_t *wstr, wfx_evaldata_t *ed, u_char *out);
 void wfx_str_http_get_part_value(wfx_str_t *wstr, wfx_str_part_t *part, ngx_str_t *out, ngx_http_request_t *r);
 void wfx_str_get_part_value(wfx_str_t *wstr, wfx_str_part_t *part, ngx_str_t *out, wfx_evaldata_t *ed);
 
+ngx_str_t *wfx_str_as_dbg_ngx_str(wfx_str_t *wstr, wfx_evaldata_t *ed);
+
 ngx_str_t *wfx_http_interpolate_string(wfx_str_t *wstr, ngx_http_request_t *r);
 #endif
