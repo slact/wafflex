@@ -335,10 +335,10 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
     ngx_atomic_fetch_add((ngx_atomic_uint_t *)&lval->count, data->increment);
   }
   realcount = limiter_current_value(limiter, lval);
-  return realcount <= limiter->limit ? WFX_COND_TRUE : WFX_COND_FALSE;
+  return condition_rc_maybe_negate(self, realcount <= limiter->limit ? WFX_COND_TRUE : WFX_COND_FALSE);
 }
 
-static int condition_limit_checkbreak_create(lua_State *L, int default_increment) {
+static int condition_limit_checkbreak_create(lua_State *L, int default_increment, int negate) {
   limit_condition_data_t *data;
   wfx_condition_t *limit_check = condition_create(L, sizeof(*data), condition_limit_check_eval);
   limit_check->data.type = WFX_DATA_PTR;
@@ -365,11 +365,15 @@ static int condition_limit_checkbreak_create(lua_State *L, int default_increment
   lua_pop(L, 1);
   
   lua_pop(L, 1); //pop data
+  
+  if(negate)
+    limit_check->negate = 1;
+  
   return 1;
 }
 
 static int condition_limit_break_create(lua_State *L) {
-  return condition_limit_checkbreak_create(L, 1);
+  return condition_limit_checkbreak_create(L, 1, 1);
 }
 
 static wfx_condition_type_t limit_break = {
@@ -379,7 +383,7 @@ static wfx_condition_type_t limit_break = {
 };
 
 static int condition_limit_check_create(lua_State *L) {
-  return condition_limit_checkbreak_create(L, 0);
+  return condition_limit_checkbreak_create(L, 0, 0);
 }
 
 static wfx_condition_type_t limit_check = {
