@@ -235,38 +235,15 @@ static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, 
   smax = wstrs[0]->parts_count;
   parts = wstrs[0]->parts;
   
-  if(smax > 0) {
-    for(si = 0; si < smax; si++) {
-      //build first (simplest) string
-      wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
-    }
-  }
-  else {
-    //weird empty string?...
-    smax = 1;
-    str[0].data = (u_char *)"";
-    str[0].len = 0;
+  if(smax == 0) {
+    //some kind of weird zero-part string. This shouldn't happen... 
+    //but I guess it's not outright insane
+    return 0;
   }
   
-  if(str[0].len == 0) {
-    //match empty string
-    for(i=1; i < data->count; i++) {
-      ci = 0;
-      cmax = wstrs[i]->parts_count;
-      parts = wstrs[i]->parts;
-      wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed);
-      while(1) {
-        if(ccur.len != 0 && !negate)
-          return 0;
-        if(ccur.len == 0 && negate)
-          return 1;
-        if(++ci < cmax)
-          wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
-        else
-          break;
-      }
-    }
-    return !negate;
+  for(si = 0; si < smax; si++) {
+    //build first (simplest) string
+    wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
   }
   
   //there's room for optimization here, guys. just not prematurely.
@@ -283,32 +260,44 @@ static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, 
     
     while(1) {
       if(scur.len < ccur.len) {
-        cmp = memcmp(scur.data, ccur.data, scur.len);
-        ccur.data+=scur.len;
-        ccur.len -=scur.len;
-        
-        if(cmp == 0 && !negate)
-          return 0;
-        if(cmp != 0 && negate)
-          return 1;
+        if(scur.len > 0) {
+          cmp = memcmp(scur.data, ccur.data, scur.len);
+          ccur.data+=scur.len;
+          ccur.len -=scur.len;
+          
+          if(cmp == 0 && !negate)
+            return 0;
+          if(cmp != 0 && negate)
+            return 1;
+        }
         
         if(++si < smax)
           scur = str[si];
+        else if(ccur.len > 0 && !negate) // unmatched data, no more other string
+          return 0;
+        else if(ccur.len == 0 && negate) //no leftover unmatched data
+          return 0;
         else
           break;
       }
       else {
-        cmp = memcmp(scur.data, ccur.data, ccur.len);
-        scur.data+=ccur.len;
-        scur.len -=ccur.len;
-        
-        if(cmp == 0 && !negate)
-          return 0;
-        if(cmp != 0 && negate)
-          return 1;
+        if(ccur.len > 0) {
+          cmp = memcmp(scur.data, ccur.data, ccur.len);
+          scur.data+=ccur.len;
+          scur.len -=ccur.len;
+          
+          if(cmp == 0 && !negate)
+            return 0;
+          if(cmp != 0 && negate)
+            return 1;
+        }
         
         if(++ci < cmax)
           wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
+        else if(scur.len > 0 && !negate) //unmatched data, no more other string
+          return 0;
+        else if(scur.len == 0 && negate) //no leftover unmatched data
+          return 0;
         else
           break;
       }
