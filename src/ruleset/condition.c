@@ -177,7 +177,7 @@ static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc
   }
 }
 
-static wfx_condition_rc_t condition_rc_maybe_negate(wfx_condition_t *self, wfx_condition_rc_t rc) {
+wfx_condition_rc_t condition_rc_maybe_negate(wfx_condition_t *self, wfx_condition_rc_t rc) {
   switch(rc) {
     case WFX_COND_FALSE:
       return self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;      

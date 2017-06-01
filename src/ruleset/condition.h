@@ -18,4 +18,5 @@ int condition_stack_push(wfx_condition_stack_t *stack, void *pd);
 void condition_stack_clear(wfx_condition_stack_t *stack);
 
 void condition_stack_set_tail_data(wfx_evaldata_t *ed, void *d);
+wfx_condition_rc_t condition_rc_maybe_negate(wfx_condition_t *self, wfx_condition_rc_t rc);
 #endif //WFX_CONDITION_H
