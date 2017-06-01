@@ -195,7 +195,10 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "end\n"
    "function clearTags(ref)\n"
    "  rawset(tags, ref, nil)\n"
-   "end\n"}
+   "end\n"},
+
+  {"tracer", 
+   ""}
 };
 wfx_module_lua_scripts_t wfx_module_lua_scripts = {
   {"binding", 

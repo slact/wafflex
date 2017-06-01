@@ -39,6 +39,8 @@ typedef struct {
   }                     data;
 } wfx_evaldata_t;
 
+typedef enum {WFX_UNKNOWN_ELEMENT = 0, WFX_RULESET, WFX_PHASE, WFX_LIST, WFX_RULE, WFX_CONDITION, WFX_ACTION, WFX_STRING, WFX_DATA} wfx_ruleset_element_type_t;
+
 typedef enum {WFX_DATA_INTEGER = 0, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_STRING_ARRAY, WFX_DATA_PTR} wfx_data_type_t;
 typedef struct {
   wfx_data_type_t   type;

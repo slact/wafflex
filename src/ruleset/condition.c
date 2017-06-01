@@ -2,6 +2,7 @@
 #include "common.h"
 #include "condition.h"
 #include <util/wfx_str.h>
+#include "tracer.h"
 
 #include <assert.h>
 
@@ -154,7 +155,9 @@ static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc
   
   for(i=start; i<len; i++) {
     cur = conditions[i];
+    wfx_tracer_push(ed, WFX_CONDITION, cur);
     rc = cur->eval(cur, ed, stack);
+    wfx_tracer_pop(ed, WFX_CONDITION, rc);
     if(rc == stop_on) {
       return stop_on;
     }
@@ -245,6 +248,7 @@ static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, 
     //build first (simplest) string
     wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
   }
+  wfx_tracer_log_wstr_array(ed, "strings", wstrs[0]);
   
   //there's room for optimization here, guys. just not prematurely.
   
@@ -257,6 +261,7 @@ static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, 
     cmax = wstrs[i]->parts_count;
     parts = wstrs[i]->parts;
     wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
+    wfx_tracer_log_wstr_array(ed, "strings", wstrs[1]);
     
     while(1) {
       if(scur.len < ccur.len) {

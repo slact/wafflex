@@ -24,6 +24,7 @@ _NGX_WAFFLEX_SRCS="\
   ${ngx_addon_dir}/src/ruleset/string.c \
   ${ngx_addon_dir}/src/ruleset/tag.c \
   ${ngx_addon_dir}/src/ruleset/limiter.c \
+  ${ngx_addon_dir}/src/ruleset/tracer.c \
 "
 
 #taken from agentzh's lua-nginx-module

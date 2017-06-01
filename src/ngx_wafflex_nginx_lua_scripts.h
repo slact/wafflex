@@ -16,6 +16,8 @@ typedef struct {
 
   wfx_lua_script_t tag;
 
+  wfx_lua_script_t tracer;
+
 } wfx_lua_scripts_t;
 wfx_lua_scripts_t wfx_lua_scripts;
 #define WFX_LUA_SCRIPTS_EACH(script) \

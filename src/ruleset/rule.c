@@ -2,11 +2,13 @@
 #include "common.h"
 #include "rule.h"
 #include "condition.h"
+#include "tracer.h"
 
 static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int              i, start, n;
   wfx_rc_t         rc = WFX_OK;
   wfx_action_t   **actions;
+  wfx_action_t    *action;
   if(ctx->rule.condition_true) {
     actions = self->actions;
     n = self->actions_len;
@@ -17,7 +19,10 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
   }
   start = ctx->nocheck ? 0 : ctx->rule.action.i;
   for(i=start; i<n; i++) {
-    rc = actions[i]->eval(actions[i], ed);
+    action = actions[i];
+    wfx_tracer_push(ed, WFX_ACTION, action);
+    rc = actions[i]->eval(action, ed);
+    wfx_tracer_pop(ed, WFX_ACTION, rc);
     switch(rc) {
       case WFX_OK:
         continue;

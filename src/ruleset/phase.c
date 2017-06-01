@@ -2,14 +2,20 @@
 #include "common.h"
 #include "phase.h"
 #include "list.h"
-#include "assert.h"
+#include "tracer.h"
+
+#include <assert.h>
+
 wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
-  int        len = self->len, i, start;
-  wfx_rc_t   rc = WFX_OK;
-  if( ctx->nocheck //from the top
-   || self->gen != ctx->phase.gen // phase has changed, start over
-  ) {
+  int              len = self->len, i, start;
+  wfx_rc_t         rc = WFX_OK;
+  wfx_rule_list_t *list;
+  if( ctx->nocheck) {//from the top
     start = 0;
+  }
+  else if(self->gen != ctx->phase.gen) { // phase has changed, start over
+    start = 0;
+    wfx_tracer_unwind(ed, WFX_PHASE, "phase has changed");
   }
   else { //resuming
     assert(ctx->list.i < len);
@@ -18,7 +24,10 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
   DBG("PHASE: %s", self->name);
   for(i=start; i<len; i++) {
     ctx->list.i = i;
-    rc = wfx_list_eval(self->lists[i], ed, ctx);
+    list = self->lists[i];
+    wfx_tracer_push(ed, WFX_LIST, list);
+    rc = wfx_list_eval(list, ed, ctx);
+    wfx_tracer_pop(ed, WFX_LIST, rc);
     switch(rc) {
       case WFX_OK:
         continue;

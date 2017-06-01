@@ -2,13 +2,18 @@
 #include "common.h"
 #include "list.h"
 #include "rule.h"
+#include "tracer.h"
 
 wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int                  start, i, len = self->len;
   wfx_rule_t         **rule = self->rules;
   wfx_rc_t             rc = WFX_OK;
-  if(ctx->nocheck || ctx->list.gen != self->gen) {
+  if(ctx->nocheck) {
     start = 0;
+  }
+  else if(ctx->list.gen != self->gen) {
+    start = 0;
+    wfx_tracer_unwind(ed, WFX_LIST, "list has changed");
   }
   else {
     start = ctx->rule.i;
@@ -16,7 +21,9 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   DBG("LIST: #%i %s", ctx->list.i, self->name);
   for(i=start; i < len; i++) {
     ctx->rule.i = i;
+    wfx_tracer_push(ed, WFX_RULE, rule[i]);
     rc = wfx_rule_eval(rule[i], ed, ctx);
+    wfx_tracer_pop(ed, WFX_RULE, rc);
     switch(rc) {
       case WFX_OK:
         continue;

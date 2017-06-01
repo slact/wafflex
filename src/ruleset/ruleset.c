@@ -9,14 +9,16 @@
 #include "limiter.h"
 #include "phase.h"
 #include "string.h"
-
+#include "tracer.h"
 static wfx_binding_t wfx_ruleset_binding;
 
 
 wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   wfx_phase_t  *phase = self->phase[ed->phase];
   DBG("RULESET: #%i %s", ctx->ruleset.i, self->name);
+  wfx_tracer_push(ed, WFX_PHASE, phase);
   wfx_rc_t      rc = wfx_phase_eval(phase, ed, ctx);
+  wfx_tracer_pop(ed, WFX_PHASE, rc);
   if(rc == WFX_DEFER) {
     ctx->ruleset.gen = self->gen;
   }
