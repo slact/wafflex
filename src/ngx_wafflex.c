@@ -88,6 +88,7 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   
   for(i=start; i<n; i++) {
     ruleset = &rcf->ruleset[i];
+    (ctx == NULL ? &tmpctx : ctx)->ruleset.i = i;
     rc = wfx_ruleset_eval(ruleset, &ed, ctx == NULL ? &tmpctx : ctx);
     //raise(SIGSTOP);
     switch(rc) {
