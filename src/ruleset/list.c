@@ -13,7 +13,7 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   else {
     start = ctx->rule.i;
   }
-  for(i=0; i < len; i++) {
+  for(i=start; i < len; i++) {
     rc = wfx_rule_eval(rule[i], ed, ctx);
     switch(rc) {
       case WFX_OK:
