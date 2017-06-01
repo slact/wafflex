@@ -322,14 +322,11 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
   }
   else {
     lval = condition_stack_pop(stack);
-    wfx_lua_getfunction(wfx_Lua, "useReceivedLimiterValue");
+    wfx_lua_getfunction(wfx_Lua, "setLimiterValue");
     lua_pushstring(wfx_Lua, data->limiter->name);
     lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
     lua_pushlightuserdata(wfx_Lua, limiter);
-    lua_pushnumber(wfx_Lua, ngx_time());
-    lua_call(wfx_Lua, 4, 1); // no error-catching for maximum speed
-    assert(lua_touserdata(wfx_Lua, -1) == limiter);
-    lua_pop(wfx_Lua, 1);
+    lua_call(wfx_Lua, 3, 0); // no error-catching for maximum speed
   }
   
   ERR("donechecky");
