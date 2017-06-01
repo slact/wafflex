@@ -37,6 +37,8 @@ static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_ev
   lua_call(wfx_Lua, 2, 1);
   found = lua_toboolean(wfx_Lua, -1);
   lua_pop(wfx_Lua, 1);
+  DBG("CONDITION: %s%s tag \"%V\" for request %p", self->negate ? "(negate) " : "", found ? "found" : "notfound", wfx_str_as_dbg_ngx_str(self->data.data.str, ed), ed->data.request);
+  
   
   return found && !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
@@ -88,6 +90,9 @@ static wfx_rc_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) { //set-
       }
     }
   }
+  
+  DBG("ACTION: set tag \"%V\" for request %p", wfx_str_as_dbg_ngx_str(self->data.data.str, ed), ed->data.request);
+  
   lua_pop(wfx_Lua, 1);
   return WFX_OK;
 }
