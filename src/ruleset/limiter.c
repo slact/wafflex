@@ -281,6 +281,7 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
       ngx_memcpy(alert.key, key_sha1, sizeof(key_sha1));
       alert.ed = *ed;
       alert.forced = 0;
+      alert.val = NULL;
       alertstr.data = (u_char *)&alert;
       alertstr.len = sizeof(alert);
       
