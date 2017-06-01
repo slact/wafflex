@@ -28,7 +28,7 @@ typedef struct {
 typedef enum {WFX_COND_FALSE=0, WFX_COND_TRUE, WFX_COND_DEFER, WFX_COND_ERROR} wfx_condition_rc_t;
 typedef enum {WFX_REJECT=0, WFX_ACCEPT, WFX_OK, WFX_SKIP, WFX_DEFER, WFX_ERROR} wfx_rc_t;
 
-typedef enum {WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
+typedef enum {WFX_EVAL_NONE=0, WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
 typedef enum{WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
 typedef struct {
   wfx_evaldata_type_t  type;
