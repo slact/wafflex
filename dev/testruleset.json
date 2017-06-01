@@ -1,7 +1,7 @@
 {
   "name": "ruleset1",
   "phases": {
-    "request": [ "list1", ["fweep", "rule1"], []]
+    "request": [ "listy", ["fweep", "rule1"], []]
   },
   
   "limiters": {
@@ -18,11 +18,12 @@
   },
   
   "lists": {
-    "list1": [
+    "listy": [
       "fweep",
       {
         "if": {"match": ["$foo", "$bar", "$baz$foobar", "phno", "$thing"]},
-        "then": {"tag":"match_success"}
+        "then": {"tag":"match_success"},
+        "else": {"tag":"match_fail"}
       },
       {
         "info": "This rule rate-limits by ip",
@@ -38,11 +39,12 @@
   },
   "rules": {   //named rules
     "fweep": {
-      "if": { "#tag-check": "yeah${http_accept} this is okay" },
-      "then": {"#tag":"yeah$http_accept and what"}
+      "if": { "tag-check": "yeah${http_accept} this is okay" },
+      "then": {"tag": "yes indeed"},
+      "else": {"tag":"yeah${http_accept} this is okay"}
     }, 
     "fwoop": { "always": { "#tag":"this is a tag yo" } },
-    "rule1": { 
+    "rule1": {
       "if-all": ["#true", {"any": ["#true", "#false"]}],
       "then": {"tag":"foobar"},
       "else": {"tag":"barbar"}
