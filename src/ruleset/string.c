@@ -8,7 +8,7 @@
 static int string_create(lua_State *L) {
   ngx_str_t        str;
   wfx_str_t       *wstr;
-  wfx_str_part_t  *part = NULL;
+  wfx_str_part_t  *part;
   int              parts_count = 0;
   u_char          *cur, *ccur;
   size_t           sz;
@@ -52,6 +52,7 @@ static int string_create(lua_State *L) {
     
     //DBG("part (%i): %s%s key: %i str: \"%V\"", i, part->variable ? "var" : "raw", part->regex_capture ? " regex capture" : "", part->key, &spart);
     i++;
+    part = &wstr->parts[i];
   }
   
   lua_pushlightuserdata(L, wstr);
