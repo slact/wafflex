@@ -52,7 +52,7 @@ return function(manager)
   if not manager then
     local reqs = {}
     function addLimiterValueRequest(request_ptr)
-      local first_time = reqs[request_ptr] ~= nil
+      local first_time = reqs[request_ptr] == nil
       reqs[request_ptr] = request_ptr
       return first_time
     end

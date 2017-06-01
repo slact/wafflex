@@ -154,7 +154,7 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "  if not manager then\n"
    "    local reqs = {}\n"
    "    function addLimiterValueRequest(request_ptr)\n"
-   "      local first_time = reqs[request_ptr] ~= nil\n"
+   "      local first_time = reqs[request_ptr] == nil\n"
    "      reqs[request_ptr] = request_ptr\n"
    "      return first_time\n"
    "    end\n"
