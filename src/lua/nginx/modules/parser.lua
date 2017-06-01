@@ -202,7 +202,12 @@ end
 
 function class:parseInterpolatedString(str)
   --validate the string
-  for sub in str:gmatch("%${?%w*}?") do
+  for sub in str:gmatch("%$%b{}") do
+    if not sub:match("^%${[%w_]+}") then
+      self:error("invalid variable \"%s\" in interpolated string", sub)
+    end
+  end
+  for sub in str:gmatch("%${?[%w_]*}?") do
     if sub:sub(2,2) == "{" then
       if sub:sub(-1) ~="}" then --unterminated bracket
         self:error("missing '}' in interpolated string")
@@ -456,7 +461,7 @@ function class:parseTimeInterval(data, err)
   if typ == "number" then
     return data
   elseif typ == "string" then
-    local num, unit = data:match("^([%d.]+)(%w*)")
+    local num, unit = data:match("^([%d.]+)([%w_]*)")
     local scale
     num = tonumber(num)
     self:assert(num and unit, ("invalid time string \"%s\"%s"):format(data, err))
