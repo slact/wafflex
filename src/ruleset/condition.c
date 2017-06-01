@@ -207,7 +207,7 @@ static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
 }
 
-static wfx_condition_rc_t condition_match_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   wfx_data_t     *data = &self->data;
   ngx_str_t       str[32];
   
@@ -230,9 +230,38 @@ static wfx_condition_rc_t condition_match_eval(wfx_condition_t *self, wfx_evalda
   smax = wstrs[0]->parts_count;
   parts = wstrs[0]->parts;
   
-  for(si=0; si < smax; si++) {
-    //build first (simplest) string
-    wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
+  if(smax > 0) {
+    for(si = 0; si < smax; si++) {
+      //build first (simplest) string
+      wfx_str_get_part_value(wstrs[0], &parts[si], &str[si], ed); 
+    }
+  }
+  else {
+    //weird empty string?...
+    smax = 1;
+    str[0].data = (u_char *)"";
+    str[0].len = 0;
+  }
+  
+  if(str[0].len == 0) {
+    //match empty string
+    for(i=1; i < data->count; i++) {
+      ci = 0;
+      cmax = wstrs[i]->parts_count;
+      parts = wstrs[i]->parts;
+      wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed);
+      while(1) {
+        if(ccur.len != 0 && !negate)
+          return 0;
+        if(ccur.len == 0 && negate)
+          return 1;
+        if(++ci < cmax)
+          wfx_str_get_part_value(wstrs[i], &parts[ci], &ccur, ed); 
+        else
+          break;
+      }
+    }
+    return !negate;
   }
   
   //there's room for optimization here, guys. just not prematurely.
@@ -283,6 +312,11 @@ static wfx_condition_rc_t condition_match_eval(wfx_condition_t *self, wfx_evalda
   
   return !negate;
 }
+
+static wfx_condition_rc_t condition_match_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  return condition_match_eval_bool(self, ed, stack) ? WFX_COND_TRUE : WFX_COND_FALSE;
+}
+
 static int condition_match_create(lua_State *L) {
   wfx_condition_t *condition;
   int              i, wstr_count;

@@ -6,7 +6,7 @@
 wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int                  start, i, len = self->len;
   wfx_rule_t         **rule = self->rules;
-  wfx_rc_t             rc;
+  wfx_rc_t             rc = WFX_OK;
   if(ctx->nocheck || ctx->list.gen != self->gen) {
     start = 0;
   }

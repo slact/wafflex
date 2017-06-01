@@ -5,7 +5,7 @@
 #include "assert.h"
 wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int        len = self->len, i, start;
-  wfx_rc_t   rc;
+  wfx_rc_t   rc = WFX_OK;
   if( ctx->nocheck //from the top
    || self->gen != ctx->phase.gen // phase has changed, start over
   ) {
