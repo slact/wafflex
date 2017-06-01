@@ -20,9 +20,10 @@ int push_tag_chunks(lua_State *L, wfx_data_t *d, wfx_evaldata_t *ed) {
 
 //tag-check
 static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
-  int             n;
   int             found;
-  lua_getglobal(wfx_Lua, "getTag");
+  u_char          key_sha1[20];
+  
+  wfx_lua_getfunction(wfx_Lua, "findTag");
   switch(ed->type) {
     case WFX_EVAL_HTTP_REQUEST: 
       lua_pushlightuserdata(wfx_Lua, ed->data.request);
@@ -31,8 +32,9 @@ static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_ev
       ERR("don't know how to do that");
       return WFX_COND_ERROR;
   }
-  n = push_tag_chunks(wfx_Lua, &self->data, ed);
-  lua_ngxcall(wfx_Lua, n+1, 0);
+  wfx_str_sha1(self->data.data.str, ed, key_sha1);
+  lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
+  lua_call(wfx_Lua, 2, 1);
   found = lua_toboolean(wfx_Lua, -1);
   lua_pop(wfx_Lua, 1);
   
@@ -51,15 +53,15 @@ static wfx_condition_type_t condition_tag_check = {
 };
 
 void tag_request_cleanup(ngx_http_request_t *r) {
-  lua_getglobal(wfx_Lua, "clearTags");
+  wfx_lua_getfunction(wfx_Lua, "clearTags");
   lua_pushlightuserdata(wfx_Lua, r);
-  lua_ngxcall(wfx_Lua, 1, 0);
+  lua_call(wfx_Lua, 1, 0);
 }
 
 static wfx_rc_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) { //set-tag
-  int             n;
+  u_char          key_sha1[20];
   
-  lua_getglobal(wfx_Lua, "setTag");
+  wfx_lua_getfunction(wfx_Lua, "setTag");
   switch(ed->type) {
     case WFX_EVAL_HTTP_REQUEST: 
       lua_pushlightuserdata(wfx_Lua, ed->data.request);
@@ -68,8 +70,9 @@ static wfx_rc_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) { //set-
       ERR("don't know how to do that");
       return WFX_ERROR;
   }
-  n = push_tag_chunks(wfx_Lua, &self->data, ed);
-  lua_ngxcall(wfx_Lua, n+1, 1);
+  wfx_str_sha1(self->data.data.str, ed, key_sha1);
+  lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
+  lua_call(wfx_Lua, 2, 1);
   if(lua_toboolean(wfx_Lua, -1)) {
     //add cleanup
     if(ed->type == WFX_EVAL_HTTP_REQUEST) {
@@ -86,7 +89,6 @@ static wfx_rc_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) { //set-
     }
   }
   lua_pop(wfx_Lua, 1);
-  ERR("hopefully set the tag there");
   return WFX_OK;
 }
 static int action_tag_create(lua_State *L) {
@@ -104,4 +106,11 @@ static wfx_action_type_t action_tag = {
 void wfx_tag_bindings_set(lua_State *L) {
   wfx_condition_binding_add(L, &condition_tag_check);
   wfx_action_binding_add(L, &action_tag);
+}
+
+int wfx_tag_init_runtime(lua_State *L, int manager) {
+  if(!manager) {
+    wfx_lua_loadscript(L, tag);
+  }
+  return 1;
 }
