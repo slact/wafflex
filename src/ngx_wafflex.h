@@ -45,7 +45,7 @@ void  wfx_shm_free(void *ptr);
 
 //initialization stuff
 
-ngx_int_t ngx_wafflex_init_lua(int loadstuff);
+ngx_int_t ngx_wafflex_init_lua(int manager);
 ngx_int_t ngx_wafflex_shutdown_lua(void);
 ngx_int_t ngx_wafflex_setup_http_request_hooks(ngx_conf_t *cf);
 

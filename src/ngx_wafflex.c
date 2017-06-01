@@ -144,21 +144,22 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   return 0;
 }
 
-ngx_int_t ngx_wafflex_init_lua(int loader) {  
+ngx_int_t ngx_wafflex_init_lua(int manager) {  
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
   
   wfx_lua_loadscript(wfx_Lua, ipc);
   
-  if(loader) {
-    wfx_lua_loadscript(wfx_Lua, init);
-    wfx_lua_register(wfx_Lua, wfx_lua_require_module);
+  wfx_lua_loadscript(wfx_Lua, init);
+  wfx_lua_register(wfx_Lua, wfx_lua_require_module);
+  if(manager) {
+    lua_pushboolean(wfx_Lua, 1);
     wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
     wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
-    lua_ngxcall(wfx_Lua, 3, 0);
+    lua_ngxcall(wfx_Lua, 4, 0);
   }
   else {
-    wfx_lua_loadscript(wfx_Lua, tag);
+    lua_ngxcall(wfx_Lua, 1, 0);
   }
   
   return NGX_OK;
