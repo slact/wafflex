@@ -29,13 +29,14 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
         return rc;
     }
   }
+  ctx->rule.condition_done = 0;
+  ctx->rule.condition_true = 0;
   return rc;
 }
 
 wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   wfx_condition_rc_t        cond_rc;
   DBG("RULE: #%i %s", ctx->rule.i, self->name);
-  wfx_rc_t                  rc;
   if(!ctx->nocheck && ctx->rule.gen != self->gen) {
     ERR("rule was changed, restart it from the top");
     condition_stack_clear(&ctx->rule.condition_stack);
@@ -48,9 +49,8 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
       case WFX_COND_TRUE:
       case WFX_COND_FALSE:
         ctx->rule.condition_done = 1;
-        ctx->rule.condition_true = WFX_COND_TRUE ? 1 : 0;
-        rc = wfx_rule_actions_eval(self, ed, ctx);
-        return rc;
+        ctx->rule.condition_true = cond_rc == WFX_COND_TRUE ? 1 : 0;
+        return wfx_rule_actions_eval(self, ed, ctx);
       case WFX_COND_ERROR:
         return WFX_ERROR;
       case WFX_COND_DEFER:
