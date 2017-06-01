@@ -175,17 +175,24 @@ static wfx_condition_rc_t condition_list_eval(wfx_data_t *data, wfx_condition_rc
   }
 }
 
+static wfx_condition_rc_t condition_rc_maybe_negate(wfx_condition_t *self, wfx_condition_rc_t rc) {
+  switch(rc) {
+    case WFX_COND_FALSE:
+      return self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;      
+    case WFX_COND_TRUE:
+      return self->negate ? WFX_COND_FALSE : WFX_COND_TRUE;
+    case WFX_COND_DEFER:
+    case WFX_COND_ERROR:
+      //do nothing
+      break;
+  }
+  return rc;
+}
+
 //any
 static wfx_condition_rc_t condition_any_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_TRUE, ed, stack);
-  switch(rc) {
-    case WFX_COND_FALSE:
-    case WFX_COND_TRUE:
-      return self->negate ? !rc : rc;
-    case WFX_COND_DEFER:
-    case WFX_COND_ERROR:
-      return rc;
-  }
+  return condition_rc_maybe_negate(self, rc);
 }
 static int condition_any_create(lua_State *L) {
   return condition_array_create(L, condition_any_eval);
@@ -194,15 +201,7 @@ static int condition_any_create(lua_State *L) {
 //all
 static wfx_condition_rc_t condition_all_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_FALSE, ed, stack);
-  switch(rc) {
-    case WFX_COND_FALSE:
-    case WFX_COND_TRUE:
-      return self->negate ? !rc : rc;
-    case WFX_COND_DEFER:
-    case WFX_COND_ERROR:
-      return rc;
-  }
-  
+  return condition_rc_maybe_negate(self, rc);
 }
 static int condition_all_create(lua_State *L) {
   return condition_array_create(L, condition_all_eval);
