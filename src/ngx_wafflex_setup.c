@@ -144,9 +144,6 @@ static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
     //reset lua
     ngx_wafflex_shutdown_lua();
     ngx_wafflex_init_lua(0);
-    ngx_wafflex_init_runtime(1);
-  }
-  else {
     ngx_wafflex_init_runtime(0);
   }
   return NGX_OK;
