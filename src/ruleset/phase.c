@@ -15,8 +15,9 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
     assert(ctx->list.i < len);
     start = ctx->list.i;
   }
-  
+  DBG("PHASE: %s", self->name);
   for(i=start; i<len; i++) {
+    ctx->list.i = i;
     rc = wfx_list_eval(self->lists[i], ed, ctx);
     switch(rc) {
       case WFX_OK:
@@ -26,7 +27,6 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
       case WFX_DEFER:
         ctx->phase.gen = self->gen;
         ctx->phase.phase = ed->phase;
-        ctx->list.i = i;
         return rc;
       default:
         return rc;

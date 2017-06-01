@@ -34,6 +34,7 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
 
 wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   wfx_condition_rc_t        cond_rc;
+  DBG("RULE: #%i %s", ctx->rule.i, self->name);
   wfx_rc_t                  rc;
   if(!ctx->nocheck && ctx->rule.gen != self->gen) {
     ERR("rule was changed, restart it from the top");

@@ -92,6 +92,7 @@ void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *cond) {
 
 //true
 static wfx_condition_rc_t condition_true_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  DBG("CONDITION: true");
   return !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
 static int condition_true_create(lua_State *L) {
@@ -101,6 +102,7 @@ static int condition_true_create(lua_State *L) {
 
 //false
 static wfx_condition_rc_t condition_false_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  DBG("CONDITION: false");
   return self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
 }
 static int condition_false_create(lua_State *L) {
@@ -191,6 +193,7 @@ static wfx_condition_rc_t condition_rc_maybe_negate(wfx_condition_t *self, wfx_c
 
 //any
 static wfx_condition_rc_t condition_any_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  DBG("CONDITION: any");
   wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_TRUE, ed, stack);
   return condition_rc_maybe_negate(self, rc);
 }
@@ -200,6 +203,7 @@ static int condition_any_create(lua_State *L) {
 
 //all
 static wfx_condition_rc_t condition_all_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
+  DBG("CONDITION: all");
   wfx_condition_rc_t   rc = condition_list_eval(&self->data, WFX_COND_FALSE, ed, stack);
   return condition_rc_maybe_negate(self, rc);
 }
@@ -221,6 +225,7 @@ static int condition_match_eval_bool(wfx_condition_t *self, wfx_evaldata_t *ed, 
   int             negate = self->negate;
   int             cmp;
 
+  DBG("CONDITION: match");
   
   if(data->count == 0)
     return 0;
@@ -370,6 +375,7 @@ static wfx_condition_rc_t condition_delay_eval(wfx_condition_t *self, wfx_evalda
   ngx_http_request_t    *r = ed->data.request;
   ngx_http_cleanup_t    *cln;
   if(condition_stack_empty(stack)) {
+    DBG("CONDITION: .delay start");
     cln = ngx_http_cleanup_add(r, sizeof(delay_request_data_t));
     delay_request_data_t  *delay_data = cln->data;
     delay_data->r = r;
@@ -383,6 +389,7 @@ static wfx_condition_rc_t condition_delay_eval(wfx_condition_t *self, wfx_evalda
     return WFX_COND_DEFER;
   }
   else {
+    DBG("CONDITION: .delay end");
     return WFX_COND_TRUE;
   }
 }

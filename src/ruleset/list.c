@@ -13,7 +13,9 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   else {
     start = ctx->rule.i;
   }
+  DBG("LIST: #%i %s", ctx->list.i, self->name);
   for(i=start; i < len; i++) {
+    ctx->rule.i = i;
     rc = wfx_rule_eval(rule[i], ed, ctx);
     switch(rc) {
       case WFX_OK:
@@ -22,7 +24,6 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
         return WFX_OK;
       case WFX_DEFER:
         ctx->list.gen = self->gen;
-        ctx->rule.i = i;
         return rc;
       default:
         return rc;

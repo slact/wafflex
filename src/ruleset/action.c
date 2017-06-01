@@ -41,6 +41,7 @@ void wfx_action_binding_add(lua_State *L, wfx_action_type_t *cond) {
 //accept
 static wfx_rc_t action_accept_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   //TODO
+  DBG("ACTION: accept");
   return WFX_ACCEPT;
 }
 static int action_accept_create(lua_State *L) {
@@ -54,6 +55,7 @@ static int action_accept_create(lua_State *L) {
 //reject
 static wfx_rc_t action_reject_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   //TODO
+  DBG("ACTION: reject");
   return WFX_REJECT;
 }
 static int action_reject_create(lua_State *L) {
@@ -92,6 +94,7 @@ static wfx_rc_t action_wait_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   ngx_http_cleanup_t    *cln;
   
   if(!ctx || ctx->nocheck || !ctx->rule.action.data) {
+    DBG("ACTION: wait start");
     //ERR("wait %i msec...", self->data.data.integer);
     cln = ngx_http_cleanup_add(r, sizeof(wait_request_data_t));
     wait_request_data_t  *wait_data = cln->data;
@@ -106,6 +109,7 @@ static wfx_rc_t action_wait_eval(wfx_action_t *self, wfx_evaldata_t *ed) {
   }
   else {
     //ERR("no more waiting!");
+    DBG("ACTION: wait finish");
     ctx->rule.action.data = (void *)0;
     return WFX_OK;
   }
