@@ -93,7 +93,7 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "local handlers = {}\n"
    "local rawget = rawget\n"
    "function setAlertHandler(name, callback)\n"
-   "  return rawset(handlers, name, callback)\n"
+   "  rawset(handlers, name, callback)\n"
    "end\n"
    "function getAlertHandler(name, data_ptr)\n"
    "  return rawget(handlers, name)\n"
