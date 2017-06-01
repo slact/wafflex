@@ -379,6 +379,7 @@ static wfx_condition_rc_t condition_delay_eval(wfx_condition_t *self, wfx_evalda
   }
   else {
     DBG("CONDITION: .delay end");
+    condition_stack_pop(stack);
     return WFX_COND_TRUE;
   }
 }
