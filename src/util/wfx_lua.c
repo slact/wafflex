@@ -29,6 +29,8 @@ static int wfx_lua_traceback(lua_State *L) {
 
 void lua_ngxcall(lua_State *L, int nargs, int nresults) {
   int rc;
+  assert(lua_isfunction(L, -(nargs+1)));
+  
   lua_pushcfunction(L, wfx_lua_traceback);
   lua_insert(L, 1);
   
@@ -37,8 +39,10 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "<wafflex:lua>: %s", lua_tostring(L, -1));
     lua_pop(L, 1);
     lua_gc(L, LUA_GCCOLLECT, 0);
+#ifdef WFX_CRASH_ON_LUA_ERROR
+    raise(SIGABRT);
+#endif
   }
-  
   lua_remove(L, 1);
 }
 
@@ -46,6 +50,12 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
 int wfx_lua_getref(lua_State *L, int index) {
   lua_pushvalue(L, index);
   return luaL_ref(L, LUA_REGISTRYINDEX);
+}
+
+int wfx_lua_getfunction(lua_State *L, const char *name) {
+  lua_getglobal(L, name);
+  assert(lua_isfunction(L, -1));
+  return 1;
 }
 
 size_t wfx_lua_len(lua_State *L, int index) {
