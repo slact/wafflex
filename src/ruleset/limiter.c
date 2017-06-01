@@ -265,9 +265,9 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
     wfx_str_sha1(data->key, ed, key_sha1);
     
     wfx_lua_getfunction(wfx_Lua, "findLimiterValue"); //get limit and update recently-used value
-    lua_pushstring(wfx_Lua, data->limiter->name);
+    lua_pushlightuserdata(wfx_Lua, data->limiter);
     lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
-    lua_call(wfx_Lua, 2, 1); // no error-catching for maximum speed
+    lua_ngxcall(wfx_Lua, 2, 1);
     
     if(!lua_isnil(wfx_Lua, -1)) {
       lval = lua_touserdata(wfx_Lua, -1);
@@ -323,10 +323,10 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
   else {
     lval = condition_stack_pop(stack);
     wfx_lua_getfunction(wfx_Lua, "setLimiterValue");
-    lua_pushstring(wfx_Lua, data->limiter->name);
-    lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
-    lua_pushlightuserdata(wfx_Lua, limiter);
-    lua_call(wfx_Lua, 3, 0); // no error-catching for maximum speed
+    lua_pushlightuserdata(wfx_Lua, data->limiter);
+    lua_pushlstring(wfx_Lua, (const char *)lval->key, 20);
+    lua_pushlightuserdata(wfx_Lua, lval);
+    lua_ngxcall(wfx_Lua, 3, 0);
   }
   
   ERR("donechecky");
