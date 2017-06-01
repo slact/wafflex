@@ -16,10 +16,10 @@ static void limiter_reap_value(wfx_limiter_value_t *lval, wfx_limiter_t *limiter
 
 typedef struct {
   wfx_limiter_t       *limiter;
-  u_char               key[20];
   wfx_limiter_value_t *val;
   wfx_evaldata_t       ed;
   int                  forced;
+  u_char               key[20];
 } limit_val_alert_t;
 
 static wfx_limiter_value_t *create_shm_limiter_value(u_char *key) {
