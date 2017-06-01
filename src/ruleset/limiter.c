@@ -155,11 +155,10 @@ static void limiter_value_request_alert_handler(ngx_pid_t sender_pid, ngx_int_t 
   ngx_str_t alert_name = ngx_string("limiter-value-response");
   limit_val_alert_t *d = (limit_val_alert_t *)data->data;
   
-  lua_printstack(wfx_Lua);
   wfx_lua_getfunction(wfx_Lua, "findLimiterValue");
   lua_pushlightuserdata(wfx_Lua, d->limiter);
   lua_pushlstring(wfx_Lua, (const char *)d->key, 20);
-  lua_ngxcall(wfx_Lua, 3, 1);
+  lua_ngxcall(wfx_Lua, 2, 1);
   if(!lua_isnil(wfx_Lua, -1)) {
     //already exists
     d->val = lua_touserdata(wfx_Lua, -1);
@@ -262,18 +261,19 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
   
   int                     realcount;
   
-  ERR("checky");
-  
   if(condition_stack_empty(stack)) {
     wfx_str_sha1(data->key, ed, key_sha1);
     
-    wfx_lua_getfunction(wfx_Lua, "useLimiterValue"); //get limit and update recently-used value
+    wfx_lua_getfunction(wfx_Lua, "findLimiterValue"); //get limit and update recently-used value
     lua_pushstring(wfx_Lua, data->limiter->name);
     lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
-    lua_pushnumber(wfx_Lua, ngx_time());
-    lua_call(wfx_Lua, 3, 1); // no error-catching for maximum speed
+    lua_call(wfx_Lua, 2, 1); // no error-catching for maximum speed
     
-    if(lua_isnil(wfx_Lua, -1)) {
+    if(!lua_isnil(wfx_Lua, -1)) {
+      lval = lua_touserdata(wfx_Lua, -1);
+      lua_pop(wfx_Lua, 1);
+    }
+    else {
       ngx_str_t             alert_name = ngx_string("limiter-value-request");
       ngx_str_t             alertstr;
       limit_val_alert_t     alert;
@@ -317,10 +317,6 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
       
       condition_stack_push(stack, NULL);
       return WFX_COND_DEFER;
-    }
-    else {
-      lval = lua_touserdata(wfx_Lua, -1);
-      lua_pop(wfx_Lua, 1);
     }
   }
   else {
