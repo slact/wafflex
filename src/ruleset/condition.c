@@ -54,6 +54,7 @@ void condition_stack_set_tail_data(wfx_evaldata_t *ed, void *d) {
     case WFX_EVAL_HTTP_REQUEST:
       ctx = ngx_http_get_module_ctx(ed->data.request, ngx_wafflex_module);
       ctx->rule.condition_stack.tail->pd = d;
+      break;
     default:
       ERR("don't know how to do that yet");
       raise(SIGABRT);
