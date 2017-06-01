@@ -148,6 +148,8 @@ ngx_int_t ngx_wafflex_init_lua(int loader) {
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
   
+  wfx_lua_loadscript(wfx_Lua, ipc);
+  
   if(loader) {
     wfx_lua_loadscript(wfx_Lua, init);
     wfx_lua_register(wfx_Lua, wfx_lua_require_module);

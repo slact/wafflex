@@ -89,6 +89,16 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "  end\n"
    "end\n"},
 
+  {"ipc", 
+   "local handlers = {}\n"
+   "local rawget = rawget\n"
+   "function setAlertHandler(name, callback)\n"
+   "  rawset(handlers, name, callback)\n"
+   "end\n"
+   "function getAlertHandler(name, data_ptr)\n"
+   "  return rawget(handlers, name)\n"
+   "end\n"},
+
   {"limiter", 
    "local limiters = {}\n"
    "return function(create_limit_data_cfunc, destroy_limit_data_cfunc)\n"
