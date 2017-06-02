@@ -94,7 +94,7 @@ void wfx_condition_binding_add(lua_State *L, wfx_condition_type_t *cond) {
 //true
 static wfx_condition_rc_t condition_true_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   DBG("CONDITION: true");
-  return !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
+  return condition_rc_maybe_negate(self, WFX_COND_TRUE);
 }
 static int condition_true_create(lua_State *L) {
   condition_create(L, 0, condition_true_eval);
@@ -104,7 +104,7 @@ static int condition_true_create(lua_State *L) {
 //false
 static wfx_condition_rc_t condition_false_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
   DBG("CONDITION: false");
-  return self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
+  return condition_rc_maybe_negate(self, WFX_COND_FALSE);
 }
 static int condition_false_create(lua_State *L) {
   condition_create(L, 0, condition_false_eval);

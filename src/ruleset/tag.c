@@ -42,7 +42,7 @@ static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_ev
   DBG("CONDITION: %s%s tag \"%V\" for request %p", self->negate ? "(negate) " : "", found ? "found" : "notfound", wfx_str_as_dbg_ngx_str(self->data.data.str, ed), ed->data.request);
   
   
-  return found && !self->negate ? WFX_COND_TRUE : WFX_COND_FALSE;
+  return condition_rc_maybe_negate(self, found ? WFX_COND_TRUE : WFX_COND_FALSE);
 }
 static int condition_tag_check_create(lua_State *L) {
   wfx_condition_t *condition = condition_create(L, 0, condition_tag_check_eval);
