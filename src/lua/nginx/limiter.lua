@@ -28,10 +28,23 @@ return function(manager)
 
   function setLimiterValue(limiter_ptr, key, limit_data_ptr)
     limiters[limiter_ptr][key]=limit_data_ptr
+    
+    --check uniqueness
+    --[[
+    local uniq = {}
+    print(limiter_ptr)
+    mm(limiters[limiter_ptr])
+    for k, v in pairs(limiters[limiter_ptr]) do
+      assert(not uniq[v], "found two different keys mapping to same limiter value")
+      uniq[v] = true
+    end
+    ]]
+    
     return limit_data_ptr
   end
     
   function unsetLimiterValue(limiter_ptr, key, limit_data_ptr)
+    --mm(limiters)
     local limit = rawget(limiters, limiter_ptr)
     local data = rawget(limit, key)
     if data then
