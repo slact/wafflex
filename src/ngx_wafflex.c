@@ -4,6 +4,7 @@
 #include <ruleset/ruleset.h>
 #include <util/wfx_str.h>
 #include <ruleset/condition.h>
+#include <ruleset/tracer.h>
 
 static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
@@ -60,7 +61,7 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   wfx_ruleset_conf_t   *rcf;
   wfx_ruleset_t        *ruleset;
   wfx_evaldata_t        ed;
-  wfx_rc_t              rc;
+  wfx_rc_t              rc = WFX_OK;
   wfx_request_ctx_t    *ctx, tmpctx;
   ngx_http_cleanup_t   *cln;
   if(!cf->rulesets) {
@@ -70,6 +71,11 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   ed.data.request = r;
   ed.type = WFX_EVAL_HTTP_REQUEST;
   ed.phase = WFX_PHASE_HTTP_REQUEST_HEADERS;
+  
+  ed.tracer.luaref = LUA_NOREF;
+  ed.tracer.on = 1;
+  
+  tracer_init(&ed);
   
   tmpctx.nocheck = 1;
   ngx_memzero(&tmpctx.rule, sizeof(tmpctx.rule));
@@ -85,42 +91,43 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   else {
     start = 0;
   }
-  
-  for(i=start; i<n; i++) {
+  for(i=start; rc == WFX_OK && i<n; i++) {
     ruleset = &rcf->ruleset[i];
     (ctx == NULL ? &tmpctx : ctx)->ruleset.i = i;
+    tracer_push(&ed, WFX_RULESET, ruleset);
     rc = wfx_ruleset_eval(ruleset, &ed, ctx == NULL ? &tmpctx : ctx);
-    //raise(SIGSTOP);
-    switch(rc) {
-      case WFX_OK:
-        continue;
-      case WFX_SKIP:
-        return NGX_OK;
-      case WFX_ACCEPT:
-        return NGX_OK;
-      case WFX_REJECT:
-        return NGX_ABORT;
-      case WFX_DEFER:
-        if(ctx == NULL) {
-          cln = ngx_http_cleanup_add(r, 0);
-          ctx = ngx_palloc(r->pool, sizeof(*ctx));
-          if (ctx == NULL || ctx == NULL)
-            return NGX_ERROR;
-          
-          cln->handler = (ngx_http_cleanup_pt )ngx_wfx_request_ctx_cleanup;
-          cln->data = ctx;
-          
-          *ctx = tmpctx;
-          ctx->nocheck = 0;
-          ngx_http_set_ctx(r, ctx, ngx_wafflex_module);
-        }
-        ctx->ruleset.i = i;
-        return NGX_DONE;
-      case WFX_ERROR:
-        return NGX_ERROR;
-    }
+    tracer_pop(&ed, WFX_RULESET, rc);
+    if(rc != WFX_OK)
+      break;
   }
-  return NGX_OK;
+  ERR("donedone");
+  tracer_finish(&ed);
+  switch(rc) {
+    case WFX_OK:
+    case WFX_SKIP:
+    case WFX_ACCEPT:
+      return NGX_OK;
+    case WFX_REJECT:
+      return NGX_ABORT;
+    case WFX_DEFER:
+      if(ctx == NULL) {
+        cln = ngx_http_cleanup_add(r, 0);
+        ctx = ngx_palloc(r->pool, sizeof(*ctx));
+        if (ctx == NULL || ctx == NULL)
+          return NGX_ERROR;
+        
+        cln->handler = (ngx_http_cleanup_pt )ngx_wfx_request_ctx_cleanup;
+        cln->data = ctx;
+        
+        *ctx = tmpctx;
+        ngx_http_set_ctx(r, ctx, ngx_wafflex_module);
+      }
+      ctx->nocheck = 0;
+      ctx->ruleset.i = i;
+      return NGX_DONE;
+    case WFX_ERROR:
+      return NGX_ERROR;
+  }
 }
 
 static ngx_int_t ngx_http_wafflex_header_filter(ngx_http_request_t *r) {

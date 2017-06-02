@@ -20,9 +20,9 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
   start = ctx->nocheck ? 0 : ctx->rule.action.i;
   for(i=start; i<n; i++) {
     action = actions[i];
-    wfx_tracer_push(ed, WFX_ACTION, action);
+    tracer_push(ed, WFX_ACTION, action);
     rc = actions[i]->eval(action, ed);
-    wfx_tracer_pop(ed, WFX_ACTION, rc);
+    tracer_pop(ed, WFX_ACTION, rc);
     switch(rc) {
       case WFX_OK:
         continue;
@@ -46,10 +46,12 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
     ERR("rule was changed, restart it from the top");
     condition_stack_clear(&ctx->rule.condition_stack);
     ngx_memzero(&ctx->rule, sizeof(ctx->rule));
+    tracer_unwind(ed, WFX_RULE, "rule has changed");
   }
-  
   if(ctx->nocheck || !ctx->rule.condition_done) {
+    tracer_push(ed, WFX_CONDITION, self->condition);
     cond_rc = self->condition->eval(self->condition, ed, &ctx->rule.condition_stack);
+    tracer_pop(ed, WFX_CONDITION, cond_rc);
     switch(cond_rc) {
       case WFX_COND_TRUE:
       case WFX_COND_FALSE:

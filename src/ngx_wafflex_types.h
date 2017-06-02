@@ -31,15 +31,31 @@ typedef enum {WFX_REJECT=0, WFX_ACCEPT, WFX_OK, WFX_SKIP, WFX_DEFER, WFX_ERROR} 
 
 typedef enum {WFX_EVAL_NONE=0, WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
 typedef enum{WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
+
+typedef struct {
+  int           luaref;
+  unsigned      on:1;
+} wfx_tracer_t;
+
+typedef struct wfx_condition_s wfx_condition_t;
+
+typedef struct {
+  ngx_atomic_int_t uses;
+  wfx_condition_t *condition;
+  unsigned         profile;
+  unsigned         trace;
+} wfx_tracer_round_t;
+
 typedef struct {
   wfx_evaldata_type_t  type;
   wfx_phase_type_t     phase;
+  wfx_tracer_t         tracer;
   union {
     ngx_http_request_t   *request;
   }                     data;
 } wfx_evaldata_t;
 
-typedef enum {WFX_UNKNOWN_ELEMENT = 0, WFX_RULESET, WFX_PHASE, WFX_LIST, WFX_RULE, WFX_CONDITION, WFX_ACTION, WFX_STRING, WFX_DATA} wfx_ruleset_element_type_t;
+typedef enum {WFX_UNKNOWN_ELEMENT = 0, WFX_RULESET, WFX_PHASE, WFX_LIST, WFX_RULE, WFX_CONDITION, WFX_ACTION} wfx_ruleset_element_type_t;
 
 typedef enum {WFX_DATA_INTEGER = 0, WFX_DATA_FLOAT, WFX_DATA_STRING, WFX_DATA_STRING_ARRAY, WFX_DATA_PTR} wfx_data_type_t;
 typedef struct {
@@ -84,8 +100,6 @@ struct wfx_limiter_s {
 }; //wfx_limiter_t
 
 typedef struct wfx_rule_s wfx_rule_t;
-
-typedef struct wfx_condition_s wfx_condition_t;
 
 typedef struct wfx_condition_stack_el_s wfx_condition_stack_el_t;
 struct wfx_condition_stack_el_s {

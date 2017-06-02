@@ -264,7 +264,7 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
   
   if(condition_stack_empty(stack)) {
     wfx_str_sha1(data->key, ed, key_sha1);
-    wfx_tracer_log_wstr(ed, "key", data->key);
+    tracer_log_wstr(ed, "key", data->key);
     
     wfx_lua_getfunction(wfx_Lua, "findLimiterValue"); //get limit and update recently-used value
     lua_pushlightuserdata(wfx_Lua, data->limiter);
@@ -337,7 +337,7 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
     ngx_atomic_fetch_add((ngx_atomic_uint_t *)&lval->count, data->increment);
   }
   realcount = limiter_current_value(limiter, lval);
-  wfx_tracer_log_int(ed, "count", realcount);
+  tracer_log_int(ed, "count", realcount);
   return condition_rc_maybe_negate(self, realcount <= limiter->limit ? WFX_COND_TRUE : WFX_COND_FALSE);
 }
 

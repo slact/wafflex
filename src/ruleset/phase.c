@@ -15,7 +15,7 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
   }
   else if(self->gen != ctx->phase.gen) { // phase has changed, start over
     start = 0;
-    wfx_tracer_unwind(ed, WFX_PHASE, "phase has changed");
+    tracer_unwind(ed, WFX_PHASE, "phase has changed");
   }
   else { //resuming
     assert(ctx->list.i < len);
@@ -25,9 +25,9 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
   for(i=start; i<len; i++) {
     ctx->list.i = i;
     list = self->lists[i];
-    wfx_tracer_push(ed, WFX_LIST, list);
+    tracer_push(ed, WFX_LIST, list);
     rc = wfx_list_eval(list, ed, ctx);
-    wfx_tracer_pop(ed, WFX_LIST, rc);
+    tracer_pop(ed, WFX_LIST, rc);
     switch(rc) {
       case WFX_OK:
         continue;

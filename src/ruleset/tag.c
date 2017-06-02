@@ -34,7 +34,7 @@ static wfx_condition_rc_t condition_tag_check_eval(wfx_condition_t *self, wfx_ev
       return WFX_COND_ERROR;
   }
   wfx_str_sha1(self->data.data.str, ed, key_sha1);
-  wfx_tracer_log_wstr(ed, "string", self->data.data.str);
+  tracer_log_wstr(ed, "string", self->data.data.str);
   lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
   lua_call(wfx_Lua, 2, 1);
   found = lua_toboolean(wfx_Lua, -1);
@@ -75,7 +75,7 @@ static wfx_rc_t action_tag_eval(wfx_action_t *self, wfx_evaldata_t *ed) { //set-
       return WFX_ERROR;
   }
   wfx_str_sha1(self->data.data.str, ed, key_sha1);
-  wfx_tracer_log_wstr(ed, "string", self->data.data.str);
+  tracer_log_wstr(ed, "string", self->data.data.str);
   lua_pushlstring(wfx_Lua, (const char *)key_sha1, 20);
   lua_call(wfx_Lua, 2, 1);
   if(lua_toboolean(wfx_Lua, -1)) {
