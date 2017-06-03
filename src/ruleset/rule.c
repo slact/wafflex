@@ -25,8 +25,10 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
     tracer_pop(ed, WFX_ACTION, rc);
     switch(rc) {
       case WFX_OK:
+        ctx->rule.action.data = NULL;
         continue;
       case WFX_DEFER:
+        ctx->rule.gen = self->gen;
         ctx->rule.action.i = i;
         ctx->rule.action.data = NULL;
         return rc;
@@ -61,7 +63,6 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
       case WFX_COND_ERROR:
         return WFX_ERROR;
       case WFX_COND_DEFER:
-        ctx->rule.gen = self->gen;
         return WFX_DEFER;
     }
   }
