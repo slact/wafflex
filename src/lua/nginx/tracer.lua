@@ -1,5 +1,5 @@
 local mm = require "mm"
-return function(ngx_cached_msec_time, ngx_cached_time, ngx_error_log, ngx_add_cleanup_handler)
+return function(ngx_cached_msec_time, ngx_cached_time, ngx_add_request_cleanup_handler, ngx_error_log)
   local ngx = {
     time_msec = function()
       local sec, msec = ngx_cached_msec_time()
@@ -7,7 +7,7 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_error_log, ngx_add_cl
     end,
     time_cached = ngx_cached_time,
     error_log = ngx_error_log,
-    add_cleanup_handler = ngx_add_cleanup_handler
+    add_request_cleanup_handler = ngx_add_request_cleanup_handler
   }
 
   local tracers = {}
@@ -15,7 +15,12 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_error_log, ngx_add_cl
   local Tracer = {}
   local tracer_mt = {__index = Tracer}
 
-  function newTracer(req_ref)
+  local function tracerCleaner(ref)
+    print("CLEANED UP AFTER TRACER")
+    tracers[ref] = nil
+  end
+  
+  function newTracer(ref_type, req_ref)
     local tracer = {
       stack = {},
       complete = {},
@@ -26,11 +31,17 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_error_log, ngx_add_cl
     }
     setmetatable(tracer, tracer_mt)
     tracers[req_ref] = tracer
+    if ref_type == "request" then
+      ngx.add_request_cleanup_handler(req_ref, tracerCleaner)
+    else
+      error("don't know how to do this")
+    end
+    
     return tracer
   end
   
-  function getTracer(req_ref)
-    local tracer =  tracers[req_ref] or newTracer(req_ref)
+  function getTracer(ref_type, req_ref)
+    local tracer =  tracers[req_ref] or newTracer(ref_type, req_ref)
     --mm(tracer)
     return tracer
   end
@@ -73,7 +84,7 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_error_log, ngx_add_cl
       el = self.stack[self.cur]
       assert(el.type == element)
       el.deferred = true
-      if self.profile then 
+      if self.profile then
         el.time.defer_start = ngx.time_msec()
       end
       if el.time.start then

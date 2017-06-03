@@ -61,6 +61,18 @@ static const char *element_type_cstr(wfx_ruleset_element_type_t et) {
   return "";
 }
 
+static const char *evaldata_type(wfx_evaldata_t *ed) {
+  switch(ed->type) {
+    case WFX_EVAL_NONE:
+      return "none";
+    case WFX_EVAL_ACCEPT:
+      return "accept";
+    case WFX_EVAL_HTTP_REQUEST:
+      return "request";
+  }
+  return "?";
+}
+
 static const char *element_name_cstr(wfx_ruleset_element_type_t et, void *el) {
   switch(et) {
     case WFX_UNKNOWN_ELEMENT:
@@ -83,6 +95,7 @@ static const char *element_name_cstr(wfx_ruleset_element_type_t et, void *el) {
   return "<...>";
 }
 
+/*
 static int element_luaref(wfx_ruleset_element_type_t et, void *el) {
   switch(et) {
     case WFX_RULESET:
@@ -99,6 +112,7 @@ static int element_luaref(wfx_ruleset_element_type_t et, void *el) {
   }
   return 0;
 }
+*/
 
 static int element_gen(wfx_ruleset_element_type_t et, void *el) {
   switch(et) {
@@ -175,6 +189,9 @@ void tracer_pop(wfx_evaldata_t *ed, wfx_ruleset_element_type_t type, int rc) {
 }
 void tracer_unwind(wfx_evaldata_t *ed, wfx_ruleset_element_type_t type, const char *reason) {
   TRACER_OR_BUST(ed, t);
+  lua_pushstring(wfx_Lua, element_type_cstr(type));
+  lua_pushstring(wfx_Lua, reason);
+  tracer_lua_call(wfx_Lua, t, "unwind", 2, 0);
 }
 void tracer_log_wstr(wfx_evaldata_t *ed, const char *name, wfx_str_t *wstr) {
   TRACER_OR_BUST(ed, t);
@@ -199,6 +216,7 @@ void tracer_init(wfx_evaldata_t *ed) {
   TRACER_OR_BUST(ed, t);
   if(t->luaref == LUA_NOREF) {
     wfx_lua_getfunction(wfx_Lua, "getTracer");
+    lua_pushstring(wfx_Lua, evaldata_type(ed));
     switch(ed->type) {
       case WFX_EVAL_HTTP_REQUEST:
         lua_pushlightuserdata(wfx_Lua, ed->data.request);
@@ -207,7 +225,7 @@ void tracer_init(wfx_evaldata_t *ed) {
         raise(SIGABRT); //what do?
         break;
     }
-    lua_ngxcall(wfx_Lua, 1, 1);
+    lua_ngxcall(wfx_Lua, 2, 1);
     t->luaref = wfx_lua_getref(wfx_Lua, -1);
   }
 }
@@ -216,10 +234,38 @@ void tracer_finish(wfx_evaldata_t *ed) {
   tracer_lua_call(wfx_Lua, t, "finish", 0, 0);
 }
 
+static void request_cleanup_handler(void *pd) {
+  ngx_http_request_t *r = pd;
+  lua_rawgetp(wfx_Lua, LUA_REGISTRYINDEX, r);
+  lua_pushlightuserdata(wfx_Lua, r);
+  lua_ngxcall(wfx_Lua, 1, 0);
+  
+  lua_pushnil(wfx_Lua);
+  lua_rawsetp(wfx_Lua, LUA_REGISTRYINDEX, r);
+}
+
+static int ngx_lua_add_request_cleanup(lua_State *L) {
+  ngx_http_cleanup_t   *cln;
+  ngx_http_request_t   *r = lua_touserdata(L, 1);
+  assert(lua_isfunction(L, 2));
+  cln = ngx_http_cleanup_add(r, 0);
+  if(!cln)
+    return 0;
+  cln->handler = request_cleanup_handler;
+  cln->data = r;
+  
+  lua_pushvalue(L, 2);
+  lua_rawsetp(L, LUA_REGISTRYINDEX, r);
+  
+  lua_pushboolean(L, 1);
+  return 1;
+}
+
 int wfx_tracer_init_runtime(lua_State *L, int manager) {
   wfx_lua_loadscript(L, tracer);
   wfx_lua_register(L, ngx_lua_msec_cached_time);
   wfx_lua_register(L, ngx_lua_sec_cached_time);
-  lua_ngxcall(L, 2, 0);
+  wfx_lua_register(L, ngx_lua_add_request_cleanup);
+  lua_ngxcall(L, 3, 0);
   return 1;
 }

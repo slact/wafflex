@@ -55,8 +55,8 @@ int wfx_lua_getref(lua_State *L, int index) {
   lua_pushvalue(L, index);
   return luaL_ref(L, LUA_REGISTRYINDEX);
 }
-int wfx_lua_fromref(lua_State *L, int index) {
-  return lua_rawgeti(L, LUA_REGISTRYINDEX, index);
+int wfx_lua_fromref(lua_State *L, int ref) {
+  return lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
 }
 
 int wfx_lua_getfunction(lua_State *L, const char *name) {
