@@ -337,7 +337,7 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
     ngx_atomic_fetch_add((ngx_atomic_uint_t *)&lval->count, data->increment);
   }
   realcount = limiter_current_value(limiter, lval);
-  tracer_log_int(ed, "count", realcount);
+  tracer_log_number(ed, "count", realcount);
   return condition_rc_maybe_negate(self, realcount <= limiter->limit ? WFX_COND_TRUE : WFX_COND_FALSE);
 }
 

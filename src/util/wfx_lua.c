@@ -80,6 +80,10 @@ int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *n
   return luaL_loadbuffer(L, buff, sz, scriptname);
 }
 
+void lua_pushngxstr(lua_State *L, ngx_str_t *str) {
+  lua_pushlstring(L, (const char *)str->data, str->len);
+}
+
 //wafflex stuff
 
 void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding) {

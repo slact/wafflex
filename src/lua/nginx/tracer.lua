@@ -54,8 +54,8 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_add_request_cleanup_h
       el = {
         type = element,
         name = el_name,
-        gen = el_gen,
-        ref = el_ref,
+        --gen = el_gen,
+        --ref = el_ref,
         
         time = { }
       }
@@ -67,7 +67,7 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_add_request_cleanup_h
       el = self.stack[self.cur]
       self.defer = self.defer - 1
       assert(el.deferred)
-      assert(el.ref == el_ref)
+      --assert(el.ref == el_ref)
       el.deferred = nil
       if el.time.defer_start then
         el.time.defer = (el.time.defer or 0) + (ngx.time_msec() - el.time.defer_start)
@@ -109,21 +109,19 @@ return function(ngx_cached_msec_time, ngx_cached_time, ngx_add_request_cleanup_h
     self.cur = self.cur - 1
   end
   
-  function Tracer:log(el_ref, data_name, data)
-    local log_el = {ref=el_ref, val=data}
+  function Tracer:log(data_name, data)
     local el = self.stack[self.cur]
     if not el.data then el.data = {} end
-    el.data[data_name]=log_el
+    el.data[data_name]=data
   end
   
-  function Tracer:log_array(el_ref, data_name, data)
-    local log_el = {ref=el_ref, val=data}
+  function Tracer:log_array(data_name, data)
     local el = self.stack[self.cur]
     if not el.data then el.data = {} end
     if not el.data[data_name] then
       el.data[data_name] = {}
     end
-    table.insert(el.data[data_name], log_el)
+    table.insert(el.data[data_name], data)
   end
   
   local parent_type = {

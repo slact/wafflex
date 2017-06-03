@@ -57,7 +57,7 @@ local calls = {
     if type(self) ~= "table" then
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
     end
-    delete_callback(self, replacee, self.ruleset)
+    delete_callback(self, self.ruleset)
     return true
   end
 }

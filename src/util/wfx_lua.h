@@ -22,7 +22,7 @@ int wfx_lua_getref(lua_State *L, int index);
 int wfx_lua_fromref(lua_State *L, int ref);
 size_t wfx_lua_len(lua_State *L, int index);
 int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *name, const char *fmt);
-#define lua_pushngxstr(L, str) lua_pushlstring(L, (const char *)str->data, str->len)
+void lua_pushngxstr(lua_State *L, ngx_str_t *str);
 #define lua_tongxstr(L, index, str) ((str)->data = (u_char *)lua_tolstring(L, index, &((str)->len)))
 
 int wfx_lua_getfunction(lua_State *L, const char *name);

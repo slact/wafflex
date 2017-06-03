@@ -10,12 +10,11 @@
 #include "phase.h"
 #include "string.h"
 #include "tracer.h"
+#include <util/wfx_str.h>
 
 #define TRACER_OR_BUST(ed, t) \
   if(!ed->tracer.on) return;  \
   wfx_tracer_t       *t = &ed->tracer
-
-
   
 static int ngx_lua_msec_cached_time(lua_State *L) {
   ngx_time_t *t = ngx_timeofday();
@@ -194,22 +193,36 @@ void tracer_unwind(wfx_evaldata_t *ed, wfx_ruleset_element_type_t type, const ch
   tracer_lua_call(wfx_Lua, t, "unwind", 2, 0);
 }
 void tracer_log_wstr(wfx_evaldata_t *ed, const char *name, wfx_str_t *wstr) {
+  ngx_str_t     *str;
   TRACER_OR_BUST(ed, t);
+  lua_pushstring(wfx_Lua, name);
+  str = wfx_str_as_dbg_ngx_str(wstr, ed);
+  lua_pushngxstr(wfx_Lua, str);
+  tracer_lua_call(wfx_Lua, t, "log", 2, 0);
 }
 void tracer_log_wstr_array(wfx_evaldata_t *ed, const char *name, wfx_str_t *wstr) {
   TRACER_OR_BUST(ed, t);
+    lua_pushstring(wfx_Lua, name);
+  lua_pushngxstr(wfx_Lua, wfx_str_as_dbg_ngx_str(wstr, ed));
+  tracer_lua_call(wfx_Lua, t, "log_array", 2, 0);
 }
 void tracer_log_str(wfx_evaldata_t *ed, const char *name, ngx_str_t *str) {
   TRACER_OR_BUST(ed, t);
+  lua_pushstring(wfx_Lua, name);
+  lua_pushngxstr(wfx_Lua, str);
+  tracer_lua_call(wfx_Lua, t, "log", 2, 0);
 }
 void tracer_log_cstr(wfx_evaldata_t *ed, const char *name, char *cstr) {
   TRACER_OR_BUST(ed, t);
+  lua_pushstring(wfx_Lua, name);
+  lua_pushstring(wfx_Lua, cstr);
+  tracer_lua_call(wfx_Lua, t, "log", 2, 0);
 }
-void tracer_log_int(wfx_evaldata_t *ed, const char *name, int n) {
+void tracer_log_number(wfx_evaldata_t *ed, const char *name, float n) {
   TRACER_OR_BUST(ed, t);
-}
-void tracer_log_float(wfx_evaldata_t *ed, const char *name, float f) {
-  TRACER_OR_BUST(ed, t);
+  lua_pushstring(wfx_Lua, name);
+  lua_pushnumber(wfx_Lua, n);
+  tracer_lua_call(wfx_Lua, t, "log", 2, 0);
 }
 
 void tracer_init(wfx_evaldata_t *ed) {

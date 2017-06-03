@@ -83,4 +83,15 @@ return function(package_loader, manager, init_bind_cfunc, ruleset_confset_cfunc)
       end
     end
   end
+  
+  function printFunctions(pattern)
+    for k,v in pairs(_G) do
+      if type(v) == "function" then
+        if not pattern or k:match(pattern) then
+          local info = debug.getinfo(v)
+          print(("%s: function %s (%s %s %s:%i-%i)"):format(tostring(k), tostring(v), info.what, info.namewhat, info.short_src, info.linedefined, info.lastlinedefined))
+        end
+      end
+    end
+  end
 end

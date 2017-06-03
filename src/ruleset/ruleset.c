@@ -96,8 +96,7 @@ void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz,
   void       *ptr;
   int        *refptr;
   
-  lua_pushvalue(L, 1); //lua-self
-  tmpref = luaL_ref(L, LUA_REGISTRYINDEX);
+  tmpref = wfx_lua_getref(L, 1);
   
   if((ptr = wfx_shm_calloc(item_sz + data_sz)) != NULL) {
     refptr = (int *)((char *)ptr + luaref_offset);

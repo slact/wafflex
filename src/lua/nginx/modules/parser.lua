@@ -210,6 +210,7 @@ function class:parseInterpolatedString(str)
   for sub in str:gmatch("%${?[%w_]*}?") do
     if sub:sub(2,2) == "{" then
       if sub:sub(-1) ~="}" then --unterminated bracket
+        mm(sub)
         self:error("missing '}' in interpolated string")
       end
       sub=sub:sub(3, -2)
