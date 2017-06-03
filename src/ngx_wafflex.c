@@ -67,23 +67,24 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   if(!cf->rulesets) {
     return NGX_DECLINED;
   }
+  ctx = ngx_http_get_module_ctx(r, ngx_wafflex_module);
+  
+  ERR("handle request %p", r);
   
   ed.data.request = r;
   ed.type = WFX_EVAL_HTTP_REQUEST;
   ed.phase = WFX_PHASE_HTTP_REQUEST_HEADERS;
   
-  ed.tracer.luaref = LUA_NOREF;
-  ed.tracer.on = 1;
-  
   tracer_init(&ed);
   
-  tmpctx.nocheck = 1;
-  ngx_memzero(&tmpctx.rule, sizeof(tmpctx.rule));
+  if(!ctx) {
+    tmpctx.nocheck = 1;
+    ngx_memzero(&tmpctx.rule, sizeof(tmpctx.rule));
+  }
   
   n = cf->rulesets->nelts;
   rcf = cf->rulesets->elts;
   
-  ctx = ngx_http_get_module_ctx(r, ngx_wafflex_module);
   if(ctx && !ctx->nocheck && ctx->ruleset.gen == rcf->ruleset[ctx->ruleset.i].gen) {
     //resume ruleset execution
     start = ctx->ruleset.i;
@@ -100,7 +101,6 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
     if(rc != WFX_OK)
       break;
   }
-  ERR("donedone");
   tracer_finish(&ed);
   switch(rc) {
     case WFX_OK:
@@ -128,6 +128,7 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
     case WFX_ERROR:
       return NGX_ERROR;
   }
+  return NGX_ERROR; //this shouldn't happen
 }
 
 static ngx_int_t ngx_http_wafflex_header_filter(ngx_http_request_t *r) {

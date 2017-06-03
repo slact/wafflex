@@ -36,9 +36,10 @@
 #endif
 
 //buncha globals
-ipc_t        *wfx_ipc;
-lua_State    *wfx_Lua;
-shmem_t      *wfx_shm;
+ipc_t          *wfx_ipc;
+lua_State      *wfx_Lua;
+shmem_t        *wfx_shm;
+wfx_shm_data_t *wfx_shm_data;
 
 void *wfx_shm_alloc(size_t sz);
 void *wfx_shm_calloc(size_t sz);

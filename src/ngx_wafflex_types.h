@@ -71,7 +71,9 @@ typedef struct {
 } wfx_data_t;
 
 typedef struct {
-  ngx_atomic_uint_t shmem_pages_used;
+  ngx_atomic_uint_t  shmem_pages_used;
+  wfx_tracer_round_t tracer_rounds[16];
+  ngx_atomic_uint_t  tracer_rounds_count;
 } wfx_shm_data_t;
 
 typedef struct wfx_limiter_value_s wfx_limiter_value_t;
@@ -213,6 +215,7 @@ typedef struct {
     ngx_http_cleanup_t *cln;
   }                   limiter;
   unsigned            nocheck:1;
+  
 } wfx_request_ctx_t;
 
 #endif //NGX_WAFFLEX_TYPES_H

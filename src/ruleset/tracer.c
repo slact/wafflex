@@ -226,6 +226,50 @@ void tracer_log_number(wfx_evaldata_t *ed, const char *name, float n) {
 }
 
 void tracer_init(wfx_evaldata_t *ed) {
+  if(wfx_shm_data->tracer_rounds_count == 0) {
+    ed->tracer.on = 0;
+    ed->tracer.luaref = LUA_NOREF;
+    return;
+  }
+  int                    i;
+  wfx_condition_stack_t  condition_stack;
+  wfx_condition_rc_t     cond_rc = WFX_COND_FALSE;
+  wfx_tracer_round_t    *tracer_round = NULL;
+  
+    ngx_memzero(&condition_stack, sizeof(condition_stack));
+  
+  for(i=0; i<16; i++) {
+    tracer_round = &wfx_shm_data->tracer_rounds[i];
+    if(tracer_round->uses <= 0) {
+      continue;
+    }
+    cond_rc = tracer_round->condition->eval(tracer_round->condition, ed, &condition_stack);
+    switch (cond_rc) {
+      case WFX_COND_DEFER:
+        ERR("ignoring deferrable condition in tracer round");
+        condition_stack_clear(&condition_stack);
+        continue;
+      case WFX_COND_FALSE:
+      case WFX_COND_ERROR:
+        condition_stack_clear(&condition_stack);
+        continue;
+      case WFX_COND_TRUE:
+        condition_stack_clear(&condition_stack);
+        break;
+    }
+  }
+  
+  if(cond_rc != WFX_COND_TRUE) {
+    ed->tracer.on = 0;
+    ed->tracer.luaref = LUA_NOREF;
+    return;
+  }
+  else {
+    ngx_atomic_fetch_add((ngx_atomic_uint_t *)&tracer_round->uses, -1);
+    ed->tracer.on = 1;
+    wfx_ipc_alert_cachemanager("tracer-round-fired", tracer_round, sizeof(tracer_round));
+  }
+  
   TRACER_OR_BUST(ed, t);
   if(t->luaref == LUA_NOREF) {
     wfx_lua_getfunction(wfx_Lua, "getTracer");

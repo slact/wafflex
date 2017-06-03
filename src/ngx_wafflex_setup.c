@@ -7,27 +7,25 @@ static ngx_int_t ngx_wafflex_init_preconfig(ngx_conf_t *cf) {
 }
 
 static ngx_int_t initialize_shm(ngx_shm_zone_t *zone, void *data) {
-  wfx_shm_data_t     *d;
   if(data) { //zone being passed after restart
     zone->data = data;
-    d = zone->data;
+    wfx_shm_data = zone->data;
 #if nginx_version <= 1011006
-    shm_set_allocd_pages_tracker(wfx_shm, &d->shmem_pages_used);
+    shm_set_allocd_pages_tracker(wfx_shm, &wfx_shm_data->shmem_pages_used);
 #endif
   }
   else {
     shm_init(wfx_shm);
     
-    if((d = shm_calloc(wfx_shm, sizeof(*d), "root shared data")) == NULL) {
+    if((wfx_shm_data = shm_calloc(wfx_shm, sizeof(*wfx_shm_data), "root shared data")) == NULL) {
       return NGX_ERROR;
     }
 #if nginx_version <= 1011006
-    d->shmem_pages_used=0;
-    shm_set_allocd_pages_tracker(wfx_shm, &d->shmem_pages_used);
+    wfx_shm_data->shmem_pages_used=0;
+    shm_set_allocd_pages_tracker(wfx_shm, &wfx_shm_data->shmem_pages_used);
 #endif
-    DBG("Shm created with data at %p", d);
+    DBG("Shm created with data at %p", wfx_shm_data);
   }
-  
   
   //we can create all the rulesets now
   lua_getglobal(wfx_Lua, "createDeferredRulesets");
