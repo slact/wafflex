@@ -331,7 +331,6 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
     lua_ngxcall(wfx_Lua, 3, 0);
   }
   
-  ERR("donechecky");
   //ok, we now have the limiter data. make use of it.
   if(data->increment > 0) {
     ngx_atomic_fetch_add((ngx_atomic_uint_t *)&lval->count, data->increment);
@@ -403,26 +402,12 @@ void wfx_limiter_bindings_set(lua_State *L) {
 
 int wfx_limiter_init_runtime(lua_State *L, int manager) {
   if(manager) {
-    wfx_lua_getfunction(L, "setAlertHandler");
-    lua_pushliteral(L, "limiter-value-request");
-    lua_pushlightuserdata(L, limiter_value_request_alert_handler);
-    lua_ngxcall(L, 2, 0);
-    
-    wfx_lua_getfunction(L, "setAlertHandler");
-    lua_pushliteral(L, "limiter-value-release-response");
-    lua_pushlightuserdata(L, limiter_value_release_response_alert_handler);
-    lua_ngxcall(L, 2, 0);
+    wfx_ipc_set_alert_handler("limiter-value-request", limiter_value_request_alert_handler);
+    wfx_ipc_set_alert_handler("limiter-value-release-response", limiter_value_release_response_alert_handler);
   }
   else {
-    wfx_lua_getfunction(L, "setAlertHandler");
-    lua_pushliteral(L, "limiter-value-response");
-    lua_pushlightuserdata(L, limiter_value_response_alert_handler);
-    lua_ngxcall(L, 2, 0);
-    
-    wfx_lua_getfunction(L, "setAlertHandler");
-    lua_pushliteral(L, "limiter-value-release-request");
-    lua_pushlightuserdata(L, limiter_value_release_request_alert_handler);
-    lua_ngxcall(L, 2, 0);
+    wfx_ipc_set_alert_handler("limiter-value-response", limiter_value_response_alert_handler);
+    wfx_ipc_set_alert_handler("limiter-value-release-request", limiter_value_release_request_alert_handler);
   }
   
   wfx_lua_loadscript(L, limiter);

@@ -41,3 +41,32 @@ ngx_int_t ipc_alert_cachemanager(ipc_t *ipc, ngx_str_t *name, ngx_str_t *data) {
   }
   return ipc_alert_slot(ipc, slot, name, data);
 }
+
+ngx_int_t wfx_ipc_alert_cachemanager(const char *name, void *data, size_t sz) {
+  ngx_str_t namestr, datastr;
+  
+  namestr.len = strlen(name);
+  namestr.data = (u_char *)name;
+  
+  datastr.len = sz;
+  datastr.data = (u_char *)data;
+  return ipc_alert_cachemanager(wfx_ipc, &namestr, &datastr);
+}
+ngx_int_t wfx_ipc_alert_slot(int slot, const char *name, void *data, size_t sz) {
+  ngx_str_t namestr, datastr;
+  
+  namestr.len = strlen(name);
+  namestr.data = (u_char *)name;
+  
+  datastr.len = sz;
+  datastr.data = (u_char *)data;
+  return ipc_alert_slot(wfx_ipc, slot, &namestr, &datastr);
+}
+
+ngx_int_t wfx_ipc_set_alert_handler(const char *name, ipc_alert_handler_pt handler) {
+  wfx_lua_getfunction(wfx_Lua, "setAlertHandler");
+  lua_pushstring(wfx_Lua, name);
+  lua_pushlightuserdata(wfx_Lua, handler);
+  lua_ngxcall(wfx_Lua, 2, 0);
+  return NGX_OK;
+}
