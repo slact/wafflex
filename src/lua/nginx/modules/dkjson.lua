@@ -256,6 +256,16 @@ encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, s
   local valtype = type (value)
   local valmeta = getmetatable (value)
   valmeta = type (valmeta) == 'table' and valmeta -- only tables
+  local replacementjsonval = valmeta and valmeta.__jsonval
+  if replacementjsonval then
+    if type(replacementjsonval) == "function" then
+      value = replacementjsonval(value)
+    else
+      value = replacementjsonval
+    end
+    valtype = type (value)
+  end
+  
   local valtojson = valmeta and valmeta.__tojson
   if valtojson then
     if tables[value] then
@@ -316,6 +326,7 @@ encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, s
       buffer[buflen] = "{"
       local order = valmeta and valmeta.__jsonorder or globalorder
       if order then
+        if type(order) == "function" then order = order(value) end
         local used = {}
         n = #order
         for i = 1, n do

@@ -1,5 +1,14 @@
 local Rule = require "rule"
 local Binding = require "binding"
+local json = require "dkjson"
+
+local tcopy = function(tbl)
+  local cpy = {}
+  for k,v in pairs(tbl) do
+    cpy[k]=v
+  end
+  return setmetatable(cpy, getmetatable(tbl))
+end
 
 local function assert_unique_name(what, tbl, data)
   assert(data.name, ("a %s must have a name"):format(what))
@@ -14,6 +23,17 @@ local function thing_name(thing)
   else
     return thing
   end
+end
+
+local function table_copy(tbl, exclude_keys)
+  local cpy = {}
+  setmetatable(cpy, getmetatable(tbl))
+  for k,v in pairs(tbl) do
+    if not exclude_keys[k] then
+      cpy[k]=v
+    end
+  end
+  return cpy
 end
 
 local ruleset_meta = { __index = {
@@ -95,7 +115,7 @@ local ruleset_meta = { __index = {
   setPhaseTable = function(self, data)
     self.phases = {}
     for k,v in pairs(data) do
-      local phase = {name=k, lists={}}
+      local phase = setmetatable({name=k, lists={}}, self.__submeta.phase)
       for i, list in pairs(v) do
         phase.lists[i]=self:findList(list) or self:addList(list)
       end
@@ -117,34 +137,107 @@ local ruleset_meta = { __index = {
     else
       return name
     end
+  end,
+  
+  toJSON = function(self)
+    local rs = {
+      name = self.name,
+      info = self.info,
+      rules = tcopy(self.rules),
+      lists = tcopy(self.lists),
+      limiters = tcopy(self.limiters),
+      phases = self.phases,
+    }
+    setmetatable(rs, self.__submeta.ruleset)
+    
+    --remove inlined names from rules, lists, and limiters
+    local excludes = {name=true}
+    for _, thingsname in ipairs({"rules", "lists", "limiters", "phases"}) do
+      local things = rs[thingsname] or {}
+      local cpy
+      for k, thing in pairs(things) do
+        things[k]=table_copy(thing, excludes)
+      end
+    end
+    
+    setmetatable(rs.lists, {__index=listorder})
+    
+    return json.encode(rs, {indent=true})
   end
   
 }}
 
+local function sorted_keys(tbl)
+  local keys = {}
+  for k, v in pairs(tbl) do
+    table.insert(keys, k)
+  end
+  table.sort(keys)
+  return keys
+end
+
 local function newRuleset(data)
   local ruleset = setmetatable({
-    rules={},
-    lists={},
-    limiters={},
+    rules=setmetatable({}, {__jsonorder=sorted_keys}),
+    lists=setmetatable({}, {__jsonorder=sorted_keys}),
+    limiters=setmetatable({}, {__jsonorder=sorted_keys}),
     phases={},
     name = data and data.name or nil
   }, ruleset_meta)
   
   ruleset.__submeta = {
-    rule = {__index = {
-      type="rule",
-      --ruleset = ruleset,
-      --in_lists = {},
-    }},
-    list = {__index = {
-      type="list",
-      --ruleset = ruleset,
-      --in_tables = {}
-    }},
-    limiter = {__index = {
-      type="limiter",
-      --ruleset = ruleset
-    }}
+    ruleset = {
+      __jsonorder = {"name", "info", "phases", "limiters", "lists", "rules"}
+    },
+    phase = {
+      __jsonval = function(self) 
+        local lists = {}
+        for _, list in pairs(self.lists) do
+          table.insert(lists, list.name)
+        end
+        return lists
+      end
+    },
+    list = {
+      __jsonorder = {"name", "info", "rules"},
+      __jsonval = function(self)
+        local rules = {}
+        for _, rule in pairs(self.rules) do
+          table.insert(rules, rule.name)
+        end
+        
+        if self.info then 
+          return setmetatable({info=self.info, rules=rules}, getmetatable(self))
+        else
+          return setmetatable(rules, getmetatable(self))
+        end
+      end
+    },
+    
+    rule = {
+      __jsonorder = {"name", "info", "key", "if", "if-any", "if-all", "then", "else"},
+      __jsonval = function(self)
+        if #self["else"] == 0 or #self["then"] == 0 or self.key then
+          local ret = tcopy(self)
+          if #self["then"] == 0 then ret["then"] = nil end
+          if #self["else"] == 0 then ret["else"] = nil end
+          if self.key then self.key = self.key.string end
+          return ret
+        end
+        return self
+      end
+    },
+    limiter = {
+      __jsonorder = {"name", "info", "limit", "interval", "burst", "burst-expire"},
+      __jsonval = function(self)
+        if self.burst then
+          local cpy = tcopy(self)
+          cpy.burst = cpy.burst["name"]
+          return cpy
+        end
+        return self
+      end
+    }
   }
 
   if not ruleset.name then ruleset.name = ruleset:uniqueName({}, "ruleset") end

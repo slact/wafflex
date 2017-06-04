@@ -1,5 +1,7 @@
 local mm = require "mm"
 local Binding = require "binding"
+local json = require "dkjson"
+local json_encode = json.encode
 
 local function ignore_leading_hash(str)
   return str:sub(1,1)=="#" and str:sub(2) or str
@@ -31,10 +33,11 @@ local function create_thing_storage(thing_name)
     return name, val
   end
   
-  function self.add(name, funcs, metaindex)
+  function self.add(name, funcs, meta)
+    print(name, funcs, meta)
     if type(name) == "table" then
       for _,v in pairs(name) do
-        self.add(v, funcs, metaindex)
+        self.add(v, funcs, meta)
       end
       return true
     end
@@ -44,10 +47,11 @@ local function create_thing_storage(thing_name)
       parse=funcs.parse,
       init=funcs.init or function() end
     }
-    if metaindex then
-      added.meta={__index = metaindex}
+    if meta then
+      added.meta=meta
     end
     self.table[name]=added
+    
     return true
   end
   
@@ -92,7 +96,9 @@ Rule.condition.add("any", {
       data[i] = Rule.condition.new(v, ruleset)
     end
   end
-})
+}, {__jsonval = function(self)
+  return {any=self.data}
+end})
 
 Rule.condition.add("all", {
   parse = function(data, parser)
@@ -107,11 +113,13 @@ Rule.condition.add("all", {
       data[i] = Rule.condition.new(v, ruleset)
     end
   end
-})
+}, {__jsonval = function(self)
+  return {all=self.data}
+end})
 
 Rule.condition.add({"true", "false"}, {parse = function(data, parser)
   --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
-end})
+end}, {__jsonval=function(self) return self.condition end})
 
 Rule.condition.add("tag-check", {
   parse = function(data, parser)
@@ -120,6 +128,9 @@ Rule.condition.add("tag-check", {
   end,
   init = function(data)
     Binding.call("string", "create", data)
+  end
+},{__jsonval=function(self)
+    return {["tag-check"]=self.data.string}
   end
 })
 
@@ -147,6 +158,14 @@ Rule.condition.add("match", {
     for _, v in ipairs(data) do
       Binding.call("string", "create", v)
     end
+  end
+}, {
+  __jsonval=function(self)
+    local strings = {}
+    for _, str in ipairs(self.data) do
+      table.insert(strings, str.string)
+    end
+    return {match=strings}
   end
 })
 
@@ -193,7 +212,22 @@ Rule.condition.add({"limit-break", "limit-check"}, {
       Binding.call("string", "create", data.key)
     end
   end
-})
+}, {__jsonval=function(self)
+  local cpy = {}
+  for k,v in pairs(self.data) do
+    cpy[k]=v
+  end
+  if cpy.derived_key then
+    cpy.derived_key = nil
+    cpy.key = nil
+  elseif cpy.key then
+    cpy.key = cpy.key.string
+  end
+  cpy.name = cpy.limiter.name
+  cpy.limiter = nil
+  local ret = {[self.condition]=cpy}
+  return ret
+end, __jsonorder={"name", "key", "increment"}})
 
 Rule.condition.add(".delay", {
   parse = function(data, parser)
@@ -210,7 +244,9 @@ Rule.action.add("tag", {
   init = function(data)
     Binding.call("string", "create", data)
   end
-})
+}, {__jsonval = function(self)
+  return {tag=self.data.string}
+end})
 
 Rule.action.add("accept", {parse = function(data, parser)
   parser:assert_type(data, "table", "\"accept\" value must be an object")
