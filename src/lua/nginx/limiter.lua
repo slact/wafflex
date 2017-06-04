@@ -32,7 +32,6 @@ return function(manager)
     --check uniqueness
     --[[
     local uniq = {}
-    print(limiter_ptr)
     mm(limiters[limiter_ptr])
     for k, v in pairs(limiters[limiter_ptr]) do
       assert(not uniq[v], "found two different keys mapping to same limiter value")

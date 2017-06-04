@@ -34,7 +34,6 @@ local function create_thing_storage(thing_name)
   end
   
   function self.add(name, funcs, meta)
-    print(name, funcs, meta)
     if type(name) == "table" then
       for _,v in pairs(name) do
         self.add(v, funcs, meta)
@@ -145,7 +144,6 @@ Rule.condition.add("match", {
   init = function(data)
     local complexity = function(str)
       local n = 0
-      mm(str)
       for match in str.string:gmatch("%$") do 
         n=n+1
       end

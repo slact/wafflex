@@ -7,31 +7,31 @@ local Binding = require "binding"
 
 Binding.set("rule", {
   create = function(self)
-    print("got a new rule", self, " named", self.name)
+    --print("got a new rule", self, " named", self.name)
   end
 })
 
 Binding.set("list", {
   create = function(self)
-    print("got a new list", self, " named", self.name)
+    --print("got a new list", self, " named", self.name)
   end
 })
 
 Binding.set("limiter", {
   create = function(self)
-    print("got a new limiter", self, " named", self.name)
+    --print("got a new limiter", self, " named", self.name)
   end
 })
 
 Binding.set("condition", {
   create = function(self)
-    print("got a new condition", self, " ", self.condition)
+    --print("got a new condition", self, " ", self.condition)
   end
 })
 
 Binding.set("action", {
   create = function(self)
-    print("got a new action", self, " ", self.action)
+    --print("got a new action", self, " ", self.action)
   end
 })
 
@@ -39,8 +39,10 @@ local p = Parser.new()
 
 local parsed = p:parseFile("../../../dev/testruleset.json")
 
-mm(parsed)
+--mm(parsed)
 
---local rs = Ruleset.new(parsed)
+local rs = Ruleset.new(parsed)
 
---mm(rs)
+mm(rs.rules)
+
+print(rs:toJSON())
