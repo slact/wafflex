@@ -167,6 +167,8 @@ Rule.condition.add("match", {
   end
 })
 
+local limit_thing_meta = {__jsonorder={"name", "key", "increment"}}
+
 --limiter conditions
 Rule.condition.add({"limit-break", "limit-check"}, {
   parse = function(data, parser)
@@ -223,9 +225,10 @@ Rule.condition.add({"limit-break", "limit-check"}, {
   end
   cpy.name = cpy.limiter.name
   cpy.limiter = nil
+  setmetatable(cpy, limit_thing_meta)
   local ret = {[self.condition]=cpy}
   return ret
-end, __jsonorder={"name", "key", "increment"}})
+end})
 
 Rule.condition.add(".delay", {
   parse = function(data, parser)
