@@ -176,7 +176,7 @@ ngx_int_t ngx_wafflex_init_lua(int manager) {
   
   return NGX_OK;
 }
-ngx_int_t ngx_wafflex_shutdown_lua(void) {
+ngx_int_t ngx_wafflex_shutdown_lua(int manager) {
   lua_close(wfx_Lua);
   wfx_Lua = NULL;
   return NGX_OK;

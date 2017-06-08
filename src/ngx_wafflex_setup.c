@@ -1,6 +1,7 @@
 #include <ngx_wafflex.h>
 #include <util/wfx_redis.h>
 static char                   errbuf[512];
+static void ngx_wafflex_exit_worker(ngx_cycle_t *cycle);
 
 static ngx_int_t ngx_wafflex_init_preconfig(ngx_conf_t *cf) {  
   ngx_wafflex_init_lua(1);
@@ -35,7 +36,33 @@ static ngx_int_t initialize_shm(ngx_shm_zone_t *zone, void *data) {
   return NGX_OK;
 }
 
+
+static void cachemanager_watchdog_log_fake_writer(ngx_log_t *log, ngx_uint_t level, u_char *buf, size_t len) {
+  static int waiting_for_exit = 1;
+  if(waiting_for_exit && (ngx_terminate || ngx_quit || ngx_exiting)) {
+    waiting_for_exit = 0; //only happens once
+    
+    //cache manager doesn't call module's exit_worker on exit. do it manually.
+    ngx_wafflex_exit_worker(ngx_cycle);
+  }
+}
+
+ngx_log_t cachemanager_watchdog_log;
+
+static int cachemanager_watchdog_added = 0;
 static ngx_msec_t wfx_cache_manager(void *data) {
+  if(!cachemanager_watchdog_added) {
+    ngx_log_t *hacklog = &cachemanager_watchdog_log;
+    ngx_memzero(hacklog, sizeof(*hacklog));
+    hacklog->next = ngx_cycle->log;
+    hacklog->writer = cachemanager_watchdog_log_fake_writer;
+    hacklog->log_level = NGX_LOG_DEBUG;
+    
+    ngx_cycle->log = hacklog;
+    
+    cachemanager_watchdog_added = 1;
+    ERR("hacklog added");
+  }
   ERR("managing ze cache");
   return 10000;
 }
@@ -177,7 +204,7 @@ static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
   
   if(ngx_process == NGX_PROCESS_WORKER) {
     //reset lua
-    ngx_wafflex_shutdown_lua();
+    ngx_wafflex_shutdown_lua(0);
     ngx_wafflex_init_lua(0);
     ngx_wafflex_init_runtime(0);
   }
@@ -188,13 +215,15 @@ static ngx_int_t ngx_wafflex_init_worker(ngx_cycle_t *cycle) {
 }
 
 static void ngx_wafflex_exit_worker(ngx_cycle_t *cycle) {
-  ngx_wafflex_shutdown_lua();
+  ngx_wafflex_shutdown_lua(ngx_process == NGX_PROCESS_WORKER ? 0 : 1);
   ipc_destroy(wfx_ipc);
+  shm_destroy(wfx_shm);
 }
 
 static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
-  ngx_wafflex_shutdown_lua();
+  ngx_wafflex_shutdown_lua(1);
   ipc_destroy(wfx_ipc);
+  shm_destroy(wfx_shm);
 }
 
 static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
