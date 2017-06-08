@@ -14,6 +14,8 @@ typedef struct {
 
   wfx_lua_script_t limiter;
 
+  wfx_lua_script_t redis;
+
   wfx_lua_script_t tag;
 
   wfx_lua_script_t tracer;
@@ -41,6 +43,8 @@ typedef struct {
   wfx_module_lua_script_t mm;
 
   wfx_module_lua_script_t parser;
+
+  wfx_module_lua_script_t redis;
 
   wfx_module_lua_script_t rule;
 

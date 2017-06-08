@@ -21,4 +21,13 @@ CfCmd.new do
       args: 1..5,
       value: "ruleset_name ruleset_name2 ruleset_name3",
       info: "Use these rulesets here."
+  
+  wafflex_redis_url [:main, :srv, :loc],
+      :ngx_conf_set_redis_url,
+      [:loc_conf, :"redis.url"],
+      
+      group: "storage",
+      tags: ['redis'],
+      default: "127.0.0.1:6379",
+      info: "The path to a redis server, of the form 'redis://:password@hostname:6379/0'. Shorthand of the form 'host:port' or just 'host' is also accepted."
 end

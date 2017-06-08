@@ -1,5 +1,6 @@
 #include <ngx_wafflex.h>
-  static char                   errbuf[512];
+#include <util/wfx_redis.h>
+static char                   errbuf[512];
 
 static ngx_int_t ngx_wafflex_init_preconfig(ngx_conf_t *cf) {  
   ngx_wafflex_init_lua(1);
@@ -36,7 +37,7 @@ static ngx_int_t initialize_shm(ngx_shm_zone_t *zone, void *data) {
 
 static ngx_msec_t wfx_cache_manager(void *data) {
   ERR("managing ze cache");
-  return 2;
+  return 10000;
 }
 
 static ngx_int_t ngx_wafflex_setup_cachemanager_process(ngx_conf_t *cf) {
@@ -110,12 +111,48 @@ static void *ngx_wafflex_create_loc_conf(ngx_conf_t *cf) {
   
   return lcf;
 }
-static char *ngx_wafflex_merge_loc_conf(ngx_conf_t *cf, void *prev, void *conf) {
-  wfx_loc_conf_t      *lcf = conf;
-  wfx_loc_conf_t      *prev_lcf = prev;
-  if(lcf->rulesets == NULL) {
-    lcf->rulesets = prev_lcf->rulesets;
+
+static char *ngx_conf_set_redis_upstream(ngx_conf_t *cf, ngx_str_t *url, void *conf) {  
+  ngx_url_t             upstream_url;
+  wfx_loc_conf_t       *lcf = conf;
+  if (lcf->redis.upstream) {
+    return "is duplicate";
   }
+  
+  ngx_memzero(&upstream_url, sizeof(upstream_url));
+  upstream_url.url = *url;
+  upstream_url.no_resolve = 1;
+  
+  if ((lcf->redis.upstream = ngx_http_upstream_add(cf, &upstream_url, 0)) == NULL) {
+    return NGX_CONF_ERROR;
+  }
+  
+  lcf->redis.enabled = 1;
+  wfx_redis_add_server_conf(cf, lcf);
+  
+  return NGX_CONF_OK;
+}
+
+static char *ngx_wafflex_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child) {
+  wfx_loc_conf_t       *prev = parent, *conf = child;
+  if(conf->rulesets == NULL) {
+    conf->rulesets = prev->rulesets;
+  }
+  
+  ngx_conf_merge_value(conf->redis.url_enabled, prev->redis.url_enabled, 0);
+  ngx_conf_merge_value(conf->redis.upstream_inheritable, prev->redis.upstream_inheritable, 0);
+  ngx_conf_merge_str_value(conf->redis.url, prev->redis.url, WAFFLEX_REDIS_DEFAULT_URL);
+  ngx_conf_merge_str_value(conf->redis.namespace, prev->redis.namespace, "");
+  ngx_conf_merge_value(conf->redis.ping_interval, prev->redis.ping_interval, WAFFLEX_REDIS_DEFAULT_PING_INTERVAL_TIME);
+  if(conf->redis.url_enabled) {
+    conf->redis.enabled = 1;
+    wfx_redis_add_server_conf(cf, conf);
+  }
+  if(conf->redis.upstream_inheritable && !conf->redis.upstream && prev->redis.upstream && prev->redis.upstream_url.len > 0) {
+    conf->redis.upstream_url = prev->redis.upstream_url;
+    ngx_conf_set_redis_upstream(cf, &conf->redis.upstream_url, conf);
+  }
+  
   return NGX_CONF_OK;
 }
 
@@ -159,129 +196,6 @@ static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
   ngx_wafflex_shutdown_lua();
   ipc_destroy(wfx_ipc);
 }
-
-
-//converts string to positive double float
-static double wfx_atof(u_char *line, ssize_t n) {
-  ssize_t cutoff, cutlim;
-  double  value = 0;
-  
-  u_char *decimal, *cur, *last = line + n;
-  
-  if (n == 0) {
-    return NGX_ERROR;
-  }
-
-  cutoff = NGX_MAX_SIZE_T_VALUE / 10;
-  cutlim = NGX_MAX_SIZE_T_VALUE % 10;
-  
-  decimal = memchr(line, '.', n);
-  
-  if(decimal == NULL) {
-    decimal = line + n;
-  }
-  
-  for (n = decimal - line; n-- > 0; line++) {
-    if (*line < '0' || *line > '9') {
-      return NGX_ERROR;
-    }
-
-    if (value >= cutoff && (value > cutoff || (*line - '0') > cutlim)) {
-      return NGX_ERROR;
-    }
-
-    value = value * 10 + (*line - '0');
-  }
-  
-  double decval = 0;
-  
-  for(cur = (decimal - last) > 10 ? decimal + 10 : last-1; cur > decimal && cur < last; cur--) {
-    if (*cur < '0' || *cur > '9') {
-      return NGX_ERROR;
-    }
-    decval = decval / 10 + (*cur - '0');
-  }
-  value = value + decval/10;
-  
-  return value;
-}
-
-static ssize_t wfx_parse_size(ngx_str_t *line) {
-  u_char   unit;
-  size_t   len;
-  ssize_t  size, scale, max;
-  double   floaty;
-  
-  len = line->len;
-  unit = line->data[len - 1];
-
-  switch (unit) {
-  case 'K':
-  case 'k':
-      len--;
-      max = NGX_MAX_SIZE_T_VALUE / 1024;
-      scale = 1024;
-      break;
-
-  case 'M':
-  case 'm':
-      len--;
-      max = NGX_MAX_SIZE_T_VALUE / (1024 * 1024);
-      scale = 1024 * 1024;
-      break;
-  
-  case 'G':
-  case 'g':
-      len--;
-      max = NGX_MAX_SIZE_T_VALUE / (1024 * 1024 * 1024);
-      scale = 1024 * 1024 * 1024;
-      break;
-
-  default:
-      max = NGX_MAX_SIZE_T_VALUE;
-      scale = 1;
-  }
-
-  floaty = wfx_atof(line->data, len);
-  
-  if (floaty == NGX_ERROR || floaty > max) {
-      return NGX_ERROR;
-  }
-
-  size = floaty * scale;
-
-  return size;
-}
-
-//config helpers
-static char *wfx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
-  char  *p = conf;
-
-  size_t           *sp;
-  ngx_str_t        *value;
-  ngx_conf_post_t  *post;
-
-
-  sp = (size_t *) (p + cmd->offset);
-  if (*sp != NGX_CONF_UNSET_SIZE) {
-      return "is duplicate";
-  }
-
-  value = cf->args->elts;
-
-  *sp = wfx_parse_size(&value[1]);
-  if (*sp == (size_t) NGX_ERROR) {
-    return "invalid value";
-  }
-
-  if (cmd->post) {
-    post = cmd->post;
-    return post->post_handler(cf, post, sp);
-  }
-
-  return NGX_CONF_OK;
-}
-
 
 static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   const char        *errstr;
@@ -358,6 +272,16 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   }
   
   return NGX_CONF_OK; 
+}
+
+static char *ngx_conf_set_redis_url(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+  wfx_loc_conf_t  *lcf = conf;
+  
+  if(lcf->redis.upstream) {
+    return "can't be set here: already using nchan_redis_pass";
+  }
+  lcf->redis.url_enabled = 1;
+  return ngx_conf_set_str_slot(cf, cmd, conf);
 }
 
 //ugly as sin but i don't carrot all

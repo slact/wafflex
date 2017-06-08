@@ -1,4 +1,5 @@
 #include "wfx_lua.h"
+#include <assert.h>
 
 //lua helpers
 size_t wfx_lua_tablesize(lua_State *L, int index) {

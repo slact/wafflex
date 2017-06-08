@@ -244,6 +244,17 @@ if [[ -z $NO_MAKE ]]; then
   bundle exec hsss --data-only $_hsss_opt --prefix wfx_module_ \
     "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
 
+    
+  #generate lua scripts for redis
+  bundle exec hsss --format whole --header-only $_hsss_opt --prefix wfx_redis_ \
+    "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_redis_lua_scripts.h"
+  if ! [ $? -eq 0 ]; then;
+    echo "failed generating redis lua scripts";
+    exit 1
+  fi
+  echo "#include <ngx_wafflex_redis_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
+  bundle exec hsss --format whole --data-only $_hsss_opt --prefix wfx_redis_ \
+    "${_src_dir}"/lua/nginx/*.lua >> "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
   
   pushd $pkg_path >/dev/null
   

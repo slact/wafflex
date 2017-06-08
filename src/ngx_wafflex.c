@@ -3,6 +3,7 @@
 #include <util/shmem.h>
 #include <ruleset/ruleset.h>
 #include <util/wfx_str.h>
+#include <util/wfx_redis.h>
 #include <ruleset/condition.h>
 #include <ruleset/tracer.h>
 
@@ -166,6 +167,8 @@ ngx_int_t ngx_wafflex_init_lua(int manager) {
     wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
     wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
     lua_ngxcall(wfx_Lua, 4, 0);
+    
+    ngx_wafflex_init_redis();
   }
   else {
     lua_ngxcall(wfx_Lua, 1, 0);
@@ -181,6 +184,7 @@ ngx_int_t ngx_wafflex_shutdown_lua(void) {
 
 ngx_int_t ngx_wafflex_init_runtime(int manager) {
   wfx_ruleset_init_runtime(wfx_Lua, manager);
+  wfx_redis_init_runtime(wfx_Lua, manager);
   return NGX_OK;
 }
 

@@ -167,6 +167,20 @@ typedef struct {
   wfx_phase_t      *phase[WFX_PHASE_INVALID];
 } wfx_ruleset_t;
 
+
+//redis stuff
+typedef struct {
+  ngx_str_t                     url;
+  ngx_flag_t                    url_enabled;
+  time_t                        ping_interval;
+  ngx_str_t                     namespace;
+  ngx_str_t                     upstream_url;
+  ngx_http_upstream_srv_conf_t *upstream;
+  ngx_flag_t                    upstream_inheritable;
+  unsigned                      enabled:1;
+  void                         *privdata;
+} wfx_redis_conf_t;
+
 //config stuff
 typedef struct {
   ngx_str_t           name;
@@ -184,6 +198,7 @@ typedef struct {
 
 typedef struct {
   ngx_array_t        *rulesets;
+  wfx_redis_conf_t    redis;
 } wfx_loc_conf_t;
 
 //request context

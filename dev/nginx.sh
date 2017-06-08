@@ -1,7 +1,7 @@
 #!/bin/zsh
 DEVDIR=`pwd`
 SRCDIR=$(readlink -m $DEVDIR/../src)
-echo $DEVDIR $SRCDIR
+#echo $DEVDIR $SRCDIR
 
 VALGRIND_OPT=( "--tool=memcheck" "--trace-children=yes" "--track-origins=yes" "--read-var-info=yes" )
 
@@ -36,6 +36,8 @@ DEBUGGER_CMD="dbus-run-session kdbg -p %s $SRCDIR/nginx"
 #DEBUGGER_NAME="nemiver"
 #DEBUGGER_CMD="nemiver --attach=%s $SRCDIR/nginx"
 
+REDIS_CONF="$DEVDIR/redis.conf"
+REDIS_PORT=8537
 
 _pkgdir="${DEVDIR}/nginx-nchan/pkg/nginx-nchan-dev"
 _dynamic_module="$_pkgdir/etc/nginx/modules/ngx_nchan_module.so"
@@ -49,6 +51,10 @@ for opt in $*; do
     WORKERS=$opt
   fi
   case $opt in
+    noredis|no-redis)
+      no_redis=1;;
+    redis-persist)
+      persist_redis=1;;
     leak|leakcheck|valgrind|memcheck)
       valgrind=1
       VALGRIND_OPT+=($VG_MEMCHECK_OPT);;
@@ -173,9 +179,45 @@ if [[ -f "$_dynamic_module" ]]; then
   sed "s|^\s*#load_module.*|load_module \"${_dynamic_module}\";|g" $NGINX_TEMP_CONFIG -i
 fi
 
+#shutdown old redis
+old_redis_pid=`pgrep -f "redis-server 127.0.0.1:$REDIS_PORT"`
+if [[ ! -z $old_redis_pid ]] && [[ -z $persist_redis ]]; then
+  kill $old_redis_pid
+  wait $old_redis_pid
+  sleep 1
+fi
+#start redis
+if [[ -z $no_redis ]]; then
+  echo "start redis!!!"
+  if [[ -z $old_redis_pid ]] || [[ -z $persist_redis ]]; then
+    if [[ -z $persist_redis ]]; then
+      redis-server $REDIS_CONF --port $REDIS_PORT &
+      redis_pid=$!
+    else
+      redis-server $REDIS_CONF --port $REDIS_PORT --daemonize yes
+      sleep 1
+      redis_pid=$(cat /tmp/redis-pushmodule.pid)
+    fi
+    echo "started redis on port $REDIS_PORT with pid $redis_pid"
+  else
+    echo "redis already running on port $REDIS_PORT with pid $old_redis_pid"
+  fi
+else
+  echo "don't start redis"
+fi
+
+
+ln -sf $DEVDIR/nginx $SRCDIR/nginx >/dev/null
+ln -sf $DEVDIR/nginx-nchan/src/nginx/src/ $SRCDIR/nginx-source >/dev/null
+
+
 debugger_pids=()
 
 TRAPINT() {
+  if [[ -z $persist_redis ]]; then
+    kill $redis_pid
+    wait $redis_pid
+  fi
   if [[ $debugger == 1 ]]; then
     sudo kill $debugger_pids
   fi

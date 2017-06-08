@@ -1,5 +1,36 @@
 ngx_addon_name=ngx_wafflex_module
 
+
+#do we have hiredis on the platform?
+# it's currently no longer possible to link the platform's hiredis lib, 
+# because we now use a hacked connect function
+# maybe it can be brought back at some later time...
+ngx_feature="hiredis with stored sockaddr"
+ngx_feature_run=yes
+ngx_feature_incs=" \
+  #include <hiredis/hiredis.h>
+  #include <sys/socket.h>
+"
+ngx_feature_test=" \
+  redisContext c; \
+  if(HIREDIS_SONAME < 0.13) { return 1; } \
+  if(sizeof(c.sockaddr) != sizeof(struct sockaddr)) { return 1;} \
+"
+ngx_feature_libs="-lhiredis"
+. auto/feature
+if [ $ngx_found = no ]; then
+  _WAFFLEX_HIREDIS_SRCS="\
+    ${ngx_addon_dir}/src/hiredis/hiredis.c \
+    ${ngx_addon_dir}/src/hiredis/read.c \
+    ${ngx_addon_dir}/src/hiredis/async.c \
+    ${ngx_addon_dir}/src/hiredis/sds.c \
+    ${ngx_addon_dir}/src/hiredis/net.c \
+  "
+  ngx_feature_libs=""
+else
+  _WAFFLEX_HIREDIS_SRCS=""
+fi
+
 _NGX_WAFFLEX_UTIL_SRCS="\
   ${ngx_addon_dir}/src/util/reaper.c \
   ${ngx_addon_dir}/src/util/wfx_util.c \
@@ -8,11 +39,15 @@ _NGX_WAFFLEX_UTIL_SRCS="\
   ${ngx_addon_dir}/src/util/ipc.c \
   ${ngx_addon_dir}/src/util/shmem.c \
   ${ngx_addon_dir}/src/util/ngx_shmem_hacked_slab.c \
+  ${ngx_addon_dir}/src/util/wfx_redis.c \
 "
 
 _NGX_WAFFLEX_SRCS="\
+  ${_WAFFLEX_HIREDIS_SRCS} \
+  ${ngx_addon_dir}/src/ngx_wafflex_hiredis_adapter.c \
   ${_NGX_WAFFLEX_UTIL_SRCS} \
   ${ngx_addon_dir}/src/ngx_wafflex_nginx_lua_scripts.c \
+  ${ngx_addon_dir}/src/ngx_wafflex_redis_lua_scripts.c \
   ${ngx_addon_dir}/src/ngx_wafflex_setup.c \
   ${ngx_addon_dir}/src/ngx_wafflex.c \
   ${ngx_addon_dir}/src/ruleset/ruleset.c \
