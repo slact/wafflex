@@ -7,18 +7,7 @@ typedef struct {
 } wfx_redis_lua_script_t;
 
 typedef struct {
-  //lua environs initializer
   wfx_redis_lua_script_t init;
-
-  wfx_redis_lua_script_t ipc;
-
-  wfx_redis_lua_script_t limiter;
-
-  wfx_redis_lua_script_t redis;
-
-  wfx_redis_lua_script_t tag;
-
-  wfx_redis_lua_script_t tracer;
 
 } wfx_redis_lua_scripts_t;
 wfx_redis_lua_scripts_t wfx_redis_lua_scripts;
