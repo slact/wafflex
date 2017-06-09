@@ -7,6 +7,7 @@
 #endif
 
 #define DEBUG_SHM_ALLOC 0
+#define DEBUG_SHM_ALLOC_VALGRIND 1
 
 #define SHPOOL(shmem) ((ngx_slab_pool_t *)(shmem)->zone->shm.addr)
 
@@ -16,7 +17,9 @@
 #define DBG(fmt, args...) ngx_log_error(DEBUG_LEVEL, ngx_cycle->log, 0, "SHMEM:" fmt, ##args)
 #define ERR(fmt, args...) ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "SHMEM:" fmt, ##args)
 
-//#include <valgrind/memcheck.h>
+#if DEBUG_SHM_ALLOC_VALGRIND
+#include <valgrind/memcheck.h>
+#endif
 
 //shared memory
 shmem_t *shm_create(ngx_str_t *name, ngx_module_t *module, ngx_conf_t *cf, size_t shm_size, ngx_int_t (*init)(ngx_shm_zone_t *, void *), void *privdata) {
@@ -40,6 +43,9 @@ shmem_t *shm_create(ngx_str_t *name, ngx_module_t *module, ngx_conf_t *cf, size_
 
   zone->init = init;
   zone->data = (void *) 1;
+#if DEBUG_SHM_ALLOC_VALGRIND
+  VALGRIND_CREATE_MEMPOOL(shm, sizeof(void*), 0);
+#endif
   return shm;
 }
 
@@ -98,6 +104,9 @@ ngx_int_t shm_destroy(shmem_t *shm) {
 }
 void *shm_alloc(shmem_t *shm, size_t size, const char *label) {
   void         *p;
+#if DEBUG_SHM_ALLOC_VALGRIND
+  size = size + 2 * sizeof(void *);
+#endif
 #if FAKESHARD  
   p = ngx_alloc(size, ngx_cycle->log);
 #else
@@ -110,6 +119,11 @@ void *shm_alloc(shmem_t *shm, size_t size, const char *label) {
   if(p == NULL) {
     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "shpool alloc failed");
   }
+
+#if DEBUG_SHM_ALLOC_VALGRIND
+  VALGRIND_MEMPOOL_ALLOC(shm, p, size);
+  p = &p[1]; //redzone of size (void *)
+#endif
 
   #if (DEBUG_SHM_ALLOC == 1)
   if (p != NULL) {
@@ -128,6 +142,10 @@ void *shm_calloc(shmem_t *shm, size_t size, const char *label) {
 }
 
 void shm_free(shmem_t *shm, void *p) {
+#if DEBUG_SHM_ALLOC_VALGRIND
+  p = &p[-1];
+  VALGRIND_MEMPOOL_FREE(shm, p);
+#endif
 #if FAKESHARD
   ngx_free(p);
 #else
