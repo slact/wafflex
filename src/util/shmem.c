@@ -19,6 +19,7 @@
 
 #if DEBUG_SHM_ALLOC_VALGRIND
 #include <valgrind/memcheck.h>
+#include <assert.h>
 #endif
 
 //shared memory
@@ -122,7 +123,7 @@ void *shm_alloc(shmem_t *shm, size_t size, const char *label) {
 
 #if DEBUG_SHM_ALLOC_VALGRIND
   VALGRIND_MEMPOOL_ALLOC(shm, p, size);
-  p = &p[1]; //redzone of size (void *)
+  p = (char *)p + sizeof(p);
 #endif
 
   #if (DEBUG_SHM_ALLOC == 1)
@@ -143,7 +144,7 @@ void *shm_calloc(shmem_t *shm, size_t size, const char *label) {
 
 void shm_free(shmem_t *shm, void *p) {
 #if DEBUG_SHM_ALLOC_VALGRIND
-  p = &p[-1];
+  p = (char *)p - sizeof(p);
   VALGRIND_MEMPOOL_FREE(shm, p);
 #endif
 #if FAKESHARD

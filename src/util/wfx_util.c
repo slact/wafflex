@@ -304,4 +304,5 @@ void wfx_resume_suspended_request(wfx_evaldata_t *ed) {
 
 int wfx_util_init_runtime(lua_State *L, int manager) {
   wfx_lua_loadscript(L, util);
+  return 1;
 }
