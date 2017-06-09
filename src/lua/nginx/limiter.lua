@@ -13,72 +13,50 @@ local setmetatable, rawset, rawget, tinsert = setmetatable, rawset, rawget, tabl
 
 local limiters = setmetatable({}, tabling_meta(2))
 
-return function(manager)
-  function findLimiterValue(limiter_ptr, key)
-    local limit = rawget(limiters, limiter_ptr)
-    if not limit then 
-      return nil
-    end
-    local data = rawget(limit, key)
-    if not data then
-      return nil
-    end
-    return data
+function findLimiterValue(limiter_ptr, key)
+  local limit = rawget(limiters, limiter_ptr)
+  if not limit then 
+    return nil
   end
+  local data = rawget(limit, key)
+  if not data then
+    return nil
+  end
+  return data
+end
 
-  function setLimiterValue(limiter_ptr, key, limit_data_ptr)
-    limiters[limiter_ptr][key]=limit_data_ptr
-    
-    --check uniqueness
-    --[[
-    local uniq = {}
-    mm(limiters[limiter_ptr])
-    for k, v in pairs(limiters[limiter_ptr]) do
-      assert(not uniq[v], "found two different keys mapping to same limiter value")
-      uniq[v] = true
-    end
-    ]]
-    
-    return limit_data_ptr
+function setLimiterValue(limiter_ptr, key, limit_data_ptr)
+  limiters[limiter_ptr][key]=limit_data_ptr
+  
+  --check uniqueness
+  --[[
+  local uniq = {}
+  mm(limiters[limiter_ptr])
+  for k, v in pairs(limiters[limiter_ptr]) do
+    assert(not uniq[v], "found two different keys mapping to same limiter value")
+    uniq[v] = true
   end
-    
-  function unsetLimiterValue(limiter_ptr, key, limit_data_ptr)
-    --mm(limiters)
-    local limit = rawget(limiters, limiter_ptr)
-    local data = rawget(limit, key)
-    if data then
-      assert(type(data) == "userdata")
-      if limit_data_ptr then
-        assert(data == limit_data_ptr)
-      end
-      rawset(limit, key, nil)
-      if next(limit) == nil then
-        rawset(limiters, limiter_ptr, nil)
-      end
-      return true
-    else
-      return nil
+  ]]
+  
+  return limit_data_ptr
+end
+  
+function unsetLimiterValue(limiter_ptr, key, limit_data_ptr)
+  --mm(limiters)
+  local limit = rawget(limiters, limiter_ptr)
+  local data = rawget(limit, key)
+  if data then
+    assert(type(data) == "userdata")
+    if limit_data_ptr then
+      assert(data == limit_data_ptr)
     end
-  end
-
-  if not manager then
-    local reqs = {}
-    function addLimiterValueRequest(request_ptr)
-      local first_time = reqs[request_ptr] == nil
-      reqs[request_ptr] = request_ptr
-      return first_time
+    rawset(limit, key, nil)
+    if next(limit) == nil then
+      rawset(limiters, limiter_ptr, nil)
     end
-    function completeLimiterValueRequest(request_ptr)
-      if reqs[request_ptr] ~= nil then
-        assert(reqs[request_ptr] == request_ptr)
-        reqs[request_ptr] = true
-        return true
-      else
-        return nil
-      end
-    end
-    function cleanupLimiterValueRequest(request_ptr)
-      reqs[request_ptr]=nil
-    end
+    return true
+  else
+    return nil
   end
 end
+
