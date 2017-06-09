@@ -222,7 +222,7 @@ static void ngx_wafflex_exit_master(ngx_cycle_t *cycle) {
   shm_destroy(wfx_shm);
 }
 
-static char *wfx_conf_load_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static char *wfx_conf_load_ruleset_file(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   const char        *errstr;
   wfx_main_conf_t   *mcf = ngx_http_conf_get_module_main_conf(cf, ngx_wafflex_module);
   lua_State         *L = wfx_Lua;
@@ -285,10 +285,25 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     lua_pushlightuserdata(wfx_Lua, rcf);
     lua_ngxcall(wfx_Lua, 2, 2);
     if (lua_isnil(wfx_Lua, -2)) {
-      errstr = lua_tostring(wfx_Lua, -1);
-      snprintf(errbuf, 512, "error: %s", errstr);
-      lua_pop(wfx_Lua, 2);
-      return errbuf;
+      if(!lcf->redis.enabled) {
+        errstr = lua_tostring(wfx_Lua, -1);
+        snprintf(errbuf, 512, "error: %s", errstr);
+        lua_pop(wfx_Lua, 2);
+        return errbuf;
+      }
+      else {
+        lua_getglobal(wfx_Lua, "deferRulesetRedisLoad");
+        lua_pushlstring(wfx_Lua, (const char *)name[i].data, name[i].len);
+        lua_pushlightuserdata(wfx_Lua, lcf);
+        lua_pushlightuserdata(wfx_Lua, rcf);
+        lua_ngxcall(wfx_Lua, 3, 2);
+        if (lua_isnil(wfx_Lua, -2)) {
+          errstr = lua_tostring(wfx_Lua, -1);
+          snprintf(errbuf, 512, "error: %s", errstr);
+          lua_pop(wfx_Lua, 2);
+          return errbuf;
+        }
+      }
     }
     lua_pop(wfx_Lua, 2);
     
@@ -306,6 +321,7 @@ static char *ngx_conf_set_redis_url(ngx_conf_t *cf, ngx_command_t *cmd, void *co
     return "can't be set here: already using nchan_redis_pass";
   }
   lcf->redis.url_enabled = 1;
+  lcf->redis.enabled = 1;
   return ngx_conf_set_str_slot(cf, cmd, conf);
 }
 

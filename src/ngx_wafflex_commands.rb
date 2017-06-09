@@ -8,12 +8,19 @@ CfCmd.new do
       default: "128M",
       info: "Shared memory slab pre-allocated for Wafflex. Used to store rule evaluation data."
   
-  wafflex_load_ruleset [:main, :srv],
-      :wfx_conf_load_ruleset,
+  wafflex_load_ruleset_file [:main, :srv],
+      :wfx_conf_load_ruleset_file,
       :main_conf,
       args: 1..2,
       value: "[<ruleset_name>] </path/to/ruleset.json>",
-      info: "Use this ruleset here."
+      info: "load ruleset from file."
+
+  #wafflex_load_ruleset_redis [:main, :srv],
+  #    :wfx_conf_load_ruleset_redis,
+  #    :main_conf,
+  #    args: 1,
+  #    value: "[<ruleset_name>] </path/to/ruleset.json>",
+  #    info: "Use this ruleset here."
   
   wafflex_ruleset [:main, :srv, :loc],
       :wfx_conf_ruleset,

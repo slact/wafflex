@@ -7,9 +7,9 @@ static ngx_command_t  wafflex_commands[] = {
     offsetof(wfx_main_conf_t, shm_size),
     NULL } ,
 
-  { ngx_string("wafflex_load_ruleset"),
+  { ngx_string("wafflex_load_ruleset_file"),
     NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1|NGX_CONF_TAKE2,
-    wfx_conf_load_ruleset,
+    wfx_conf_load_ruleset_file,
     NGX_HTTP_MAIN_CONF_OFFSET,
     0,
     NULL } ,
