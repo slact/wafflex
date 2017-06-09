@@ -465,6 +465,23 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "    end\n"
    "    mm(self)\n"
    "  end\n"
+   "end\n"},
+
+  {"util", 
+   "local reqs = {}\n"
+   "\n"
+   "function trackPtr(request_ptr, data)\n"
+   "  local first_time = reqs[request_ptr] == nil\n"
+   "  reqs[request_ptr] = true\n"
+   "  return first_time\n"
+   "end\n"
+   "\n"
+   "function getTrackedPtr(request_ptr)\n"
+   "  return reqs[request_ptr]\n"
+   "end\n"
+   "\n"
+   "function untrackPtr(request_ptr)\n"
+   "  reqs[request_ptr]=nil\n"
    "end\n"}
 };
 wfx_module_lua_scripts_t wfx_module_lua_scripts = {

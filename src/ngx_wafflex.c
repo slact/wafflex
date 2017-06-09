@@ -63,6 +63,39 @@ static void ngx_wfx_request_ctx_cleanup(wfx_request_ctx_t *ctx) {
   }
 }
 
+
+typedef struct {
+  wfx_ruleset_conf_t   *rcf;
+  wfx_ruleset_t        *ruleset;
+  wfx_evaldata_t        ed;
+} rcf_ruleset_request_t;
+
+static void ruleconfig_ruleset_request_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
+  rcf_ruleset_request_t *d = (rcf_ruleset_request_t *)data->data;
+  if(d->rcf->ruleset) {
+    d->ruleset = d->rcf->ruleset;
+    wfx_ipc_alert_slot(sender, "ruleconfig-ruleset-response", d, sizeof(*d));
+  }
+}
+
+static void ruleconfig_ruleset_response_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
+  rcf_ruleset_request_t *d = (rcf_ruleset_request_t *)data->data;
+  d->rcf->ruleset = d->ruleset;
+  
+  if(wfx_tracked_request_active(&d->ed)) {
+    wfx_request_ctx_t *ctx = wfx_get_request_ctx(&d->ed);
+    if(ctx) {
+      ctx->ruleset.gen = d->ruleset->gen;
+      ctx->nocheck = 1;
+    }
+    wfx_resume_suspended_request(&d->ed);
+  }
+}
+static void ruleconfig_ruleset_offer_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
+  rcf_ruleset_request_t *d = (rcf_ruleset_request_t *)data->data;
+  d->rcf->ruleset = d->ruleset;
+}
+
 static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   wfx_loc_conf_t       *cf = ngx_http_get_module_loc_conf(r, ngx_wafflex_module);
   int                   start, i, n;
@@ -93,21 +126,39 @@ static ngx_int_t ngx_wafflex_request_handler(ngx_http_request_t *r) {
   n = cf->rulesets->nelts;
   rcf = cf->rulesets->elts;
   
-  if(ctx && !ctx->nocheck && ctx->ruleset.gen == rcf->ruleset[ctx->ruleset.i].gen) {
+  if(ctx 
+    && !ctx->nocheck 
+    && rcf[ctx->ruleset.i].ruleset 
+    && ctx->ruleset.gen == rcf[ctx->ruleset.i].ruleset->gen
+  ) {
     //resume ruleset execution
     start = ctx->ruleset.i;
   }
   else {
     start = 0;
   }
-  for(i=start; rc == WFX_OK && i<n; i++) {
-    ruleset = &rcf->ruleset[i];
+  for(i=start; i < n; i++) {
+    ruleset = rcf[i].ruleset;
     (ctx == NULL ? &tmpctx : ctx)->ruleset.i = i;
-    tracer_push(&ed, WFX_RULESET, ruleset);
-    rc = wfx_ruleset_eval(ruleset, &ed, ctx == NULL ? &tmpctx : ctx);
-    tracer_pop(&ed, WFX_RULESET, rc);
-    if(rc != WFX_OK)
+    
+    if(ruleset) {
+      tracer_push(&ed, WFX_RULESET, ruleset);
+      rc = wfx_ruleset_eval(ruleset, &ed, ctx == NULL ? &tmpctx : ctx);
+      tracer_pop(&ed, WFX_RULESET, rc);
+    }
+    else {
+      rcf_ruleset_request_t d;
+      d.ed = ed;
+      d.ruleset = NULL;
+      d.rcf = &rcf[i];
+      //fetch ruleset from cachemanager
+      wfx_track_request(&ed);
+      wfx_ipc_alert_cachemanager("ruleconfig-ruleset-request", &d, sizeof(d));
+      rc = WFX_DEFER;
+    }
+    if(rc != WFX_OK) {
       break;
+    }
   }
   tracer_finish(&ed);
   switch(rc) {
@@ -158,6 +209,7 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   wfx_ruleset_conf_t *rcf = lua_touserdata(L, 2);
   lua_getfield(L, 1, "__binding");
   rcf->ruleset = lua_touserdata(L, -1);
+  
   return 0;
 }
 
@@ -197,12 +249,23 @@ ngx_int_t ngx_wafflex_shutdown_lua(int manager) {
 ngx_int_t ngx_wafflex_init_runtime(int manager) {
   wfx_ruleset_init_runtime(wfx_Lua, manager);
   wfx_redis_init_runtime(wfx_Lua, manager);
+  wfx_util_init_runtime(wfx_Lua, manager);
   
   if(manager) {
     //we can create all the rulesets now
     lua_getglobal(wfx_Lua, "createDeferredRulesets");
     lua_ngxcall(wfx_Lua, 0, 0);
   }
+  
+  
+  if(manager) {
+    wfx_ipc_set_alert_handler("ruleconfig-ruleset-request", ruleconfig_ruleset_request_alert_handler);
+  }
+  else {
+    wfx_ipc_set_alert_handler("ruleconfig-ruleset-response", ruleconfig_ruleset_response_alert_handler);
+    wfx_ipc_set_alert_handler("ruleconfig-ruleset-offer", ruleconfig_ruleset_offer_alert_handler);
+  }
+  
   
   return NGX_OK;
 }

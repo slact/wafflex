@@ -126,11 +126,7 @@ static ngx_int_t limiter_value_ready_to_reap(wfx_limiter_value_t *lval, wfx_limi
       return NGX_OK;
     }
     else {
-      ngx_str_t          alert_name = ngx_string("limiter-value-release-request");
       limit_val_alert_t  data;
-      ngx_str_t          alert;
-      alert.len = sizeof(data);
-      alert.data = (u_char *)&data;
       
       data.limiter = limiter;
       ngx_memcpy(data.key, lval->key, 20);
@@ -138,7 +134,7 @@ static ngx_int_t limiter_value_ready_to_reap(wfx_limiter_value_t *lval, wfx_limi
       ngx_memzero(&data.ed, sizeof(data.ed));
       data.forced = force;
       
-      ipc_alert_all_workers(wfx_ipc, &alert_name, &alert);
+      wfx_ipc_alert_all_workers("limiter-value-release-request", &data, sizeof(data));
       return force ? NGX_OK : NGX_DECLINED;
     }
     return NGX_OK;
@@ -172,7 +168,6 @@ typedef struct {
 } limit_condition_data_t;
 
 static void limiter_value_request_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
-  ngx_str_t alert_name = ngx_string("limiter-value-response");
   limit_val_alert_t *d = (limit_val_alert_t *)data->data;
   
   wfx_lua_getfunction(wfx_Lua, "findLimiterValue");
@@ -197,12 +192,11 @@ static void limiter_value_request_alert_handler(ngx_pid_t sender_pid, ngx_int_t 
   lua_pop(wfx_Lua, 1);
   lua_printstack(wfx_Lua);
   
-  ipc_alert_slot(wfx_ipc, sender, &alert_name, data);
+  wfx_ipc_alert_slot(sender, "limiter-value-response", d, sizeof(*d));
 }
 
 static void limiter_value_response_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
   limit_val_alert_t *d = (limit_val_alert_t *)data->data;
-  
   
   assert(d->val);
   wfx_lua_getfunction(wfx_Lua, "setLimiterValue");
@@ -211,29 +205,13 @@ static void limiter_value_response_alert_handler(ngx_pid_t sender_pid, ngx_int_t
   lua_pushlightuserdata(wfx_Lua, d->val);
   lua_ngxcall(wfx_Lua, 3, 0);
   
-  switch(d->ed.type) {
-    case WFX_EVAL_HTTP_REQUEST:
-      wfx_lua_getfunction(wfx_Lua, "completeLimiterValueRequest");
-      lua_pushlightuserdata(wfx_Lua, d->ed.data.request);
-      lua_ngxcall(wfx_Lua, 1, 1);
-      if(lua_toboolean(wfx_Lua, -1)) {
-        //request is still there. finish running it
-        condition_stack_set_tail_data(&d->ed, d->val);
-        ngx_http_core_run_phases(d->ed.data.request);
-      }
-      else {
-        //request is gone. do nothing
-      }
-      lua_pop(wfx_Lua, 1);
-      return;
-    default:
-      ERR("i can't do that yet, Dave.");
-      raise(SIGABRT); 
+  if(wfx_tracked_request_active(&d->ed)) {
+    condition_stack_set_tail_data(&d->ed, d->val);
+    wfx_resume_suspended_request(&d->ed);
   }
 }
 
 static void limiter_value_release_request_alert_handler(ngx_pid_t sender_pid, ngx_int_t sender, ngx_str_t *name, ngx_str_t *data) {
-  ngx_str_t alert_name = ngx_string("limiter-value-release-response");
   limit_val_alert_t *d = (limit_val_alert_t *)data->data;
   wfx_lua_getfunction(wfx_Lua, "unsetLimiterValue");
   lua_pushlightuserdata(wfx_Lua, d->limiter);
@@ -245,7 +223,7 @@ static void limiter_value_release_request_alert_handler(ngx_pid_t sender_pid, ng
   lua_ngxcall(wfx_Lua, 3, 1);
   if(lua_toboolean(wfx_Lua, -1)) {
     //unset successful
-    ipc_alert_slot(wfx_ipc, sender, &alert_name, data);
+    wfx_ipc_alert_slot(sender, "limiter-value-release-response", d, sizeof(*d));
   }
   else {
     //limiter value not found here. don't reply.
@@ -265,12 +243,6 @@ static void limiter_value_release_response_alert_handler(ngx_pid_t sender_pid, n
   else {
     //was already reaped
   }
-}
-
-static void limiter_value_request_cleanup(void *d) {
-  wfx_lua_getfunction(wfx_Lua, "cleanupLimiterValueRequest");
-  lua_pushlightuserdata(wfx_Lua, d);
-  lua_ngxcall(wfx_Lua, 1, 0);
 }
 
 static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_evaldata_t *ed, wfx_condition_stack_t *stack) {
@@ -295,47 +267,15 @@ static wfx_condition_rc_t condition_limit_check_eval(wfx_condition_t *self, wfx_
       lua_pop(wfx_Lua, 1);
     }
     else {
-      ngx_str_t             alert_name = ngx_string("limiter-value-request");
-      ngx_str_t             alertstr;
       limit_val_alert_t     alert;
       alert.limiter = data->limiter;
       ngx_memcpy(alert.key, key_sha1, sizeof(key_sha1));
       alert.ed = *ed;
       alert.forced = 0;
       alert.val = NULL;
-      alertstr.data = (u_char *)&alert;
-      alertstr.len = sizeof(alert);
       
-      //add cleanup in case request goes away
-      wfx_lua_getfunction(wfx_Lua, "addLimiterValueRequest");
-      switch(ed->type) {
-        case WFX_EVAL_HTTP_REQUEST:
-          lua_pushlightuserdata(wfx_Lua, ed->data.request);
-          break;
-        default:
-          ERR("how do?");
-          raise(SIGABRT);
-      }
-      lua_ngxcall(wfx_Lua, 1, 1);
-      if(lua_toboolean(wfx_Lua, -1)) {
-        //first time we add a limiter value ipc request. add some cleanup
-        ngx_http_cleanup_t *cln;
-        
-        switch(ed->type) {
-          case WFX_EVAL_HTTP_REQUEST:
-            cln = ngx_http_cleanup_add(ed->data.request, 0);
-            cln->data = ed->data.request;
-            cln->handler = limiter_value_request_cleanup;
-            break;
-          default:
-            ERR("how do?");
-            raise(SIGABRT);
-        }
-        
-      }
-      lua_pop(wfx_Lua, 1);
-      
-      ipc_alert_cachemanager(wfx_ipc, &alert_name, &alertstr);
+      wfx_track_request(ed);
+      wfx_ipc_alert_cachemanager("limiter-value-request", &alert, sizeof(alert));
       
       condition_stack_push(stack, NULL);
       return WFX_COND_DEFER;
@@ -430,8 +370,6 @@ int wfx_limiter_init_runtime(lua_State *L, int manager) {
   }
   
   wfx_lua_loadscript(L, limiter);
-  lua_pushboolean(L, manager);
-  lua_ngxcall(L, 1, 0);
   
   return NGX_OK;
 }

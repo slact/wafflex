@@ -73,6 +73,17 @@ ngx_int_t ipc_alert_cachemanager(ipc_t *ipc, ngx_str_t *name, ngx_str_t *data) {
   return ipc_alert_slot(ipc, slot, name, data);
 }
 
+ngx_int_t wfx_ipc_alert_all_workers(const char *name, void *data, size_t sz) {
+  ngx_str_t namestr, datastr;
+  
+  namestr.len = strlen(name);
+  namestr.data = (u_char *)name;
+  datastr.len = sz;
+  datastr.data = (u_char *)data;
+  
+  return ipc_alert_all_workers(wfx_ipc, &namestr, &datastr);
+}
+
 ngx_int_t wfx_ipc_alert_cachemanager(const char *name, void *data, size_t sz) {
   ngx_str_t namestr, datastr;
   
@@ -221,4 +232,76 @@ char *wfx_conf_set_size_slot(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   }
 
   return NGX_CONF_OK;
+}
+
+
+wfx_request_ctx_t *wfx_get_request_ctx(wfx_evaldata_t *ed) {
+  switch(ed->type) {
+    case WFX_EVAL_HTTP_REQUEST:
+      return ngx_http_get_module_ctx(ed->data.request, ngx_wafflex_module);
+    default:
+      ERR("how do?");
+      raise(SIGABRT);
+      return NULL;
+  }
+  return NULL;
+}
+
+
+static void wfx_track_request_cleanup_handler(void *d) {
+  wfx_lua_getfunction(wfx_Lua, "untrackPtr");
+  lua_pushlightuserdata(wfx_Lua, d);
+  lua_ngxcall(wfx_Lua, 1, 0);
+}
+
+int wfx_track_request(wfx_evaldata_t *ed) {
+  wfx_lua_getfunction(wfx_Lua, "trackPtr");
+  switch(ed->type) {
+    case WFX_EVAL_HTTP_REQUEST:
+      lua_pushlightuserdata(wfx_Lua, ed->data.request);
+      break;
+    default:
+      ERR("how do?");
+      raise(SIGABRT);
+  }
+  lua_ngxcall(wfx_Lua, 1, 1);
+  if(lua_toboolean(wfx_Lua, -1)) {
+    //first time it was added. add cleanup stuff
+    ngx_http_cleanup_t *cln = ngx_http_cleanup_add(ed->data.request, 0);
+    if(cln == NULL) {
+      return 0;
+    }
+    cln->data = ed->data.request;
+    cln->handler = wfx_track_request_cleanup_handler;
+  }
+  return 1;
+}
+
+int wfx_tracked_request_active(wfx_evaldata_t *ed) {
+  wfx_lua_getfunction(wfx_Lua, "getTrackedPtr");
+  switch(ed->type) {
+    case WFX_EVAL_HTTP_REQUEST:
+      lua_pushlightuserdata(wfx_Lua, ed->data.request);
+      break;
+    default:
+      ERR("how do?");
+      raise(SIGABRT);
+  }
+  lua_ngxcall(wfx_Lua, 1, 1);
+  return lua_toboolean(wfx_Lua, -1);
+}
+
+void wfx_resume_suspended_request(wfx_evaldata_t *ed) {
+ switch(ed->type) {
+    case WFX_EVAL_HTTP_REQUEST:
+      ngx_http_core_run_phases(ed->data.request);
+      return;
+    default:
+      ERR("i can't do that yet, Dave.");
+      raise(SIGABRT); 
+  } 
+}
+
+int wfx_util_init_runtime(lua_State *L, int manager) {
+  wfx_lua_loadscript(L, util);
 }
