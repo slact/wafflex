@@ -207,8 +207,14 @@ static ngx_int_t ngx_http_wafflex_body_filter(ngx_http_request_t *r, ngx_chain_t
 
 static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   wfx_ruleset_conf_t *rcf = lua_touserdata(L, 2);
+  if(rcf == NULL) {
+    luaL_error(L, "ruleset conf is NULL");
+  }
   lua_getfield(L, 1, "__binding");
   rcf->ruleset = lua_touserdata(L, -1);
+  if(rcf->ruleset == NULL) {
+    luaL_error(L, "ruleset conf->ruleset is NULL");
+  }
   
   return 0;
 }
