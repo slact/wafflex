@@ -155,7 +155,6 @@ local ruleset_meta = { __index = {
   end,
   
   setPhaseTable = function(self, data)
-    local prev_phases = self.phases
     if self.phases then
       for _, phase in pairs(self.phases) do
         Binding.call("phase", "delete", phase)
@@ -202,13 +201,10 @@ local ruleset_meta = { __index = {
     local excludes = {name=true}
     for _, thingsname in ipairs({"rules", "lists", "limiters", "phases"}) do
       local things = rs[thingsname] or {}
-      local cpy
       for k, thing in pairs(things) do
         things[k]=table_copy(thing, excludes)
       end
     end
-    
-    setmetatable(rs.lists, {__index=listorder})
     
     return json.encode(rs, {indent=true})
   end,
@@ -239,7 +235,7 @@ local ruleset_meta = { __index = {
 
 local function sorted_keys(tbl)
   local keys = {}
-  for k, v in pairs(tbl) do
+  for k in pairs(tbl) do
     table.insert(keys, k)
   end
   table.sort(keys)
@@ -260,7 +256,7 @@ local function newRuleset(data)
       __jsonorder = {"name", "info", "phases", "limiters", "lists", "rules"}
     },
     phase = {
-      __jsonval = function(self) 
+      __jsonval = function(self)
         local lists = {}
         for _, list in pairs(self.lists) do
           table.insert(lists, list.name)
@@ -276,14 +272,13 @@ local function newRuleset(data)
           table.insert(rules, rule.name)
         end
         
-        if self.info then 
+        if self.info then
           return setmetatable({info=self.info, rules=rules}, getmetatable(self))
         else
           return setmetatable(rules, getmetatable(self))
         end
       end
     },
-    
     rule = {
       __jsonorder = {"name", "info", "key", "if", "if-any", "if-all", "then", "else"},
       __jsonval = function(self)

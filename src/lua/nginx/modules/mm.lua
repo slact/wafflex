@@ -34,6 +34,7 @@ local C = {
   _w = '\27[47m'  -- white
 }
 
+--luacheck: ignore
 local METATABLE = { "<metatable>", colors = C.it .. C.y }
 local INDENT = "   "
 

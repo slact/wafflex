@@ -1,5 +1,5 @@
 local reqs = {}
-
+--luacheck: globals trackPtr getTrackedPtr untrackPtr
 function trackPtr(request_ptr, data)
   local first_time = reqs[request_ptr] == nil
   reqs[request_ptr] = true

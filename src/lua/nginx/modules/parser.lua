@@ -1,7 +1,6 @@
 local mm = require "mm"
 local Rule = require "rule"
 local json = require "dkjson"
-local Binding = require "binding"
 
 local function parseRulesetThing(parser, data_in, opt)
   local data = data_in[opt.key]
@@ -59,9 +58,9 @@ local function jsonmeta(what)
   end
 end
 
-local class = {}
+local Parser = {}
 
-function class:jsontype(var)
+function Parser:jsontype(var)
   if type(var) == "table" then
     local m = getmetatable(var)
     return m and m.__jsontype or nil
@@ -69,25 +68,25 @@ function class:jsontype(var)
     return type(var)
   end
 end
-function class:assert(cond, err, ...)
+function Parser:assert(cond, err, ...)
   if not cond then self:error(err, ...) end
   return cond
 end
-function class:assert_type(var, expected_type, err, ...)
+function Parser:assert_type(var, expected_type, err, ...)
   if err then
     return self:assert(type(var) == expected_type, err, ...)
   else
     return self:assert(type(var) == expected_type, "expected type '%s', got '%s'", expected_type, type(var))
   end
 end
-function class:assert_jsontype(var, expected_type, err, ...)
+function Parser:assert_jsontype(var, expected_type, err, ...)
   if err then
     return self:assert(self:jsontype(var) == expected_type, err, ...)
   else
     return self:assert(self:jsontype(var) == expected_type,"expected JSON type '%s', got '%s'", expected_type, self:jsontype(var))
   end
 end
-function class:assert_table_size(var, expected_size, err, ...)
+function Parser:assert_table_size(var, expected_size, err, ...)
   self:assert_type(var, "table")
   local n = 0
   for _, _ in pairs(var) do
@@ -119,7 +118,7 @@ local function getlc_str(tbl)
   end
 end
 
-function class:error(err, ...)
+function Parser:error(err, ...)
   
   if not err then err = "unknown error" end
   if select("#", ...) > 0 then
@@ -145,26 +144,26 @@ function class:error(err, ...)
   end
 end
 
-function class:setInterpolationChecker(func)
+function Parser:setInterpolationChecker(func)
   self.interpolation_checker = func
 end
-function class:checkInterpolatedString(str)
+function Parser:checkInterpolatedString(str)
   if self.interpolation_checker then
     self.interpolation_checker(str, self)
   end
   return true
 end
 
-function class:pushContext(ctx, name)
+function Parser:pushContext(ctx, name)
   table.insert(self.ctx_stack, {ctx=ctx, name=name})
   self.context = self.ctx_stack[#self.ctx_stack]
   return self
 end
-function class:popContext()
+function Parser:popContext()
   table.remove(self.ctx_stack, #self.ctx_stack)
   self.context = self.ctx_stack[#self.ctx_stack]
 end
-function class:getContext(name)
+function Parser:getContext(name)
   if not name then return self.context and self.context.ctx end
   for i=#self.ctx_stack, 1, -1 do
     local cur = self.ctx_stack[i]
@@ -174,14 +173,14 @@ function class:getContext(name)
   end
   return nil
 end
-function class:printContext()
+function Parser:printContext()
   for i=#self.ctx_stack, 1, -1 do
     local cur = self.ctx_stack[i]
     print(cur.name or "<?>", self:jsontype(cur.ctx) or "<?>", getlc_str(cur.ctx) or "")
   end
 end
 
-function class:parseFile(path)
+function Parser:parseFile(path)
   local file = assert(io.open(path, "rb")) -- r read mode and b binary mode
   local content = file:read("*a") -- *a or *all reads the whole file
   file:close()
@@ -189,7 +188,7 @@ function class:parseFile(path)
   return self:parseJSON(content, "file " .. path)
 end
 
-function class:parseJSON(json_str, json_name)
+function Parser:parseJSON(json_str, json_name)
   self:assert_type(json_str, "string", "expected a JSON string")
   local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
   self.name = json_name or self.context_name
@@ -200,7 +199,7 @@ function class:parseJSON(json_str, json_name)
   return self:parseRuleSet(data)
 end
 
-function class:parseInterpolatedString(str)
+function Parser:parseInterpolatedString(str)
   --validate the string
   for sub in str:gmatch("%$%b{}") do
     if not sub:match("^%${[%w_]+}") then
@@ -233,7 +232,7 @@ function class:parseInterpolatedString(str)
   return {string = str}
 end
 
-function class:parseRuleSet(data, name)
+function Parser:parseRuleSet(data, name)
   self.ruleset = {
     limiters= {},
     rules= {},
@@ -250,6 +249,7 @@ function class:parseRuleSet(data, name)
   })
   self:checkLimiters(data.limiters)
   
+  --luacheck: push ignore 432 --don't mind the shadowing
   parseRulesetThing(self, data, {
     thing="rule", key="rules",  type="table",
     parser_method=function(self, data, name)
@@ -259,6 +259,7 @@ function class:parseRuleSet(data, name)
       return self:parseRule(data, name)
     end
   })
+  --luacheck: pop
   
   parseRulesetThing(self, data, {
     thing="list", key="lists",  type="table",
@@ -286,7 +287,7 @@ function class:parseRuleSet(data, name)
   return self.ruleset
 end
 
-function class:parsePhaseTable(data)
+function Parser:parsePhaseTable(data)
   self:assert(data ~= nil, "missing phase table (\"phases\" attribute)")
   self:assert_jsontype(data, "object", "phase table must be an object")
   self:pushContext(data, "phase table")
@@ -315,7 +316,7 @@ function class:parsePhaseTable(data)
   return data
 end
 
-function class:parseRuleList(data, name)
+function Parser:parseRuleList(data, name)
   if type(data)=="string" then
     self:assert(self.ruleset.lists[data], ([[named list "%s" not found]]):format(data))
     return self.ruleset.lists[data]
@@ -341,7 +342,7 @@ function class:parseRuleList(data, name)
   return list
 end
 
-function class:parseRule(data, name)
+function Parser:parseRule(data, name)
   self:pushContext(data, "rule")
   local rule
   if type(data) == "string" then
@@ -397,7 +398,7 @@ function class:parseRule(data, name)
   return rule
 end
 
-function class:parseCondition(data)
+function Parser:parseCondition(data)
   self:pushContext(data, "condition")
   local condition
   if type(data) == "string" then
@@ -418,7 +419,7 @@ function class:parseCondition(data)
   return condition
 end
   
-function class:parseAction(data)
+function Parser:parseAction(data)
   self:pushContext(data, "action")
   local action
   if type(data) == "string" then
@@ -438,7 +439,7 @@ function class:parseAction(data)
   return action
 end
 
-function class:parseActions(data, name)
+function Parser:parseActions(data, name)
   if data == nil then
     return {}
   end
@@ -456,7 +457,7 @@ function class:parseActions(data, name)
   return actions
 end
 
-function class:parseTimeInterval(data, err)
+function Parser:parseTimeInterval(data, err)
   if err then err = " for " .. err end
   local typ = self:jsontype(data)
   if typ == "number" then
@@ -489,7 +490,7 @@ function class:parseTimeInterval(data, err)
   end
 end
 
-function class:parseLimiter(data, name)
+function Parser:parseLimiter(data, name)
   self:pushContext(data, "limiter")
   
   if not data.name then data.name = name end
@@ -502,7 +503,7 @@ function class:parseLimiter(data, name)
   if data.sync_steps then
     data.sync_steps = self:assert(tonumber(data.sync_steps), "invalid \"sync-steps\" value")
   end
-  if data.burst then 
+  if data.burst then
     self:assert_type(data.burst, "string", "invalid \"burst\" value type")
   end
   if data["burst-expire"] then
@@ -514,10 +515,10 @@ function class:parseLimiter(data, name)
   self:popContext()
   return data
 end
-function class:checkLimiters(data)
+function Parser:checkLimiters(data)
   if not data then return true end
   self:pushContext(data, "limiters")
-  for k, v in pairs(data) do
+  for _, v in pairs(data) do
     self:pushContext(v, ("limiter \"%s\""):format(v.name))
     if v.burst then
       --make sure the burst value refers to a known limiter
@@ -528,16 +529,16 @@ function class:checkLimiters(data)
   self:popContext()
 end
 
+local Parser_meta = {__index = Parser}
+
 local function newparser()
   local parser = {
     name = "<?>",
     ctx_stack = {}
   }
   
-  setmetatable(parser, {__index = class})
+  setmetatable(parser, Parser_meta)
   return parser
 end
 
-local Parser = {new = newparser}
-
-return Parser
+return {new = newparser}

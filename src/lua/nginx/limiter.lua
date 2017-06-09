@@ -1,21 +1,24 @@
-local mm = require "mm"
-local setmetatable, rawset, rawget, tinsert = setmetatable, rawset, rawget, table.insert
-  local function tabling_meta(depth, ephemeron)
-    return {__index = function(t,k)
-      local v = {}
-      if depth > 0 then
-        setmetatable(v, tabling_meta(depth-1, type(ephemeron) == number and ephemeron-1 or ephemeron))
-      end
-      t[k]=v
-      return v
-    end, __mode = (ephemeron == true or (ephemeron and ephemeron > 0)) and "k" or nil }
-  end
+
+--luacheck: globals findLimiterValue setLimiterValue unsetLimiterValue
+--local mm = require "mm"
+local setmetatable, rawset, rawget = setmetatable, rawset, rawget
+
+local function tabling_meta(depth, ephemeron)
+  return {__index = function(t,k)
+    local v = {}
+    if depth > 0 then
+      setmetatable(v, tabling_meta(depth-1, type(ephemeron) == "number" and ephemeron-1 or ephemeron))
+    end
+    t[k]=v
+    return v
+  end, __mode = (ephemeron == true or (ephemeron and ephemeron > 0)) and "k" or nil }
+end
 
 local limiters = setmetatable({}, tabling_meta(2))
 
 function findLimiterValue(limiter_ptr, key)
   local limit = rawget(limiters, limiter_ptr)
-  if not limit then 
+  if not limit then
     return nil
   end
   local data = rawget(limit, key)

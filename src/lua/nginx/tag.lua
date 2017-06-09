@@ -1,6 +1,7 @@
 local tags = {}
-local tconcat = table.concat
 local rawset, rawget = rawset, rawget
+
+--luacheck: globals findTag setTag clearTags
 
 function findTag(ref, key)
   local mytags = rawget(tags, ref)

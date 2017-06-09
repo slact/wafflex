@@ -1,9 +1,11 @@
 local mm = require "mm"
 local Redis = require "redis"
 
+--luacheck: globals registerRedis connectRedises
+
 local function parseRedisUrl(url)
   local host, port, pass, db
-  local cur, rest
+  local rest
   
   mm(url)
   
@@ -27,10 +29,29 @@ local function parseRedisUrl(url)
   mm(ret)
   
   return ret
-  
 end
 
-return function(redis_connect, redis_close, redis_command, loadscripts, timeout)
+local redises = {}
+  
+function registerRedis(url)
+  local exists = redises[url]
+  if exists then return exists end
+  
+  local parsedUrl = parseRedisUrl(url)
+  
+  local r = Redis.new(parsedUrl.host, parsedUrl.port, parsedUrl.pass, parsedUrl.db)
+  redises[parsedUrl.url]=r
+  mm(redises)
+  return parsedUrl.url
+end
+
+function connectRedises()
+  for _, r in pairs(redises) do
+    r:connect()
+  end
+end
+
+return function(redis_connect, redis_close, redis_command, loadscripts, timeout, get_hiredis_asyncContext_peername)
   assert(type(redis_connect) == "function")
   assert(type(redis_command) == "function")
   assert(type(loadscripts) == "function")
@@ -40,25 +61,5 @@ return function(redis_connect, redis_close, redis_command, loadscripts, timeout)
   Redis.c.redis_command = redis_command
   Redis.c.loadscripts = loadscripts
   Redis.c.timeout = timeout
-
-  local redises = {}
-  
-  function registerRedis(url)
-    local exists = redises[url]
-    if exists then return exists end
-    
-    local parsedUrl = parseRedisUrl(url)
-    
-    local r = Redis.new(parsedUrl.host, parsedUrl.port, parsedUrl.pass, parsedUrl.db)
-    redises[parsedUrl.url]=r
-    mm(redises)
-    return parsedUrl.url
-  end
-  
-  function connectRedises()
-    for url, r in pairs(redises) do
-      r:connect()
-    end
-  end
-  
+  Redis.c.get_hiredis_asyncContext_peername = get_hiredis_asyncContext_peername
 end

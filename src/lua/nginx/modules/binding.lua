@@ -1,4 +1,3 @@
-local mm = require "mm"
 local binds = {}
 local Binding = {
   bindings = binds,
@@ -10,6 +9,7 @@ setmetatable(binds, {__index = function(t,k)
     error("missing binding for " .. tostring(k))
   end
 end})
+--local mm = require "mm"
 
 local calls = {
   create = function(create_callback, self, ...)

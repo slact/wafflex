@@ -1,7 +1,5 @@
-local mm = require "mm"
 local Binding = require "binding"
-local json = require "dkjson"
-local json_encode = json.encode
+--local mm = require "mm"
 
 local function ignore_leading_hash(str)
   return str:sub(1,1)=="#" and str:sub(2) or str
@@ -109,7 +107,7 @@ Rule.condition.add("any", {
     end
   end,
   delete = function(data, ruleset)
-    for i, cond in ipairs(data) do
+    for _, cond in ipairs(data) do
       Rule.condition.delete(cond, ruleset)
     end
   end
@@ -120,7 +118,7 @@ end})
 Rule.condition.add("all", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "array", "\"all\" condition value must be an array of conditions")
-    for _, v in ipairs(data) do
+    for i, v in ipairs(data) do
       local condition = parser:parseCondition(v)
       data[i]=condition
     end
@@ -170,7 +168,7 @@ Rule.condition.add("match", {
   init = function(data)
     local complexity = function(str)
       local n = 0
-      for match in str.string:gmatch("%$") do 
+      for _ in str.string:gmatch("%$") do
         n=n+1
       end
       return n
@@ -205,9 +203,7 @@ Rule.condition.add({"limit-break", "limit-check"}, {
   parse = function(data, parser)
     if type(data) == "string" then
       data = {name=data}
-    elseif type(data) == "table" then
-      --no problem
-    else
+    elseif type(data) ~= "table" then
       parser:error("invalid value type %s", type(data))
     end
     local condition_name = next(parser:getContext())
@@ -235,7 +231,7 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     parser:assert_type(data.name, "string", "invalid \"name\" type")
     return data
   end,
-  init = function(data, thing, ruleset) 
+  init = function(data, thing, ruleset)
     local limiter = assert(ruleset:findLimiter(data.name), "unknown limiter")
     data.name = nil
     data.limiter = limiter
