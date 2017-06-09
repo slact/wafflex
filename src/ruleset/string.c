@@ -33,7 +33,6 @@ static int string_create(lua_State *L) {
   
   cur = wstr->str.data;
   part = &wstr->parts[0];
-  
   while(wfx_str_each_part(&wstr->str, &cur, part)) {
     ccur = &wstr->str.data[part->start];
     spart.data = ccur;
@@ -58,12 +57,19 @@ static int string_create(lua_State *L) {
   lua_pushlightuserdata(L, wstr);
   return 1;
 }
+
+static int string_destroy(lua_State *L) {
+  wfx_str_t *wstr = lua_touserdata(L, 1);
+  ruleset_common_shm_free(wstr);
+  return 0;
+}
+
 static wfx_binding_t wfx_string_binding = {
   "string",
   string_create,
   NULL,
   NULL,
-  NULL
+  string_destroy
 };
 
 void wfx_string_bindings_set(lua_State *L) {

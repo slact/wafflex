@@ -57,7 +57,8 @@ local calls = {
     if type(self) ~= "table" then
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
     end
-    delete_callback(self, self.ruleset)
+    assert(type(self.__binding) == "userdata", ("expected seld.__binding userdata, got %s"):format(type(self.__binding)))
+    delete_callback(self.__binding, self, self.ruleset)
     return true
   end
 }
@@ -91,7 +92,10 @@ function Binding.call(binding_name, call_name, ...)
   if not callbacks then return end
   local binding_call = calls[call_name]
   if not binding_call then
-    error(("unknown binding call \"%s\""):format(call_name))
+    error(("unknown binding call \"%s\" for \"%s\""):format(call_name, binding_name))
+  end
+  if not callbacks[call_name] then
+    error(("no callback for binding call \"%s\" for \"%s\""):format(call_name, binding_name))
   end
   local ok, err = binding_call(callbacks[call_name], ...)
   if not ok then

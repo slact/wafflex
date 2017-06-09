@@ -61,6 +61,20 @@ static int ruleset_create(lua_State *L) {
   return 1;
 }
 
+static int ruleset_delete(lua_State *L) {
+  wfx_ruleset_t     *ruleset = lua_touserdata(L, 1);
+  if (!ruleset) {
+    lua_printstack(L);
+    luaL_error(L, "expected ruleset __binding to be some value, bit got NULL");
+    return 0;
+  }
+  
+  luaL_unref(L, LUA_REGISTRYINDEX, ruleset->luaref);
+  ruleset->luaref = LUA_NOREF;
+  ruleset_common_shm_free(ruleset);
+  return 0;
+}
+
 int wfx_ruleset_bindings_set(lua_State *L) {
   //string interpolation
   wfx_string_bindings_set(L);
@@ -136,13 +150,16 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t
   return ptr;
 }
 
+void ruleset_common_shm_free(void *ptr) {
+  wfx_shm_free(ptr);
+}
 
 static wfx_binding_t wfx_ruleset_binding = {
   "ruleset",
   ruleset_create,
   NULL,
   NULL,
-  NULL
+  ruleset_delete
 };
 
 ngx_int_t wfx_ruleset_init_runtime(lua_State *L, int manager) {

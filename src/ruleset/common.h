@@ -26,4 +26,6 @@ int ruleset_subbinding_getname_call(lua_State *L, const char *binding_name, cons
 void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t data_sz, char *str_key, off_t str_offset, off_t luaref_offset);
 void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, size_t data_sz, off_t luaref_offset);
 
+void ruleset_common_shm_free(void *);
+
 #endif //WFX_RULESET_TYPES_H

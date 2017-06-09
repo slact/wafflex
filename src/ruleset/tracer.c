@@ -11,6 +11,7 @@
 #include "string.h"
 #include "tracer.h"
 #include <util/wfx_str.h>
+#include <assert.h>
 
 #define TRACER_OR_BUST(ed, t) \
   if(!ed->tracer.on) return;  \

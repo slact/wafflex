@@ -70,12 +70,18 @@ static int list_create(lua_State *L) {
   return 1;
 }
 
+static int list_delete(lua_State *L) {
+  wfx_rule_list_t     *list = lua_touserdata(L, 1);
+  ruleset_common_shm_free(list);
+  return 0;
+}
+
 static wfx_binding_t wfx_list_binding = {
   "list",
   list_create,
   NULL,
   NULL,
-  NULL
+  list_delete
 };
 
 void wfx_list_bindings_set(lua_State *L) {

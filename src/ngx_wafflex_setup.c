@@ -29,10 +29,6 @@ static ngx_int_t initialize_shm(ngx_shm_zone_t *zone, void *data) {
     DBG("Shm created with data at %p", wfx_shm_data);
   }
   
-  //we can create all the rulesets now
-  lua_getglobal(wfx_Lua, "createDeferredRulesets");
-  lua_ngxcall(wfx_Lua, 0, 0);
-  
   return NGX_OK;
 }
 
@@ -43,7 +39,7 @@ static void cachemanager_watchdog_log_fake_writer(ngx_log_t *log, ngx_uint_t lev
     waiting_for_exit = 0; //only happens once
     
     //cache manager doesn't call module's exit_worker on exit. do it manually.
-    ngx_wafflex_exit_worker(ngx_cycle);
+    ngx_wafflex_exit_worker((ngx_cycle_t *)ngx_cycle);
   }
 }
 

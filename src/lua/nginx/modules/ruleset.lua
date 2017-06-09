@@ -62,6 +62,13 @@ local ruleset_meta = { __index = {
     Binding.call("limiter", "create", limiter)
     return limiter
   end,
+  deleteLimiter = function(self, limiter)
+    assert(self.limiters[limiter.name] == limiter, "tried deleting unexpected list of the same name")
+    --TODO: check which rules use this limiter
+    self.limiters[limiter.name] = nil
+    
+    Binding.call("limiter", "delete", limiter)
+  end,
   
   findRule = function(self, name)
     return self.rules[thing_name(name)]
@@ -92,6 +99,31 @@ local ruleset_meta = { __index = {
     Binding.call("rule", "create", rule)
     return rule
   end,
+  deleteRule = function(self, rule)
+    assert(self.rules[rule.name] == rule, "tried deleting unexpected list of the same name")
+    for list_name, list in pairs(self.lists) do
+      for _, list_rule in ipairs(list) do
+        assert(list_rule ~= rule, ("can't delete rule \"%s\", it's used in list \"%s\""):format(rule.name, list_name))
+      end
+    end
+    
+    self.rules[rule.name] = nil
+    
+    if rule["if"] then
+      Rule.condition.delete(rule["if"], self)
+    end
+    
+    for _,clause in pairs{"then", "else"} do
+      if rule[clause] then
+        local actions = rule[clause]
+        for _,action in pairs(actions) do
+          Rule.action.delete(action, self)
+        end
+        rule[clause]={}
+      end
+    end
+    Binding.call("rule", "delete", rule)
+  end,
   
   findList = function(self, name)
     return self.lists[thing_name(name)]
@@ -111,8 +143,24 @@ local ruleset_meta = { __index = {
     Binding.call("list", "create", list)
     return list
   end,
+  deleteList = function(self, list)
+    assert(self.lists[list.name] == list, "tried deleting unexpected list of the same name")
+    for phase_name, phase in pairs(self.phases) do
+      for _, phase_list in ipairs(phase) do
+        assert(phase_list ~= list, ("can't delete list \"%s\", it's used in phase \"%s\""):format(list.name, phase_name))
+      end
+    end
+    self.lists[list.name] = nil
+    Binding.call("list", "delete", list)
+  end,
   
   setPhaseTable = function(self, data)
+    local prev_phases = self.phases
+    if self.phases then
+      for _, phase in pairs(self.phases) do
+        Binding.call("phase", "delete", phase)
+      end
+    end
     self.phases = {}
     for k,v in pairs(data) do
       local phase = setmetatable({name=k, lists={}}, self.__submeta.phase)
@@ -163,8 +211,30 @@ local ruleset_meta = { __index = {
     setmetatable(rs.lists, {__index=listorder})
     
     return json.encode(rs, {indent=true})
-  end
+  end,
   
+  destroy = function(self)
+    --clear phases
+    self:setPhaseTable({})
+    
+    --clear lists
+    for _, list in pairs(self.lists) do
+      self:deleteList(list)
+    end
+    
+    --clear rules
+    for _, rule in pairs(self.rules) do
+      self:deleteRule(rule)
+    end
+    
+    --clear limiters
+    for _, limiter in pairs(self.limiters) do
+      self:deleteLimiter(limiter)
+    end
+    
+    Binding.call("ruleset", "delete", self)
+    
+  end
 }}
 
 local function sorted_keys(tbl)

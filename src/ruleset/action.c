@@ -5,6 +5,19 @@
 
 static wfx_action_type_t action_types[];
 
+int action_simple_destroy(lua_State *L) {
+  wfx_action_t *action = lua_touserdata(L, 1);
+  if (!action) {
+    lua_printstack(L);
+    luaL_error(L, "expected action __binding to be some value, bit got NULL");
+    return 0;
+  }
+  luaL_unref(L, LUA_REGISTRYINDEX, action->luaref);
+  action->luaref = LUA_NOREF;
+  ruleset_common_shm_free(action);
+  return 0;
+}
+
 wfx_action_t *action_create(lua_State *L, size_t data_sz, wfx_action_eval_pt eval) {
   wfx_action_t *action = ruleset_common_shm_alloc_init_item(wfx_action_t, data_sz, L, action);
   action->eval = eval;
@@ -20,7 +33,7 @@ wfx_action_t *action_create(lua_State *L, size_t data_sz, wfx_action_eval_pt eva
   (binding).replace = NULL; \
   (binding).delete = action->destroy
 
-void wfx_action_bindings_set(lua_State *L) {;
+void wfx_action_bindings_set(lua_State *L) {
   char     buf[255];
   wfx_action_type_t  *cur;
   wfx_binding_t         binding;

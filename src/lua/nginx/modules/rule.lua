@@ -44,7 +44,8 @@ local function create_thing_storage(thing_name)
     assert(self.table[name] == nil, ("%s %s already exists"):format(thing_name, name))
     local added = {
       parse=funcs.parse,
-      init=funcs.init or function() end
+      init=funcs.init,
+      delete=funcs.delete
     }
     if meta then
       added.meta=meta
@@ -65,12 +66,24 @@ local function create_thing_storage(thing_name)
     name = ignore_leading_hash(name)
     local thing_preset = self.table[name]
     local thing = setmetatable({[thing_name]=name, data=val}, thing_preset.meta)
-    local replacement_data = thing_preset.init(val, thing, ruleset)
-    if replacement_data then
-      thing.data = replacement_data
+    if thing_preset.init then
+      local replacement_data = thing_preset.init(val, thing, ruleset)
+      if replacement_data then
+        thing.data = replacement_data
+      end
     end
     Binding.call(("%s:%s"):format(thing_name, name), "create", thing)
     return thing
+  end
+  
+  function self.delete(thing, ruleset)
+    local name = thing[thing_name] or thing.name
+    local thing_preset = self.table[name]
+    print(thing_name .. " DELETE THING " .. name .. " " .. tostring(thing_preset.delete))
+    if thing_preset.delete then
+      thing_preset.delete(thing.data, ruleset)
+    end
+    Binding.call(("%s:%s"):format(thing_name, name), "delete", thing)
   end
   
   return self
@@ -94,6 +107,11 @@ Rule.condition.add("any", {
     for i, v in ipairs(data) do
       data[i] = Rule.condition.new(v, ruleset)
     end
+  end,
+  delete = function(data, ruleset)
+    for i, cond in ipairs(data) do
+      Rule.condition.delete(cond, ruleset)
+    end
   end
 }, {__jsonval = function(self)
   return {any=self.data}
@@ -107,9 +125,14 @@ Rule.condition.add("all", {
       data[i]=condition
     end
   end,
-  init = function(data, thing, ruleset)
+  init = function(data, ruleset)
     for i, v in ipairs(data) do
       data[i] = Rule.condition.new(v, ruleset)
+    end
+  end,
+  delete = function(data, ruleset)
+    for _, cond in ipairs(data) do
+      Rule.condition.delete(cond, ruleset)
     end
   end
 }, {__jsonval = function(self)
@@ -127,6 +150,9 @@ Rule.condition.add("tag-check", {
   end,
   init = function(data)
     Binding.call("string", "create", data)
+  end,
+  delete = function(data)
+    Binding.call("string", "delete", data)
   end
 },{__jsonval=function(self)
     return {["tag-check"]=self.data.string}
@@ -153,8 +179,13 @@ Rule.condition.add("match", {
       return complexity(str1) < complexity(str2)
     end
     table.sort(data, simplefirst)
-    for _, v in ipairs(data) do
-      Binding.call("string", "create", v)
+    for _, str in ipairs(data) do
+      Binding.call("string", "create", str)
+    end
+  end,
+  delete = function(data)
+    for _, str in ipairs(data) do
+      Binding.call("string", "delete", str)
     end
   end
 }, {
@@ -211,6 +242,11 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     if data.key then
       Binding.call("string", "create", data.key)
     end
+  end,
+  delete = function(data)
+    if data.key then
+      Binding.call("string", "delete", data.key)
+    end
   end
 }, {__jsonval=function(self)
   local cpy = {}
@@ -244,6 +280,9 @@ Rule.action.add("tag", {
   end,
   init = function(data)
     Binding.call("string", "create", data)
+  end,
+  delete = function(data)
+    Binding.call("string", "delete", data)
   end
 }, {__jsonval = function(self)
   return {tag=self.data.string}

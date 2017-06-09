@@ -101,6 +101,25 @@ static int limiter_create(lua_State *L) {
   return 1;
 }
 
+static int limiter_delete(lua_State *L) {
+  wfx_limiter_t     *limiter = lua_touserdata(L, 1);
+  if (!limiter) {
+    lua_printstack(L);
+    luaL_error(L, "expected limiter __binding to be some value, bit got NULL");
+    return 0;
+  }
+  
+  luaL_unref(L, LUA_REGISTRYINDEX, limiter->luaref);
+  limiter->luaref = LUA_NOREF;
+  
+  reaper_stop(limiter->values);
+  ngx_free(limiter->values);
+  limiter->values = NULL;
+  
+  ruleset_common_shm_free(limiter);
+  return 0;
+}
+
 static ngx_int_t limiter_value_ready_to_reap(wfx_limiter_value_t *lval, wfx_limiter_t *limiter, uint8_t force) {
   if(force || ((lval->count == 0 || limiter_current_value(limiter, lval) == 0) && lval->time + 1 <= ngx_time())) {
     if(lval->refcount == 0) {
@@ -142,7 +161,7 @@ static wfx_binding_t wfx_limiter_binding = {
   limiter_create,
   NULL,
   NULL,
-  NULL
+  limiter_delete
 };
 
 //limiter conditions
@@ -381,7 +400,7 @@ static int condition_limit_break_create(lua_State *L) {
 static wfx_condition_type_t limit_break = {
   "limit-break",
   condition_limit_break_create,
-  NULL
+  condition_simple_destroy
 };
 
 static int condition_limit_check_create(lua_State *L) {
@@ -391,7 +410,7 @@ static int condition_limit_check_create(lua_State *L) {
 static wfx_condition_type_t limit_check = {
   "limit-check",
   condition_limit_check_create,
-  NULL
+  condition_simple_destroy
 };
 
 void wfx_limiter_bindings_set(lua_State *L) {

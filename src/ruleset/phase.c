@@ -67,12 +67,26 @@ static int phase_create(lua_State *L) {
   return 1;
 }
 
+static int phase_delete(lua_State *L) {
+  wfx_phase_t     *phase = lua_touserdata(L, 1);
+  if (!phase) {
+    lua_printstack(L);
+    luaL_error(L, "expected phase __binding to be some value, bit got NULL");
+    return 0;
+  }
+  
+  luaL_unref(L, LUA_REGISTRYINDEX, phase->luaref);
+  phase->luaref = LUA_NOREF;
+  ruleset_common_shm_free(phase);
+  return 0;
+}
+
 static wfx_binding_t wfx_phase_binding = {
   "phase",
   phase_create,
   NULL,
   NULL,
-  NULL
+  phase_delete
 };
 
 void wfx_phase_bindings_set(lua_State *L) {

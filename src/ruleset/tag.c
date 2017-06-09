@@ -53,7 +53,7 @@ static int condition_tag_check_create(lua_State *L) {
 static wfx_condition_type_t condition_tag_check = {
   "tag-check",
   condition_tag_check_create,
-  NULL
+  condition_simple_destroy
 };
 
 void tag_request_cleanup(ngx_http_request_t *r) {
@@ -108,7 +108,7 @@ static int action_tag_create(lua_State *L) {
 static wfx_action_type_t action_tag = {
   "tag",
   action_tag_create,
-  NULL
+  condition_simple_destroy
 };
 
 void wfx_tag_bindings_set(lua_State *L) {

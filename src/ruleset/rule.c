@@ -125,12 +125,26 @@ static int rule_create(lua_State *L) {
   return 1;
 }
 
+static int rule_delete(lua_State *L) {
+  wfx_rule_t *rule = lua_touserdata(L, 1);
+  if (!rule) {
+    lua_printstack(L);
+    luaL_error(L, "expected rule __binding to be some value, bit got NULL");
+    return 0;
+  }
+  
+  luaL_unref(L, LUA_REGISTRYINDEX, rule->luaref);
+  rule->luaref = LUA_NOREF;
+  ruleset_common_shm_free(rule);
+  return 0;
+}
+
 static wfx_binding_t wfx_rule_binding = {
   "rule",
   rule_create,
   NULL,
   NULL,
-  NULL
+  rule_delete
 };
 
 void wfx_rule_bindings_set(lua_State *L) {

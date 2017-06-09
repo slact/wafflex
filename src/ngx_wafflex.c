@@ -6,6 +6,7 @@
 #include <util/wfx_redis.h>
 #include <ruleset/condition.h>
 #include <ruleset/tracer.h>
+#include <assert.h>
 
 static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_http_output_body_filter_pt    ngx_http_next_body_filter;
@@ -34,12 +35,18 @@ lua_State    *wfx_Lua = NULL;
 shmem_t      *wfx_shm = NULL;
 
 void *wfx_shm_alloc(size_t sz) {
+  //return ngx_alloc(sz, ngx_cycle->log);
+  assert(ngx_process == NGX_PROCESS_HELPER);
   return shm_alloc(wfx_shm, sz, "wafflex item");
 }
 void *wfx_shm_calloc(size_t sz) {
+  //return ngx_calloc(sz, ngx_cycle->log);
+  assert(ngx_process == NGX_PROCESS_HELPER);
   return shm_calloc(wfx_shm, sz, "wafflex item");
 }
 void wfx_shm_free(void *ptr) {
+  //ngx_free(ptr);
+  assert(ngx_process == NGX_PROCESS_HELPER);
   shm_free(wfx_shm, ptr);
 }
 
@@ -177,6 +184,11 @@ ngx_int_t ngx_wafflex_init_lua(int manager) {
   return NGX_OK;
 }
 ngx_int_t ngx_wafflex_shutdown_lua(int manager) {
+  
+  wfx_lua_getfunction(wfx_Lua, "shutdown");
+  lua_pushboolean(wfx_Lua, manager);
+  lua_ngxcall(wfx_Lua, 1, 0);
+  
   lua_close(wfx_Lua);
   wfx_Lua = NULL;
   return NGX_OK;
@@ -185,6 +197,13 @@ ngx_int_t ngx_wafflex_shutdown_lua(int manager) {
 ngx_int_t ngx_wafflex_init_runtime(int manager) {
   wfx_ruleset_init_runtime(wfx_Lua, manager);
   wfx_redis_init_runtime(wfx_Lua, manager);
+  
+  if(manager) {
+    //we can create all the rulesets now
+    lua_getglobal(wfx_Lua, "createDeferredRulesets");
+    lua_ngxcall(wfx_Lua, 0, 0);
+  }
+  
   return NGX_OK;
 }
 

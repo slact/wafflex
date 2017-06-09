@@ -291,3 +291,16 @@
    fun:ngx_master_process_cycle
    fun:main
 }
+
+
+
+{
+   <shmem initial chunk can leak>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:shm_alloc
+   fun:shm_calloc
+   fun:initialize_shm
+   fun:ngx_init_cycle
+   fun:main
+}

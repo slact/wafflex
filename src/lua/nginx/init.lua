@@ -14,21 +14,25 @@ return function(package_loader, manager, init_bind_cfunc, ruleset_confset_cfunc)
     return loader
   end})
   
-  _G.Parser = require "parser"
-  _G.Ruleset = require "ruleset"
-  _G.Binding = require "binding"
+  
+  --GLOBALS
+  Parser = require "parser"
+  Ruleset = require "ruleset"
+  Binding = require "binding"
+  
   Binding.require_create_userdata = true
   Binding.require_binding = true
   
-  _G.mm = require "mm"
+  mm = require "mm"
   
   if init_bind_cfunc then
     init_bind_cfunc(Binding.set)
   end
   
   local parsed_ruleset_data = {}
+  local rulesets = {}
   
-  _G.parseRulesetFile = function(prefix, path, ruleset_name)
+  function parseRulesetFile(prefix, path, ruleset_name)
     local p = Parser.new()
     
     local fullpath
@@ -66,7 +70,7 @@ return function(package_loader, manager, init_bind_cfunc, ruleset_confset_cfunc)
     return t[k]
   end})
   
-  _G.deferRulesetCreation = function(name, conf_ref)
+  function deferRulesetCreation(name, conf_ref)
     if not parsed_ruleset_data[name] then
       return nil, ("unknown ruleset \"%s\""):format(name)
     end
@@ -74,14 +78,26 @@ return function(package_loader, manager, init_bind_cfunc, ruleset_confset_cfunc)
     return true
   end
   
-  _G.createDeferredRulesets = function()
+  function createDeferredRulesets()
     for name, def in pairs(deferred) do
       for _, ref in pairs(def) do
         local rsdata = parsed_ruleset_data[name]
         local rs = Ruleset.new(rsdata)
         ruleset_confset_cfunc(rs, ref)
+        rulesets[rs.name] = rs
       end
     end
+    deferred = setmetatable({}, getmetatable(deferred)) -- clear 'deferred' table
+  end
+  
+  function shutdown(manager)
+    if manager then
+      for name, ruleset in pairs(rulesets) do
+        print("kill a ruleset named " .. name)
+        ruleset:destroy()
+      end
+    end
+    rulesets = {}
   end
   
   function printFunctions(pattern)
