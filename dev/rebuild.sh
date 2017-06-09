@@ -222,12 +222,23 @@ if [[ -z $NO_MAKE ]]; then
   #  exit 1
   #fi
 
+  
+  if type "luacheck" > /dev/null; then
+    pushd ${_src_dir}
+    luacheck lua/ --ignore 611 212 631
+    if ! [ $? -eq 0 ]; then;
+      echo "luacheck failed"
+      exit 1
+    fi
+    popd
+  fi
+  
   #generate nginx script embeds
   _hsss_opt=("--format=whole" "--no-hashes" "--no-count" "--no-static")
   bundle exec hsss --header-only $_hsss_opt --prefix wfx_ \
     "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
   if ! [ $? -eq 0 ]; then;
-    echo "failed generating nginx lua scripts";
+    echo "failed generating nginx lua scripts"
     exit 1
   fi
 
