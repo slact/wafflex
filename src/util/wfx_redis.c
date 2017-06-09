@@ -188,6 +188,35 @@ int wfx_lua_timeout(lua_State *L) {
   return 0;
 }
 
+static int wfx_lua_hiredis_get_peername(lua_State *L) {
+  
+  redisAsyncContext     *ctx = lua_touserdata(L, 1);
+  char                  ipstr[INET6_ADDRSTRLEN+1];
+  struct sockaddr_in    *s4;
+  struct sockaddr_in6   *s6;
+  
+  // deal with both IPv4 and IPv6:
+  switch(ctx->c.sockaddr.sa_family) {
+    case AF_INET:
+      s4 = (struct sockaddr_in *)&ctx->c.sockaddr;
+      inet_ntop(AF_INET, &s4->sin_addr, ipstr, INET6_ADDRSTRLEN);
+      break;
+    case AF_INET6:
+      s6 = (struct sockaddr_in6 *)&ctx->c.sockaddr;
+      inet_ntop(AF_INET6, &s6->sin6_addr, ipstr, INET6_ADDRSTRLEN);
+      break;
+    case AF_UNSPEC:
+      DBG("sockaddr info not available");
+      return NGX_ERROR;
+    default:
+      DBG("unexpected sockaddr af family");
+      return NGX_ERROR;
+  }
+  
+  lua_pushstring(L, ipstr);
+  return 1;
+}
+
 ngx_int_t ngx_wafflex_init_redis(void) {
   redis_nginx_init();
   wfx_lua_loadscript(wfx_Lua, redis);
@@ -196,7 +225,8 @@ ngx_int_t ngx_wafflex_init_redis(void) {
   wfx_lua_register(wfx_Lua, redis_command);
   wfx_lua_register(wfx_Lua, redis_loadscripts);
   wfx_lua_register(wfx_Lua, wfx_lua_timeout);
-  lua_ngxcall(wfx_Lua, 5, 0);
+  wfx_lua_register(wfx_Lua, wfx_lua_hiredis_get_peername);
+  lua_ngxcall(wfx_Lua, 6, 0);
   return NGX_OK;
 }
 
