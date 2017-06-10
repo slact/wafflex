@@ -4,6 +4,7 @@
 #include <hiredis/hiredis.h>
 #include <hiredis/async.h>
 #include <ngx_wafflex_hiredis_adapter.h>
+#include <ngx_wafflex_redis_lua_scripts.h>
 #include <assert.h>
 
 #define LUAHIREDIS_MAXARGS (256)
@@ -14,11 +15,13 @@ int wfx_redis_add_server_conf(ngx_conf_t *cf, wfx_loc_conf_t *lcf) {
   wfx_lua_getfunction(wfx_Lua, "registerRedis");
   lua_pushngxstr(wfx_Lua, &lcf->redis.url);
   lua_ngxcall(wfx_Lua, 1, 1);
+  
   lua_tongxstr(wfx_Lua, -1, &str);
   buf = ngx_palloc(cf->pool, str.len);
   ngx_memcpy(buf, str.data, str.len);
   lcf->redis.url.len = str.len;
   lcf->redis.url.data = (u_char *)buf;
+  lua_pop(wfx_Lua, 1);
   return 1;
 }
 
@@ -45,6 +48,11 @@ int redis_connect(lua_State *L) {
 }
 
 int redis_close(lua_State *L) {
+  redisAsyncContext *ctx = lua_touserdata(L, 1);
+  if(!ctx) {
+    luaL_error(L, "expected a redisAsyncContext for redis_close, got NULL");
+  }
+  redisAsyncFree(ctx);
   return 0;
 }
 
@@ -133,31 +141,60 @@ static int push_reply(lua_State *L, redisReply *pReply) {
 static void resume_lua(redisAsyncContext *c, void *rep, void *privdata) {
   intptr_t    ref = (intptr_t )(char *)privdata;
   redisReply *reply = rep;
+  int         coroutine;
+  lua_State  *L;
   
-  lua_rawgeti(wfx_Lua, LUA_REGISTRYINDEX, ref);
-  assert(lua_type(wfx_Lua, -1) == LUA_TFUNCTION);
+  wfx_lua_pushfromref(wfx_Lua, ref);
+  if(lua_isfunction(wfx_Lua, -1)) {
+    coroutine = 0;
+    L = wfx_Lua;
+  }
+  else {
+    assert(lua_isthread(wfx_Lua, -1));
+    L = lua_tothread(wfx_Lua, -1);
+    lua_pop(L, 1);
+    coroutine = 1;
+  }
   
   if(reply == NULL) { //redis disconnected?...
-    lua_pushnil(wfx_Lua);
+    lua_pushnil(L);
     if(c->err) {
-      lua_pushstring(wfx_Lua, c->errstr);
+      lua_pushstring(L, c->errstr);
     }
     else {
-      lua_pushliteral(wfx_Lua, "got a NULL redis reply for unknown reason");
+      lua_pushliteral(L, "got a NULL redis reply for unknown reason");
     }
   }
   else if(reply->type == REDIS_REPLY_ERROR) {
-    lua_pushnil(wfx_Lua);
-    lua_pushstring(wfx_Lua, reply->str);
+    lua_pushnil(L);
+    lua_pushstring(L, reply->str);
   }
   else {
     //all ok
-    push_reply(wfx_Lua, reply);
-    lua_pushnil(wfx_Lua);
+    push_reply(L, reply);
+    lua_pushnil(L);
   }
   
-  lua_ngxcall(wfx_Lua, 2, 0);
-  luaL_unref(wfx_Lua, LUA_REGISTRYINDEX, ref);
+  //lua_printstack(wfx_Lua);
+  
+  if(coroutine) {
+    //ERR("COROSTACK");
+    //lua_printstack(L);
+    wfx_lua_resume(L, 2);
+    wfx_lua_unref(wfx_Lua, ref);
+    lua_pop(wfx_Lua, 1);
+  }
+  else {
+    lua_ngxcall(L, 2, 1);
+    if(lua_isfunction(L, -1)) {
+      lua_rawseti(L, LUA_REGISTRYINDEX, ref);
+    }
+    else {
+      wfx_lua_unref(wfx_Lua, ref);
+      lua_pop(wfx_Lua, 1);
+    }
+  }
+  //lua_printstack(wfx_Lua);
 }
 
 int redis_command(lua_State *L) {
@@ -165,28 +202,59 @@ int redis_command(lua_State *L) {
   size_t             argvlen[LUAHIREDIS_MAXARGS];
   int                nargs;
   int                ref;
-  
-  ERR("redis_command");
+  int                yield;
   
   redisAsyncContext *ctx = lua_touserdata(L, 1);
-  assert(lua_isfunction(L, 2));
+  if(lua_isfunction(L, 2)) {
+    yield = 0;
+  }
+  else {
+    assert(lua_isthread(L, 2));
+    yield = 1;
+  }
   
   nargs = load_args(L, 3, argv, argvlen);
   
-  lua_pushvalue(L, 2);
-  ref = luaL_ref(L, LUA_REGISTRYINDEX);
+  ref = wfx_lua_ref(L, 2);
   
   redisAsyncCommandArgv(ctx, resume_lua, (void *)(intptr_t )ref, nargs, argv, argvlen);
   
-  lua_pushboolean(L, 1);
-  return 1;
+  if(!yield) {
+    lua_pushboolean(L, 1);
+    return 1;
+  }
+  return lua_yield(L, 0);
 }
-int redis_loadscripts(lua_State *L) {
-  return 0;
+
+int redis_subscribe(lua_State *L) {
+  const char        *argv[LUAHIREDIS_MAXARGS];
+  size_t             argvlen[LUAHIREDIS_MAXARGS];
+  int                nargs;
+  int                ref;
+  int                yield;
+  
+  redisAsyncContext *ctx = lua_touserdata(L, 1);
+  if(lua_isfunction(L, 2)) {
+    yield = 0;
+  }
+  else {
+    assert(lua_isthread(L, 2));
+    yield = 1;
+  }
+  
+  nargs = load_args(L, 3, argv, argvlen);
+  
+  ref = wfx_lua_ref(L, 2);
+  
+  redisAsyncCommandArgv(ctx, resume_lua, (void *)(intptr_t )ref, nargs, argv, argvlen);
+  
+  if(!yield) {
+    lua_pushboolean(L, 1);
+    return 1;
+  }
+  return lua_yield(L, 0);
 }
-int wfx_lua_timeout(lua_State *L) {
-  return 0;
-}
+
 
 static int wfx_lua_hiredis_get_peername(lua_State *L) {
   
@@ -218,22 +286,47 @@ static int wfx_lua_hiredis_get_peername(lua_State *L) {
 }
 
 ngx_int_t ngx_wafflex_init_redis(void) {
+  wfx_redis_lua_script_t  *cur;
+  int                      n = 1;
   redis_nginx_init();
   wfx_lua_loadscript(wfx_Lua, redis);
   wfx_lua_register(wfx_Lua, redis_connect);
   wfx_lua_register(wfx_Lua, redis_close);
   wfx_lua_register(wfx_Lua, redis_command);
-  wfx_lua_register(wfx_Lua, redis_loadscripts);
   wfx_lua_register(wfx_Lua, wfx_lua_timeout);
   wfx_lua_register(wfx_Lua, wfx_lua_hiredis_get_peername);
+  
+  lua_createtable(wfx_Lua, wfx_redis_lua_scripts_count, 0);
+  WFX_REDIS_LUA_SCRIPTS_EACH(cur) {
+    lua_createtable(wfx_Lua, 0, 3);
+    
+    lua_pushstring(wfx_Lua, cur->name);
+    lua_setfield(wfx_Lua, -2, "name");
+    
+    lua_pushstring(wfx_Lua, cur->hash);
+    lua_setfield(wfx_Lua, -2, "hash");
+    
+    lua_pushstring(wfx_Lua, cur->script);
+    lua_setfield(wfx_Lua, -2, "src");
+    
+    lua_rawseti(wfx_Lua, -2, n++);
+  }
   lua_ngxcall(wfx_Lua, 6, 0);
+  
   return NGX_OK;
 }
 
 int wfx_redis_init_runtime(lua_State *L, int manager) {
   if (!manager) {
+    //ngx_wafflex_init_redis();
+    //lua_getglobal(L, "testRedisConnector");
+    //lua_ngxcall(L, 0, 0);
     return 0;
   }
+  
+  //lua_getglobal(L, "testRedisConnector");
+  //lua_ngxcall(L, 0, 0);
+  
   lua_getglobal(L, "connectRedises");
   lua_ngxcall(L, 0, 0);
   return 1;
