@@ -292,6 +292,7 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
         return errbuf;
       }
       else {
+        lua_pop(wfx_Lua, 2);
         lua_getglobal(wfx_Lua, "deferRulesetRedisLoad");
         lua_pushlstring(wfx_Lua, (const char *)name[i].data, name[i].len);
         lua_pushlightuserdata(wfx_Lua, lcf);
