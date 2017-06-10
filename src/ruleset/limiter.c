@@ -109,14 +109,11 @@ static int limiter_delete(lua_State *L) {
     return 0;
   }
   
-  luaL_unref(L, LUA_REGISTRYINDEX, limiter->luaref);
-  limiter->luaref = LUA_NOREF;
-  
   reaper_stop(limiter->values);
   ngx_free(limiter->values);
   limiter->values = NULL;
   
-  ruleset_common_shm_free(limiter);
+  ruleset_common_shm_free(L, limiter);
   return 0;
 }
 

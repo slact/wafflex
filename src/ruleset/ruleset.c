@@ -69,9 +69,7 @@ static int ruleset_delete(lua_State *L) {
     return 0;
   }
   
-  luaL_unref(L, LUA_REGISTRYINDEX, ruleset->luaref);
-  ruleset->luaref = LUA_NOREF;
-  ruleset_common_shm_free(ruleset);
+  ruleset_common_shm_free(L, ruleset);
   return 0;
 }
 
@@ -110,7 +108,7 @@ void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz,
   void       *ptr;
   int        *refptr;
   
-  tmpref = wfx_lua_getref(L, 1);
+  tmpref = wfx_lua_ref(L, 1);
   
   if((ptr = wfx_shm_calloc(item_sz + data_sz)) != NULL) {
     refptr = (int *)((char *)ptr + luaref_offset);
@@ -130,8 +128,7 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t
   char      **strptr;
   int        *refptr;
   
-  lua_pushvalue(L, 1); //lua-self
-  tmpref = luaL_ref(L, LUA_REGISTRYINDEX);
+  tmpref = wfx_lua_ref(L, 1);
   
   lua_pushvalue(L, 1); //lua-self
   lua_getfield(L, -1, str_key);
@@ -150,7 +147,7 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t
   return ptr;
 }
 
-void ruleset_common_shm_free(void *ptr) {
+void __ruleset_common_shm_free(void *ptr) {
   wfx_shm_free(ptr);
 }
 

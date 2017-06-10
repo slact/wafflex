@@ -30,7 +30,7 @@ static int ngx_lua_sec_cached_time(lua_State *L) {
 }
   
 static void tracer_lua_call(lua_State *L, wfx_tracer_t *t, const char *func, int nargs, int nresp) {
-  wfx_lua_fromref(L, t->luaref);
+  wfx_lua_pushfromref(L, t->luaref);
   lua_getfield(L, -1, func);
   
   lua_insert(L, -(nargs + 2));
@@ -284,7 +284,7 @@ void tracer_init(wfx_evaldata_t *ed) {
         break;
     }
     lua_ngxcall(wfx_Lua, 2, 1);
-    t->luaref = wfx_lua_getref(wfx_Lua, -1);
+    t->luaref = wfx_lua_ref(wfx_Lua, -1);
   }
 }
 void tracer_finish(wfx_evaldata_t *ed) {

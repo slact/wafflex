@@ -60,7 +60,7 @@ static int string_create(lua_State *L) {
 
 static int string_destroy(lua_State *L) {
   wfx_str_t *wstr = lua_touserdata(L, 1);
-  ruleset_common_shm_free(wstr);
+  ruleset_common_shm_free(L, wstr);
   return 0;
 }
 

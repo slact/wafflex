@@ -7,14 +7,7 @@ static wfx_action_type_t action_types[];
 
 int action_simple_destroy(lua_State *L) {
   wfx_action_t *action = lua_touserdata(L, 1);
-  if (!action) {
-    lua_printstack(L);
-    luaL_error(L, "expected action __binding to be some value, bit got NULL");
-    return 0;
-  }
-  luaL_unref(L, LUA_REGISTRYINDEX, action->luaref);
-  action->luaref = LUA_NOREF;
-  ruleset_common_shm_free(action);
+  ruleset_common_shm_free(L, action);
   return 0;
 }
 

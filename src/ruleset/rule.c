@@ -133,9 +133,7 @@ static int rule_delete(lua_State *L) {
     return 0;
   }
   
-  luaL_unref(L, LUA_REGISTRYINDEX, rule->luaref);
-  rule->luaref = LUA_NOREF;
-  ruleset_common_shm_free(rule);
+  ruleset_common_shm_free(L, rule);
   return 0;
 }
 

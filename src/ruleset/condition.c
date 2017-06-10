@@ -10,15 +10,7 @@ static wfx_condition_type_t condition_types[];
 
 int condition_simple_destroy(lua_State *L) {
   wfx_condition_t *cond = lua_touserdata(L, 1);
-  if (!cond) {
-    lua_printstack(L);
-    luaL_error(L, "expected condition __binding to be some value, bit got NULL");
-    return 0;
-  }
-  
-  luaL_unref(L, LUA_REGISTRYINDEX, cond->luaref);
-  cond->luaref = LUA_NOREF;
-  ruleset_common_shm_free(cond);
+  ruleset_common_shm_free(L, cond);
   return 0;
 }
 

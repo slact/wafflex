@@ -72,7 +72,7 @@ static int list_create(lua_State *L) {
 
 static int list_delete(lua_State *L) {
   wfx_rule_list_t     *list = lua_touserdata(L, 1);
-  ruleset_common_shm_free(list);
+  ruleset_common_shm_free(L, list);
   return 0;
 }
 

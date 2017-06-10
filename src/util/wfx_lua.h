@@ -18,8 +18,9 @@
 //generic lua helpers
 size_t wfx_lua_tablesize(lua_State *L, int index);
 void lua_ngxcall(lua_State *L, int nargs, int nresults);
-int wfx_lua_getref(lua_State *L, int index);
-int wfx_lua_fromref(lua_State *L, int ref);
+int wfx_lua_ref(lua_State *L, int index);
+void wfx_lua_unref(lua_State *L, int index);
+int wfx_lua_pushfromref(lua_State *L, int ref);
 size_t wfx_lua_len(lua_State *L, int index);
 int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *name, const char *fmt);
 void lua_pushngxstr(lua_State *L, ngx_str_t *str);

@@ -52,12 +52,15 @@ void lua_ngxcall(lua_State *L, int nargs, int nresults) {
 }
 
 
-int wfx_lua_getref(lua_State *L, int index) {
+int wfx_lua_ref(lua_State *L, int index) {
   lua_pushvalue(L, index);
   return luaL_ref(L, LUA_REGISTRYINDEX);
 }
-int wfx_lua_fromref(lua_State *L, int ref) {
+int wfx_lua_pushfromref(lua_State *L, int ref) {
   return lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
+}
+void wfx_lua_unref(lua_State *L, int index) {
+  luaL_unref(L, LUA_REGISTRYINDEX, index);
 }
 
 int wfx_lua_getfunction(lua_State *L, const char *name) {
