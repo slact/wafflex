@@ -42,6 +42,8 @@ typedef struct {
   // and key ordering callbacks by slact
   wfx_module_lua_script_t dkjson;
 
+  wfx_module_lua_script_t inspect;
+
   wfx_module_lua_script_t mm;
 
   wfx_module_lua_script_t parser;
