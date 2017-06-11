@@ -38,10 +38,10 @@ typedef struct {
   wfx_module_lua_script_t binding;
 
   //David Kolf's JSON module for Lua 5.1/5.2
-  //small hack to generate object and array metatables by slact
+  // small hack to generate object and array metatables, 
+  // and key ordering callbacks by slact
   wfx_module_lua_script_t dkjson;
 
-  //mm, a pretty printer
   wfx_module_lua_script_t mm;
 
   wfx_module_lua_script_t parser;

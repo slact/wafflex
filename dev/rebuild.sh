@@ -225,11 +225,11 @@ if [[ -z $NO_MAKE ]]; then
   
   _sha1_lua_scripts=`sha1sum ./smush_redis_scripts.rb "${_src_dir}"/lua/**/*.lua | sha1sum`
   if [[ $(cat .lua_rebuild_hash) != $_sha1_lua_scripts ]]; then
-    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/_parser_main.lua ${_src_dir}/lua/nginx/modules/{dkjson,parser}.lua > ${_src_dir}/lua/redis/parser.lua
+    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/_parser_main.lua ${_src_dir}/lua/nginx/modules/{dkjson,parser,rule,ruleset}.lua > ${_src_dir}/lua/redis/parser.lua
     
     if type "luacheck" > /dev/null; then
       pushd ${_src_dir}
-      luacheck lua/ --ignore 611 212 631
+      luacheck lua/ --ignore 611 212 631 --exclude-files "**/mm.lua" "**/dkjson.lua"
       if ! [ $? -eq 0 ]; then;
         echo "luacheck failed"
         exit 1

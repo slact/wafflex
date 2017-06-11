@@ -1,5 +1,6 @@
 --David Kolf's JSON module for Lua 5.1/5.2
---small hack to generate object and array metatables by slact
+-- small hack to generate object and array metatables, 
+-- and key ordering callbacks by slact
 
 local always_try_using_lpeg = false
 local register_global_module_table = false
