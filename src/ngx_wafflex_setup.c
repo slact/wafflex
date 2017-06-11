@@ -317,13 +317,18 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
 
 static char *ngx_conf_set_redis_url(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   wfx_loc_conf_t  *lcf = conf;
+  char *rc;
   
   if(lcf->redis.upstream) {
     return "can't be set here: already using nchan_redis_pass";
   }
   lcf->redis.url_enabled = 1;
   lcf->redis.enabled = 1;
-  return ngx_conf_set_str_slot(cf, cmd, conf);
+  rc = ngx_conf_set_str_slot(cf, cmd, conf);
+  if(rc == NGX_CONF_OK) {
+    wfx_redis_add_server_conf(cf, conf);
+  }
+  return rc;
 }
 
 //ugly as sin but i don't carrot all

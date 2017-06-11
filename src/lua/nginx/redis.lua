@@ -1,5 +1,5 @@
-local mm = require "mm"
 local Redis = require "redis"
+--local mm = require "mm"
 
 --luacheck: globals registerRedis connectRedises testRedisConnector
 
@@ -32,7 +32,6 @@ end
 local redises = {}
   
 function registerRedis(url)
-  mm(url)
   local exists = redises[url]
   if exists then return exists end
   

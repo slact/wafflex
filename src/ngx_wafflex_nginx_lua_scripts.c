@@ -245,8 +245,8 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "\n"},
 
   {"redis", 
-   "local mm = require \"mm\"\n"
    "local Redis = require \"redis\"\n"
+   "--local mm = require \"mm\"\n"
    "\n"
    "--luacheck: globals registerRedis connectRedises testRedisConnector\n"
    "\n"
@@ -279,7 +279,6 @@ wfx_lua_scripts_t wfx_lua_scripts = {
    "local redises = {}\n"
    "  \n"
    "function registerRedis(url)\n"
-   "  mm(url)\n"
    "  local exists = redises[url]\n"
    "  if exists then return exists end\n"
    "  \n"
