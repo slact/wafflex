@@ -7,7 +7,7 @@ local rmeta = {__index = Redis}
 local scripts = {}
 local script_hash = {}
 
-local table_rip = function(tbl)
+--[[local table_rip = function(tbl)
   local keys = {}
   local vals = {}
   for k, v in pairs(tbl) do
@@ -16,6 +16,7 @@ local table_rip = function(tbl)
   end
   return keys, vals
 end
+]]
 
 local function current_coroutine()
   local co, main = coroutine.running()
@@ -101,14 +102,15 @@ function Redis:connect()
       self.sub_ctx = nil
     end
     
-    module.c.log_error("error", ("Failed to connect to Redis server: %s. Retry in 5 sec."):format(msg or "unknown error"))
+    local my_url = ("redis://%s:%i%s"):format(self.connection_params.host, self.connection_params.port, self.connection_params.db and "/" .. self.connection_params.db or "")
+    
+    module.c.log_error("error", ("Failed to connect to %s: %s. Retry in 5 sec."):format(my_url, msg or "unknown error"))
     
     module.c.timeout(5000, coroutine.wrap(function()
       self:connect()
     end))
     return nil
   end
-  
   
   local function get_info(info, what)
     local m = "^"..what..":(.*)"
@@ -153,26 +155,19 @@ function Redis:connect()
     end
     
     --load scripts
-    local check_script_names, check_script_hashes = table_rip(script_hash)
-    local script_existence
-    if #check_script_names > 0 then
-    
-      script_existence, err = raw_redis_command(self.ctx, "SCRIPT", "EXISTS", table.unpack(check_script_hashes))
-      if not script_existence then return fail(err) end
-      
-      for i, name in ipairs(check_script_names) do
-        if script_existence[i] == 0 then --script does not exist
-          local hash = script_hash[name]
-          
-          res, err = raw_redis_command(self.ctx, "SCRIPT", "LOAD", scripts[name])
-          if not res then return fail(("error in script %s\n%s"):format(name, err)) end
-          if hash ~= res then return fail("loaded script hash doesn't match") end
-          
-        end
+    for name, hash, src in module.eachScript() do
+      res, err = raw_redis_command(self.ctx, "SCRIPT", "EXISTS", hash)
+      if res and res[1]~=1 then
+        res, err = raw_redis_command(self.ctx, "SCRIPT", "LOAD", src)
+        if not res then return fail(("error in script %s\n%s"):format(name, err)) end
+        if hash ~= res then return fail("loaded script hash doesn't match") end
+        
+        raw_redis_command(self.ctx, "HSET", "wafflex:scripts", name, hash)
+      elseif not res then
+        return fail(err)
       end
-      
-      --loaded the scripts. I think that's everything...
     end
+    --loaded the scripts. I think that's everything...
     
     self:setStatus("ready")
     --luacheck: pop
@@ -327,6 +322,16 @@ function module.addScript(name, hash, src)
   assert(scripts[name] == nil, ("redis lua script \"%s\" already exists"):format(name))
   script_hash[name]=hash
   scripts[name]=src
+end
+
+function module.eachScript()
+  local name, hash
+  return function()
+    name, hash = next(script_hash, name)
+    if name then
+      return name, hash, scripts[name]
+    end
+  end
 end
 
 for _,v in pairs {"redis_connect", "redis_close", "redis_command", "loadscripts", "timeout", "log_error"} do
