@@ -232,6 +232,47 @@ int wfx_lua_timeout(lua_State *L) {
   }
 }
 
+int wfx_lua_ngx_log_error(lua_State *L) {
+  const char  *lvl, *err;
+  int          nargs;
+  ngx_uint_t   errlvl;
+  
+  nargs = lua_gettop(L);
+  if(nargs != 2) {
+    return luaL_error(L, "expected 2 string arguments to wfx_lua_ngx_log_error, got %i", nargs);
+  }
+  
+  lvl = lua_tostring(L, 1);
+  err = lua_tostring(L, 2);
+  if(strcmp(lvl, "emerg") == 0)
+    errlvl = NGX_LOG_EMERG;
+  else if(strcmp(lvl, "alert") == 0)
+    errlvl = NGX_LOG_ALERT;
+  else if(strcmp(lvl, "crit") == 0)
+    errlvl = NGX_LOG_CRIT;
+  else if(strcmp(lvl, "error") == 0)
+    errlvl = NGX_LOG_ERR;
+  else if(strcmp(lvl, "warn") == 0)
+    errlvl = NGX_LOG_WARN;
+  else if(strcmp(lvl, "notice") == 0)
+    errlvl = NGX_LOG_NOTICE;
+  else if(strcmp(lvl, "info") == 0)
+    errlvl = NGX_LOG_INFO;
+  else if(strcmp(lvl, "debug") == 0)
+    errlvl = NGX_LOG_DEBUG;
+  else {
+    return luaL_error(L, "invalid log error level \"%s\"", lvl ? lvl : "NULL");
+  }
+  
+  if(!err) {
+    return luaL_error(L, "invalid error message");
+  }
+  
+  LOG(errlvl, "%s", err);
+  
+  return 0;
+}
+
 //wafflex stuff
 
 void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding) {

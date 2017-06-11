@@ -92,7 +92,6 @@ function Redis:connect()
   
   local function fail(msg)
     self:setStatus("disconnected")
-    print("error: " .. tostring(msg))
     if self.ctx then
       module.c.redis_close(self.ctx)
       self.ctx = nil
@@ -101,8 +100,13 @@ function Redis:connect()
       module.c.redis_close(self.sub_ctx)
       self.sub_ctx = nil
     end
-    --TODO: retry
-    error("how do i retry this?")
+    
+    module.c.log_error("error", ("Failed to connect to Redis server: %s. Retry in 5 sec."):format(msg or "unknown error"))
+    
+    module.c.timeout(5000, coroutine.wrap(function()
+      self:connect()
+    end))
+    return nil
   end
   
   
@@ -325,7 +329,7 @@ function module.addScript(name, hash, src)
   scripts[name]=src
 end
 
-for _,v in pairs {"redis_connect", "redis_close", "redis_command", "loadscripts", "timeout"} do
+for _,v in pairs {"redis_connect", "redis_close", "redis_command", "loadscripts", "timeout", "log_error"} do
   module.c[v]=function()
     error("c binding " .. v .. " not set")
   end

@@ -204,6 +204,8 @@ int redis_command(lua_State *L) {
   int                ref;
   int                yield;
   
+  //lua_printstack(L);
+  
   redisAsyncContext *ctx = lua_touserdata(L, 1);
   if(lua_isfunction(L, 2)) {
     yield = 0;
@@ -293,8 +295,9 @@ ngx_int_t ngx_wafflex_init_redis(void) {
   wfx_lua_register(wfx_Lua, redis_connect);
   wfx_lua_register(wfx_Lua, redis_close);
   wfx_lua_register(wfx_Lua, redis_command);
-  wfx_lua_register(wfx_Lua, wfx_lua_timeout);
   wfx_lua_register(wfx_Lua, wfx_lua_hiredis_get_peername);
+  wfx_lua_register(wfx_Lua, wfx_lua_timeout);
+  wfx_lua_register(wfx_Lua, wfx_lua_ngx_log_error);
   
   lua_createtable(wfx_Lua, wfx_redis_lua_scripts_count, 0);
   WFX_REDIS_LUA_SCRIPTS_EACH(cur) {
@@ -311,7 +314,7 @@ ngx_int_t ngx_wafflex_init_redis(void) {
     
     lua_rawseti(wfx_Lua, -2, n++);
   }
-  lua_ngxcall(wfx_Lua, 6, 0);
+  lua_ngxcall(wfx_Lua, 7, 0);
   
   return NGX_OK;
 }

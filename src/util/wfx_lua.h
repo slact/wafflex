@@ -30,6 +30,8 @@ int wfx_lua_resume(lua_State *thread, int nargs);
 
 int wfx_lua_timeout(lua_State *L);
 
+int wfx_lua_ngx_log_error(lua_State *L);
+
 int wfx_lua_getfunction(lua_State *L, const char *name);
 
 //wafflex-specific lua stuff

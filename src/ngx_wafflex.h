@@ -27,7 +27,9 @@
 #else
 #define DBG(fmt, args...) 
 #endif
+  
 #define ERR(fmt, args...) ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "wafflex:" fmt, ##args)
+#define LOG(lvl, fmt, args...) ngx_log_error(lvl, ngx_cycle->log, 0, "wafflex:" fmt, ##args)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ({                      \

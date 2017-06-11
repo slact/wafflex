@@ -75,7 +75,7 @@ function testRedisConnector()
   end)()
 end
 
-return function(redis_connect, redis_close, redis_command, timeout, get_hiredis_asyncContext_peername, scripts)
+return function(redis_connect, redis_close, redis_command, get_hiredis_asyncContext_peername, timeout, log_error, scripts)
   assert(type(redis_connect) == "function")
   assert(type(redis_command) == "function")
   assert(type(timeout) == "function")
@@ -84,6 +84,7 @@ return function(redis_connect, redis_close, redis_command, timeout, get_hiredis_
   Redis.c.redis_command = redis_command
   Redis.c.timeout = timeout
   Redis.c.get_hiredis_asyncContext_peername = get_hiredis_asyncContext_peername
+  Redis.c.log_error = log_error
   for _, script in ipairs(scripts) do
     Redis.addScript(script.name, script.hash, script.src)
   end
