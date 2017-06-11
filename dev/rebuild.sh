@@ -221,52 +221,61 @@ if [[ -z $NO_MAKE ]]; then
   #  echo "failed generating documentation"; 
   #  exit 1
   #fi
-
   
-  if type "luacheck" > /dev/null; then
-    pushd ${_src_dir}
-    luacheck lua/ --ignore 611 212 631
+  
+  _sha1_lua_scripts=`sha1sum ./smush_redis_scripts.rb "${_src_dir}"/lua/**/*.lua | sha1sum`
+  if [[ $(cat .lua_rebuild_hash) != $_sha1_lua_scripts ]]; then
+    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/_parser_main.lua ${_src_dir}/lua/nginx/modules/{dkjson,parser}.lua > ${_src_dir}/lua/redis/parser.lua
+    
+    if type "luacheck" > /dev/null; then
+      pushd ${_src_dir}
+      luacheck lua/ --ignore 611 212 631
+      if ! [ $? -eq 0 ]; then;
+        echo "luacheck failed"
+        exit 1
+      fi
+      popd
+    fi
+    
+    #generate nginx script embeds
+    _hsss_opt=("--format=whole" "--no-hashes" "--no-count" "--no-static")
+    bundle exec hsss --header-only $_hsss_opt --prefix wfx_ \
+      "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
     if ! [ $? -eq 0 ]; then;
-      echo "luacheck failed"
+      echo "failed generating nginx lua scripts"
       exit 1
     fi
-    popd
-  fi
-  
-  #generate nginx script embeds
-  _hsss_opt=("--format=whole" "--no-hashes" "--no-count" "--no-static")
-  bundle exec hsss --header-only $_hsss_opt --prefix wfx_ \
-    "${_src_dir}"/lua/nginx/*.lua > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
-  if ! [ $? -eq 0 ]; then;
-    echo "failed generating nginx lua scripts"
-    exit 1
-  fi
-
-  echo "#include <ngx_wafflex_nginx_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
-  bundle exec hsss --data-only $_hsss_opt --prefix wfx_ \
-    "${_src_dir}"/lua/nginx/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
-  
-  bundle exec hsss --header-only $_hsss_opt --prefix wfx_module_ \
-    "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
-  if ! [ $? -eq 0 ]; then;
-    echo "failed generating nginx lua module scripts";
-    exit 1
-  fi
-  bundle exec hsss --data-only $_hsss_opt --prefix wfx_module_ \
-    "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
-
     
-  #generate lua scripts for redis
-  _hsss_opt=("--format=whole" "--no-static")
-  bundle exec hsss --header-only $_hsss_opt --prefix wfx_redis_ \
-    "${_src_dir}"/lua/redis/*.lua > "${_src_dir}/ngx_wafflex_redis_lua_scripts.h"
-  if ! [ $? -eq 0 ]; then;
-    echo "failed generating redis lua scripts";
-    exit 1
+    echo "#include <ngx_wafflex_nginx_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+    bundle exec hsss --data-only $_hsss_opt --prefix wfx_ \
+      "${_src_dir}"/lua/nginx/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+    
+    bundle exec hsss --header-only $_hsss_opt --prefix wfx_module_ \
+      "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
+    if ! [ $? -eq 0 ]; then;
+      echo "failed generating nginx lua module scripts";
+      exit 1
+    fi
+    bundle exec hsss --data-only $_hsss_opt --prefix wfx_module_ \
+      "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+      
+
+    #generate lua scripts for redis
+    _hsss_opt=("--format=whole" "--no-static")
+    bundle exec hsss --header-only $_hsss_opt --prefix wfx_redis_ \
+      "${_src_dir}"/lua/redis/*.lua > "${_src_dir}/ngx_wafflex_redis_lua_scripts.h"
+    if ! [ $? -eq 0 ]; then;
+      echo "failed generating redis lua scripts";
+      exit 1
+    fi
+    echo "#include <ngx_wafflex_redis_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
+    bundle exec hsss --data-only $_hsss_opt --prefix wfx_redis_ \
+      "${_src_dir}"/lua/redis/*.lua >> "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
+  
+    echo $_sha1_lua_scripts > .lua_rebuild_hash
+  else
+    echo "Lua cripts haven't changed, don't need to regenerate."
   fi
-  echo "#include <ngx_wafflex_redis_lua_scripts.h>\n" > "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
-  bundle exec hsss --data-only $_hsss_opt --prefix wfx_redis_ \
-    "${_src_dir}"/lua/redis/*.lua >> "${_src_dir}/ngx_wafflex_redis_lua_scripts.c"
   
   pushd $pkg_path >/dev/null
   
