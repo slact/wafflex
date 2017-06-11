@@ -1,4 +1,4 @@
-local Binding = require "binding"
+local Binding = require "binding" or {call=function()end}
 --local mm = require "mm"
 
 local function ignore_leading_hash(str)

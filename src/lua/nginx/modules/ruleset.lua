@@ -1,5 +1,5 @@
 local Rule = require "rule"
-local Binding = require "binding"
+local Binding = require "binding" or {call=function()end}
 local json = require "dkjson"
 
 local tcopy = function(tbl)

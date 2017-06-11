@@ -2046,7 +2046,9 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "      self.sub_ctx = nil\n"
    "    end\n"
    "    \n"
-   "    module.c.log_error(\"error\", (\"Failed to connect to Redis server: %s. Retry in 5 sec.\"):format(msg or \"unknown error\"))\n"
+   "    local my_url = (\"redis://%s:%i%s\"):format(self.connection_params.host, self.connection_params.port, self.connection_params.db and \"/\" .. self.connection_params.db or \"\")\n"
+   "    \n"
+   "    module.c.log_error(\"error\", (\"Failed to connect to %s: %s. Retry in 5 sec.\"):format(my_url, msg or \"unknown error\"))\n"
    "    \n"
    "    module.c.timeout(5000, coroutine.wrap(function()\n"
    "      self:connect()\n"
@@ -2283,7 +2285,7 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "return module\n"},
 
   {"rule", 
-   "local Binding = require \"binding\"\n"
+   "local Binding = require \"binding\" or {call=function()end}\n"
    "--local mm = require \"mm\"\n"
    "\n"
    "local function ignore_leading_hash(str)\n"
@@ -2588,7 +2590,7 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
 
   {"ruleset", 
    "local Rule = require \"rule\"\n"
-   "local Binding = require \"binding\"\n"
+   "local Binding = require \"binding\" or {call=function()end}\n"
    "local json = require \"dkjson\"\n"
    "\n"
    "local tcopy = function(tbl)\n"
