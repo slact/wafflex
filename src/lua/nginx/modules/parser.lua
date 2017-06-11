@@ -1,6 +1,6 @@
---local mm = require "mm"
 local Rule = require "rule"
 local json = require "dkjson"
+--local mm = require "mm"
 
 local function parseRulesetThing(parser, data_in, opt)
   local data = data_in[opt.key]
