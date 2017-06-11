@@ -2110,9 +2110,9 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "end\n"},
 
   {"parser", 
-   "local mm = require \"mm\"\n"
    "local Rule = require \"rule\"\n"
    "local json = require \"dkjson\"\n"
+   "--local mm = require \"mm\"\n"
    "\n"
    "local function parseRulesetThing(parser, data_in, opt)\n"
    "  local data = data_in[opt.key]\n"
@@ -2321,7 +2321,6 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "  for sub in str:gmatch(\"%${?[%w_]*}?\") do\n"
    "    if sub:sub(2,2) == \"{\" then\n"
    "      if sub:sub(-1) ~=\"}\" then --unterminated bracket\n"
-   "        mm(sub)\n"
    "        self:error(\"missing '}' in interpolated string\")\n"
    "      end\n"
    "      sub=sub:sub(3, -2)\n"
@@ -2383,9 +2382,6 @@ wfx_module_lua_scripts_t wfx_module_lua_scripts = {
    "  local function move_dbg_data(tbl)\n"
    "    local meta = getmetatable(tbl)\n"
    "    if meta and meta.__jsonmeta then\n"
-   "      if not meta.__line then\n"
-   "        mm(tbl)\n"
-   "      end\n"
    "      setmetatable(tbl, {line=meta.__line, col=meta.__column})\n"
    "    end\n"
    "    for _, v in pairs(tbl) do\n"

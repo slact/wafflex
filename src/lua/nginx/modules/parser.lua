@@ -1,4 +1,4 @@
-local mm = require "mm"
+--local mm = require "mm"
 local Rule = require "rule"
 local json = require "dkjson"
 
@@ -209,7 +209,6 @@ function Parser:parseInterpolatedString(str)
   for sub in str:gmatch("%${?[%w_]*}?") do
     if sub:sub(2,2) == "{" then
       if sub:sub(-1) ~="}" then --unterminated bracket
-        mm(sub)
         self:error("missing '}' in interpolated string")
       end
       sub=sub:sub(3, -2)
@@ -271,9 +270,6 @@ function Parser:parseRuleSet(data, name)
   local function move_dbg_data(tbl)
     local meta = getmetatable(tbl)
     if meta and meta.__jsonmeta then
-      if not meta.__line then
-        mm(tbl)
-      end
       setmetatable(tbl, {line=meta.__line, col=meta.__column})
     end
     for _, v in pairs(tbl) do
