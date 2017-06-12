@@ -1,5 +1,5 @@
 local Binding = require "binding" or {call=function()end}
---local mm = require "mm"
+local mm = require "mm"
 
 local function ignore_leading_hash(str)
   return str:sub(1,1)=="#" and str:sub(2) or str
@@ -31,10 +31,10 @@ local function create_thing_storage(thing_name)
     return name, val
   end
   
-  function self.add(name, funcs, meta)
+  function self.add(name, funcs)
     if type(name) == "table" then
       for _,v in pairs(name) do
-        self.add(v, funcs, meta)
+        self.add(v, funcs)
       end
       return true
     end
@@ -43,11 +43,12 @@ local function create_thing_storage(thing_name)
     local added = {
       parse=funcs.parse,
       init=funcs.init,
-      delete=funcs.delete
+      delete=funcs.delete,
+      meta = {
+        __jsonval = funcs.jsonval,
+        __jsonorder = funcs.jsonorder or {"action", "condition"}
+      }
     }
-    if meta then
-      added.meta=meta
-    end
     self.table[name]=added
     
     return true
@@ -87,13 +88,13 @@ local function create_thing_storage(thing_name)
   return self
 end
 
-local Rule = {
+local Component = {
   condition = create_thing_storage("condition"),
   action = create_thing_storage("action")
 }
 
 --now let's add some basic conditions and actions
-Rule.condition.add("any", {
+Component.condition.add("any", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "array", "\"any\" condition value must be an array of conditions")
     for i, v in ipairs(data) do
@@ -103,19 +104,20 @@ Rule.condition.add("any", {
   end,
   init = function(data, thing, ruleset)
     for i, v in ipairs(data) do
-      data[i] = Rule.condition.new(v, ruleset)
+      data[i] = Component.condition.new(v, ruleset)
     end
   end,
   delete = function(data, ruleset)
     for _, cond in ipairs(data) do
-      Rule.condition.delete(cond, ruleset)
+      Component.condition.delete(cond, ruleset)
     end
+  end,
+  jsonval = function(self)
+    return {any=self.data}
   end
-}, {__jsonval = function(self)
-  return {any=self.data}
-end})
+})
 
-Rule.condition.add("all", {
+Component.condition.add("all", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "array", "\"all\" condition value must be an array of conditions")
     for i, v in ipairs(data) do
@@ -125,23 +127,29 @@ Rule.condition.add("all", {
   end,
   init = function(data, ruleset)
     for i, v in ipairs(data) do
-      data[i] = Rule.condition.new(v, ruleset)
+      data[i] = Component.condition.new(v, ruleset)
     end
   end,
   delete = function(data, ruleset)
     for _, cond in ipairs(data) do
-      Rule.condition.delete(cond, ruleset)
+      Component.condition.delete(cond, ruleset)
     end
+  end,
+  jsonval = function(self)
+    return {all=self.data}
   end
-}, {__jsonval = function(self)
-  return {all=self.data}
-end})
+})
 
-Rule.condition.add({"true", "false"}, {parse = function(data, parser)
+Component.condition.add({"true", "false"}, {
+  parse = function(data, parser)
   --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
-end}, {__jsonval=function(self) return self.condition end})
+  end,
+  jsonval = function(self) 
+    return self.condition 
+  end
+})
 
-Rule.condition.add("tag-check", {
+Component.condition.add("tag-check", {
   parse = function(data, parser)
     parser:assert_type(data, "string", "\"tag-check\" value must be a string")
     return parser:parseInterpolatedString(data)
@@ -151,13 +159,13 @@ Rule.condition.add("tag-check", {
   end,
   delete = function(data)
     Binding.call("string", "delete", data)
-  end
-},{__jsonval=function(self)
+  end,
+  jsonval=function(self)
     return {["tag-check"]=self.data.string}
   end
 })
 
-Rule.condition.add("match", {
+Component.condition.add("match", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
     for i, v in ipairs(data) do
@@ -185,9 +193,8 @@ Rule.condition.add("match", {
     for _, str in ipairs(data) do
       Binding.call("string", "delete", str)
     end
-  end
-}, {
-  __jsonval=function(self)
+  end,
+  jsonval = function(self)
     local strings = {}
     for _, str in ipairs(self.data) do
       table.insert(strings, str.string)
@@ -199,7 +206,7 @@ Rule.condition.add("match", {
 local limit_thing_meta = {__jsonorder={"name", "key", "increment"}}
 
 --limiter conditions
-Rule.condition.add({"limit-break", "limit-check"}, {
+Component.condition.add({"limit-break", "limit-check"}, {
   parse = function(data, parser)
     if type(data) == "string" then
       data = {name=data}
@@ -229,10 +236,14 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     
     parser:assert(data.name, "name missing")
     parser:assert_type(data.name, "string", "invalid \"name\" type")
+    
+    mm(data)
+    
     return data
   end,
   init = function(data, thing, ruleset)
-    local limiter = assert(ruleset:findLimiter(data.name), "unknown limiter")
+    local limiter = ruleset:findLimiter(data.name)
+    if not limiter then error("unknown limiter " .. data.name) end
     data.name = nil
     data.limiter = limiter
     if data.key then
@@ -243,33 +254,34 @@ Rule.condition.add({"limit-break", "limit-check"}, {
     if data.key then
       Binding.call("string", "delete", data.key)
     end
+  end,
+  jsonval = function(self)
+    local cpy = {}
+    for k,v in pairs(self.data) do
+      cpy[k]=v
+    end
+    if cpy.derived_key then
+      cpy.derived_key = nil
+      cpy.key = nil
+    elseif cpy.key then
+      cpy.key = cpy.key.string
+    end
+    cpy.name = cpy.limiter.name
+    cpy.limiter = nil
+    setmetatable(cpy, limit_thing_meta)
+    local ret = {[self.condition]=cpy}
+    return ret
   end
-}, {__jsonval=function(self)
-  local cpy = {}
-  for k,v in pairs(self.data) do
-    cpy[k]=v
-  end
-  if cpy.derived_key then
-    cpy.derived_key = nil
-    cpy.key = nil
-  elseif cpy.key then
-    cpy.key = cpy.key.string
-  end
-  cpy.name = cpy.limiter.name
-  cpy.limiter = nil
-  setmetatable(cpy, limit_thing_meta)
-  local ret = {[self.condition]=cpy}
-  return ret
-end})
+})
 
-Rule.condition.add(".delay", {
+Component.condition.add(".delay", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "number", "delay by <number> please")
   end
 })
 
 --some actions, too
-Rule.action.add("tag", {
+Component.action.add("tag", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "string", "\"tag\" value must be a string")
     return parser:parseInterpolatedString(data)
@@ -279,24 +291,25 @@ Rule.action.add("tag", {
   end,
   delete = function(data)
     Binding.call("string", "delete", data)
+  end,
+  jsonval = function(self)
+    return {tag=self.data.string}
   end
-}, {__jsonval = function(self)
-  return {tag=self.data.string}
-end})
+})
 
-Rule.action.add("accept", {parse = function(data, parser)
+Component.action.add("accept", {parse = function(data, parser)
   parser:assert_type(data, "table", "\"accept\" value must be an object")
   parser:assert_table_size(data, 0, "\"accept\" value must be empty")
 end})
-Rule.action.add("reject", {parse = function(data, parser)
+Component.action.add("reject", {parse = function(data, parser)
   parser:assert_type(data, "table", "\"reject\" value must be an object")
   --parser:assert_table_size(data, 0, "\"reject\" value must be empty")
 end})
 
-Rule.action.add("wait", {
+Component.action.add("wait", {
   parse = function(data, parser)
     parser:assert_jsontype(data, "number", "\"wait\" value must be a number")
   end
 })
 
-return Rule
+return Component

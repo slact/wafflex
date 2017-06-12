@@ -23,7 +23,7 @@
       {
         "if": {"match": ["$foo", "$bar", "$baz$foobar", "phno", "$thing"]},
         "then": {"tag":"match_success"},
-        "else": {"tag":"match_fail"}
+        "else": [ {"tag":"match_fail"}, {"tag":"bananas"} ]
       },
       {
         "info": "This rule rate-limits by ip",

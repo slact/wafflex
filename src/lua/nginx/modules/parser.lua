@@ -1,4 +1,4 @@
-local Rule = require "rule"
+local RuleComponent = require "rulecomponent"
 local json = require "dkjson"
 --local mm = require "mm"
 
@@ -180,23 +180,45 @@ function Parser:printContext()
   end
 end
 
-function Parser:parseFile(path)
-  local file = assert(io.open(path, "rb")) -- r read mode and b binary mode
+function Parser:parseFile(path, unprotected)
+  local file, err = io.open(path, "rb") -- r read mode and b binary mode
+  if not file then return nil, err end
   local content = file:read("*a") -- *a or *all reads the whole file
   file:close()
   self.name = path
-  return self:parseJSON(content, "file " .. path)
+  return self:parseJSON("ruleset", content, "file " .. path, unprotected)
 end
 
-function Parser:parseJSON(json_str, json_name)
+function Parser:parseJSON(element_name, json_str, json_name, unprotected)
   self:assert_type(json_str, "string", "expected a JSON string")
   local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
-  self.name = json_name or self.context_name
-  self.source = json_str
-  if not data then
-    self:error(err)
+  self.name = json_name
+  
+  local function parse_it()
+    if not data then self:error(err) end
+    if element_name == "ruleset" then
+      return self:parseRuleSet(data)
+    elseif element_name == "phase" then
+      return self:parsePhase(data)
+    elseif element_name == "limiter" then
+      return self:parseLimiter(data)
+    elseif element_name == "list" then
+      return self:parseList(data)
+    elseif element_name == "rule" then
+      return self:parseRule(data)
+    end
   end
-  return self:parseRuleSet(data)
+  
+  if unprotected then
+    return parse_it()
+  else
+    local ok, res = pcall(parse_it)
+    if not ok then
+      return nil, (res:match("[^:]*:%d+: (.*)") or res)
+    else
+      return res
+    end
+  end
 end
 
 function Parser:parseInterpolatedString(str)
@@ -232,13 +254,6 @@ function Parser:parseInterpolatedString(str)
 end
 
 function Parser:parseRuleSet(data, name)
-  self.ruleset = {
-    limiters= {},
-    rules= {},
-    lists= {},
-    phases={},
-    name = name
-  }
   self:pushContext(data, "ruleset")
   
   self:assert_type(data, "table", "wrong type for ruleset")
@@ -247,6 +262,8 @@ function Parser:parseRuleSet(data, name)
     parser_method= self.parseLimiter
   })
   self:checkLimiters(data.limiters)
+  
+  self.ruleset.name = name or data.name
   
   --luacheck: push ignore 432 --don't mind the shadowing
   parseRulesetThing(self, data, {
@@ -262,7 +279,7 @@ function Parser:parseRuleSet(data, name)
   
   parseRulesetThing(self, data, {
     thing="list", key="lists",  type="table",
-    parser_method= self.parseRuleList
+    parser_method= self.parseList
   })
   
   self.ruleset.phases = self:parsePhaseTable(data.phases)
@@ -293,17 +310,17 @@ function Parser:parsePhaseTable(data)
     if self:jsontype(phase_data) == "array" then
       for i, list in ipairs(phase_data) do
         if type(list)=="string" or self:jsontype(list) == "array" or self:jsontype(list) == "object" then
-          phase_data[i]=self:parseRuleList(list)
+          phase_data[i]=self:parseList(list)
         else
           self:error("invalid rule list type: %s", self:jsontype(list))
         end
       end
     elseif type(phase_data) == "string" then
       --singe named list
-      data[phase_name]={ self:parseRuleList(phase_data) }
+      data[phase_name]={ self:parseList(phase_data) }
     elseif self:jsontype(phase_data)=="object" then
       --single long-form list
-      data[phase_name]=self:parseRuleList(phase_data)
+      data[phase_name]=self:parseList(phase_data)
     end
   end
   
@@ -312,10 +329,17 @@ function Parser:parsePhaseTable(data)
   return data
 end
 
-function Parser:parseRuleList(data, name)
+function Parser:getList(name)
+  local list = self.ruleset.lists[name]
+  if not list and self.external then
+    list = self.external.lists[name]
+  end
+  return list
+end
+
+function Parser:parseList(data, name)
   if type(data)=="string" then
-    self:assert(self.ruleset.lists[data], ([[named list "%s" not found]]):format(data))
-    return self.ruleset.lists[data]
+    return self:assert(self:getList(data), ([[named list "%s" not found]]):format(data))
   end
   self:pushContext(data, "list")
   local list
@@ -338,11 +362,19 @@ function Parser:parseRuleList(data, name)
   return list
 end
 
+function Parser:getRule(name)
+  local r = self.ruleset.rules[name]
+  if not r and self.external then
+    r = self.external.rules[name]
+  end
+  return r
+end
+
 function Parser:parseRule(data, name)
   self:pushContext(data, "rule")
   local rule
   if type(data) == "string" then
-    rule = self.ruleset.rules[data]
+    rule = self:getRule(data)
     self:assert(rule, ([[named rule "%s" not found]]):format(data))
     self:popContext()
     return rule
@@ -409,7 +441,7 @@ function Parser:parseCondition(data)
   self:popContext()
   -- be more specific with condition name
   self:pushContext(data, "condition " .. (next(condition)))
-  condition = Rule.condition.parse(condition, self)
+  condition = RuleComponent.condition.parse(condition, self)
   self:popContext()
   inheritmetatable(condition, data)
   return condition
@@ -430,7 +462,7 @@ function Parser:parseAction(data)
   --we can be more specific about the action name now
   self:pushContext(data, ("\"%s\" action"):format(next(action)))
   inheritmetatable(action, data)
-  action = Rule.action.parse(action, self)
+  action = RuleComponent.action.parse(action, self)
   self:popContext()
   return action
 end
@@ -486,6 +518,14 @@ function Parser:parseTimeInterval(data, err)
   end
 end
 
+function Parser:getLimiter(name)
+  local lim = self.ruleset.limiters[name]
+  if not lim and self.external then
+    lim = self.external.limiters[name]
+  end
+  return lim
+end
+
 function Parser:parseLimiter(data, name)
   self:pushContext(data, "limiter")
   
@@ -527,12 +567,38 @@ end
 
 local Parser_meta = {__index = Parser}
 
-local function newparser()
+local function newparser(opt)
   local parser = {
     name = "<?>",
-    ctx_stack = {}
+    ctx_stack = {},
+    ruleset = {
+      limiters = {},
+      rules = {},
+      lists = {},
+      phases ={},
+    }
   }
   
+  opt = opt or {}
+  if opt.external then
+    parser.external = {}
+    for k, n in pairs{lists="list", rules="rule", limiters="limiter"} do
+      local fn = opt.external[n]
+      parser.external[k]=setmetatable({}, {__index = function(tbl, key)
+        local ret = fn(key)
+        if ret then
+          if type(ret) ~= "table" then
+            ret = {name=key, external=true}
+          else
+            error("how do?...")
+          end
+        end
+        tbl[key]=ret
+        return ret
+      end})
+    end
+  end
+
   setmetatable(parser, Parser_meta)
   return parser
 end

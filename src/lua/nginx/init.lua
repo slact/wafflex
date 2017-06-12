@@ -53,9 +53,9 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
         fullpath = (prefix:match("/$") and "%s%s" or "%s/%s"):format(prefix, path)
       end
       
-      local ok, res = pcall(p.parseFile, p, fullpath)
-      if not ok then
-        return nil, (res:match("[^:]*:%d+: (.*)") or res)
+      local res, err = p:parseFile(fullpath)
+      if not res then
+        return nil, err
       end
       
       if ruleset_name then

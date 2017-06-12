@@ -1,6 +1,7 @@
-local Rule = require "rule"
+local RuleComponent = require "rulecomponent"
 local Binding = require "binding" or {call=function()end}
 local json = require "dkjson"
+local mm = require "mm"
 
 local tcopy = function(tbl)
   local cpy = {}
@@ -83,13 +84,13 @@ local ruleset_meta = { __index = {
     local rule =setmetatable(data, self.__submeta.rule)
     rule.ruleset = nil
     if data["if"] then
-      data["if"] = Rule.condition.new(rule["if"], self)
+      data["if"] = RuleComponent.condition.new(rule["if"], self)
     end
     for _,clause in pairs{"then", "else"} do
       if data[clause] then
         local actions = {}
         for _,v in pairs(data[clause]) do
-          table.insert(actions, Rule.action.new(v, self))
+          table.insert(actions, RuleComponent.action.new(v, self))
         end
         data[clause]=actions
       end
@@ -110,14 +111,14 @@ local ruleset_meta = { __index = {
     self.rules[rule.name] = nil
     
     if rule["if"] then
-      Rule.condition.delete(rule["if"], self)
+      RuleComponent.condition.delete(rule["if"], self)
     end
     
     for _,clause in pairs{"then", "else"} do
       if rule[clause] then
         local actions = rule[clause]
         for _,action in pairs(actions) do
-          Rule.action.delete(action, self)
+          RuleComponent.action.delete(action, self)
         end
         rule[clause]={}
       end
@@ -282,10 +283,14 @@ local function newRuleset(data)
     rule = {
       __jsonorder = {"name", "info", "key", "if", "if-any", "if-all", "then", "else"},
       __jsonval = function(self)
-        if #self["else"] == 0 or #self["then"] == 0 or self.key then
+        if #self["else"] <= 1 or #self["then"] <= 1 or self.key or self["if"].condition == "any" or self["if"].condition == "all" then
           local ret = tcopy(self)
+          if self["if"].condition == "any" then ret["if-any"] = ret["if"].data; ret["if"] = nil end
+          if self["if"].condition == "all" then ret["if-all"] = ret["if"].data; ret["if"] = nil end
           if #self["then"] == 0 then ret["then"] = nil end
+          if #self["then"] == 1 then ret["then"] = self["then"][1] end
           if #self["else"] == 0 then ret["else"] = nil end
+          if #self["else"] == 1 then ret["else"] = self["else"][1] end
           if self.key then self.key = self.key.string end
           return ret
         end
