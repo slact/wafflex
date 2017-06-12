@@ -144,8 +144,8 @@ Component.condition.add({"true", "false"}, {
   parse = function(data, parser)
   --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
   end,
-  jsonval = function(self) 
-    return self.condition 
+  jsonval = function(self)
+    return self.condition
   end
 })
 
