@@ -25,9 +25,42 @@ end})
 return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_cfunc, get_loc_conf_redis)
   package_loader = package_loader_cfunc
   
+  local rulesets = {}
+  
   Parser = require "parser"
   Ruleset = require "ruleset"
   Binding = require "binding"
+  
+  do
+    local ruleset_n = 0
+    local function uniqueName(thing, thingtbl, ruleset)
+      local name
+      if ruleset then
+        if not ruleset.__n then
+          ruleset.__n = 0
+        else
+          ruleset.__n = ruleset.__n + 1
+        end
+        name = ("%s%i"):format(thing, ruleset.__n)
+        if thingtbl[name] then --oh no it's not unique. try again
+          return uniqueName(thing, thingtbl, ruleset)
+        else
+          return name
+        end
+      else
+        assert(thing == "ruleset")
+        ruleset_n = ruleset_n + 1
+        name = "ruleset"..ruleset_n
+        if rulesets[name] then  --oh no it's not unique. try again
+          return uniqueName(thing, thingtbl, ruleset)
+        else
+          return name
+        end
+      end
+    end
+    Ruleset.uniqueName = uniqueName
+  end
+  
   
   Binding.require_create_userdata = true
   Binding.require_binding = true
@@ -37,8 +70,6 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
   if init_bind_cfunc then
     init_bind_cfunc(Binding.set)
   end
-  
-  local rulesets = {}
   
   if manager then
     local parsed_ruleset_data = {}

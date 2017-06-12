@@ -1,5 +1,4 @@
 {
-  "name": "ruleset1",
   "phases": {
     "request": [ "listy", ["fweep", "rule1"], []]
   },

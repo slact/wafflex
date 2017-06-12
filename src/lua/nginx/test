@@ -4,36 +4,28 @@ local mm = require "mm"
 local Parser = require "parser"
 local Ruleset = require "ruleset"
 local Binding = require "binding"
+local inspect = require "inspect"
 
-Binding.set("rule", {
-  create = function(self)
-    --print("got a new rule", self, " named", self.name)
+Ruleset.uniqueName = function(thing, thingtbl, ruleset)
+  local name
+  if ruleset then
+    if not ruleset.__n then
+      ruleset.__n = 0
+    else
+      ruleset.__n = ruleset.__n + 1
+    end
+    name = ("%s%i"):format(thing, ruleset.__n)
+  else
+    assert(thing == "ruleset")
+    name = "ruleset0"
   end
-})
-
-Binding.set("list", {
-  create = function(self)
-    --print("got a new list", self, " named", self.name)
+  
+  if type(thingcheck) == thingtbl[name] then --oh no it's not unique. try again
+    return self:uniqueName(thing, thingtbl, ruleset)
+  else
+    return name
   end
-})
-
-Binding.set("limiter", {
-  create = function(self)
-    --print("got a new limiter", self, " named", self.name)
-  end
-})
-
-Binding.set("condition", {
-  create = function(self)
-    --print("got a new condition", self, " ", self.condition)
-  end
-})
-
-Binding.set("action", {
-  create = function(self)
-    --print("got a new action", self, " ", self.action)
-  end
-})
+end
 
 local p = Parser.new()
 

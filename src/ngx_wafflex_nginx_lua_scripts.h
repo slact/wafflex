@@ -50,7 +50,7 @@ typedef struct {
 
   wfx_module_lua_script_t redis;
 
-  wfx_module_lua_script_t rule;
+  wfx_module_lua_script_t rulecomponent;
 
   wfx_module_lua_script_t ruleset;
 
