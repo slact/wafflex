@@ -6,6 +6,8 @@ local Ruleset = require "ruleset"
 local Binding = require "binding"
 local inspect = require "inspect"
 
+Parser.RuleComponent.generate_refs = true
+
 Ruleset.uniqueName = function(thing, thingtbl, ruleset)
   local name
   if ruleset then
@@ -31,7 +33,7 @@ local p = Parser.new()
 
 local parsed = p:parseFile("../../../dev/testruleset.json")
 
---mm(parsed)
+mm(parsed)
 
 local rs = Ruleset.new(parsed)
 

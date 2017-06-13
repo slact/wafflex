@@ -1,6 +1,8 @@
 local Binding = require "binding" or {call=function()end}
 local mm = require "mm"
 
+local Component -- forward declaration
+
 local function ignore_leading_hash(str)
   return str:sub(1,1)=="#" and str:sub(2) or str
 end
@@ -88,7 +90,7 @@ local function create_thing_storage(thing_name)
   return self
 end
 
-local Component = {
+Component = {
   condition = create_thing_storage("condition"),
   action = create_thing_storage("action")
 }
@@ -237,7 +239,11 @@ Component.condition.add({"limit-break", "limit-check"}, {
     parser:assert(data.name, "name missing")
     parser:assert_type(data.name, "string", "invalid \"name\" type")
     
-    mm(data)
+    if Component.generate_refs then
+      if not rule.refs then rule.refs = {} end
+      if not rule.refs.limiters then rule.refs.limiters = {} end
+      table.insert(rule.refs.limiters, data.name)
+    end
     
     return data
   end,

@@ -1,7 +1,7 @@
 local RuleComponent = require "rulecomponent"
 local Binding = require "binding" or {call=function()end}
 local json = require "dkjson"
---local mm = require "mm"
+local mm = require "mm"
 
 local Module -- forward declaration
 
@@ -52,7 +52,7 @@ local function sorted_keys(tbl)
   return keys
 end
 
-local Ruleset, Phase, List, Rule, Limiter = {}, {}, {}, {}, {}
+local Ruleset = {} --forward declaration
 
 local mt = {}
 
@@ -62,10 +62,14 @@ mt.ruleset = {
 }
   
 mt.phase = {
-  new = function(data)
-    
+  new = function(name, data)
+    return setmetatable({name=name, lists=data}, mt.phase)
   end,
-  __index = Phase,
+  __index = {
+    toJSON = function(self)
+      return json.encode(self, {indent=true})
+    end
+  },
   __jsonval = function(self)
     local lists = {}
     for _, list in pairs(self.lists) do
@@ -83,7 +87,11 @@ mt.list = {
   new = function(data)
     return setmetatable(data, mt.list)
   end,
-  __index = List,
+  __index = {
+    toJSON = function(self)
+      return json.encode(self, {indent=true})
+    end
+  },
   __jsonorder = {"name", "info", "rules"},
   __jsonval = function(self)
     local rules = {}
@@ -116,10 +124,14 @@ mt.rule = {
     end
     return data
   end,
-  __index = Rule,
+  __index = {
+    toJSON = function(self)
+      return json.encode(self, {indent=true})
+    end
+  },
   __jsonorder = {"name", "info", "key", "if", "if-any", "if-all", "then", "else"},
   __jsonval = function(self)
-    if #self["else"] <= 1 or #self["then"] <= 1 or self.key or self["if"].condition == "any" or self["if"].condition == "all" then
+    if #self["else"] <= 1 or #self["then"] <= 1 or self.key or self["if"].condition == "any" or self["if"].condition == "all" or self["refs"] then
       local ret = tcopy(self)
       if self["if"].condition == "any" then ret["if-any"] = ret["if"].data; ret["if"] = nil end
       if self["if"].condition == "all" then ret["if-all"] = ret["if"].data; ret["if"] = nil end
@@ -128,6 +140,7 @@ mt.rule = {
       if #self["else"] == 0 then ret["else"] = nil end
       if #self["else"] == 1 then ret["else"] = self["else"][1] end
       if self.key then self.key = self.key.string end
+      if ret.refs then ret.refs = nil end
       return ret
     end
     return self
@@ -138,7 +151,11 @@ mt.limiter = {
   new = function(data)
     return setmetatable(data, mt.limiter)
   end,
-  __index = Limiter,
+  __index = {
+    toJSON = function(self)
+      return json.encode(self, {indent=true})
+    end
+  },
   __jsonorder = {"name", "info", "limit", "interval", "burst", "burst-expire"},
   __jsonval = function(self)
     if self.burst then
@@ -265,7 +282,7 @@ function Ruleset:setPhaseTable(data)
   end
   self.phases = {}
   for k,v in pairs(data) do
-    local phase = setmetatable({name=k, lists={}}, mt.phase)
+    local phase = mt.phase.new(k, data)
     for i, list in pairs(v) do
       phase.lists[i]=self:findList(list) or self:addList(list)
     end

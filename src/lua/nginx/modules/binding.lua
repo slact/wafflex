@@ -24,20 +24,20 @@ local calls = {
     end
     return true
   end,
-  update = function(update_callback, self, update_name, update_data)
+  update = function(update_callback, self, update_name, update_data, ...)
     if type(self) ~= "table" then
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
     end
     if type(update_name) ~= "string" then
       return nil, ("expected 'update_name' to be string, got %s)"):format(type(self))
     end
-    local ref = update_callback(self, update_name, update_data, self.ruleset)
+    local ref = update_callback(self, update_name, update_data, ...)
     if type(ref) == "userdata" then
       self.__binding = ref
     end
     return true
   end,
-  replace = function(replace_callback, self, replacee)
+  replace = function(replace_callback, self, replacee, ...)
     if type(self) ~= "table" then
       return nil, ("expected 'self'(replacement) to be table, got %s)"):format(type(self))
     end
@@ -47,18 +47,18 @@ local calls = {
     if self.ruleset ~= replacee.ruleset then
       return nil, "replacement ruleset differs from replacee ruleset"
     end
-    local ref = replace_callback(self, replacee, self.ruleset)
+    local ref = replace_callback(self, replacee, ...)
     if type(ref) == "userdata" then
       self.__binding = ref
     end
     return true
   end,
-  delete = function(delete_callback, self)
+  delete = function(delete_callback, self, ...)
     if type(self) ~= "table" then
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
     end
     assert(type(self.__binding) == "userdata", ("expected seld.__binding userdata, got %s"):format(type(self.__binding)))
-    delete_callback(self.__binding, self, self.ruleset)
+    delete_callback(self.__binding, self, ...)
     return true
   end
 }

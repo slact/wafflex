@@ -403,27 +403,35 @@ function Parser:parseRule(data, name)
       end
       condition = {[(data["if-any"] and "any" or "all")]=conditions}
       inheritmetatable(condition, data["if"] or data["if-any"] or data["if-all"])
+      data["if-any"]=nil
+      data["if-all"]=nil
     end
-    rule = {["if"]=condition, ["then"]=data["then"], ["else"]=data["else"], name=data["name"] or name, info=data["info"], key=data["key"]}
+    data["if"]=condition
   elseif data["always"] then
-    rule = {["if"]={["true"]={}}, ["then"]=data["always"], name=data["name"] or name, info=data["info"], key=data["key"]}
+    data["if"]={["true"]={}}
+    data["then"]=data["always"]
+    data["always"]=nil
   elseif next(data) == nil then
     self:error("empty rule not allowed")
   else
     self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")
   end
-  if rule["if"] then
-    rule["then"] = self:parseActions(rule["then"], "then")
-    rule["else"] = self:parseActions(rule["else"], "else")
+  
+  if not data.name then
+    data.name = name
   end
-  if rule.key then
-    rule.key = self:parseInterpolatedString(rule.key)
+  
+  if data["if"] then
+    data["then"] = self:parseActions(data["then"], "then")
+    data["else"] = self:parseActions(data["else"], "else")
+  end
+  if data.key then
+    data.key = self:parseInterpolatedString(data.key)
   end
   
   self:popContext()
   --reuse metatable for debugging purposes
-  inheritmetatable(rule, data)
-  return rule
+  return data
 end
 
 function Parser:parseCondition(data)
@@ -603,4 +611,7 @@ local function newparser(opt)
   return parser
 end
 
-return {new = newparser}
+return {
+  new = newparser,
+  RuleComponent = RuleComponent
+}
