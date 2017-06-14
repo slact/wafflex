@@ -6,6 +6,7 @@ Minitest::Reporters.use! [Minitest::Reporters::SpecReporter.new(:color => true)]
 require 'securerandom'
 require "redis"
 require "pry"
+require "json"
 
 SERVER=ENV["NGINX_SERVER"] || "127.0.0.1"
 PORT=ENV["NGINX_PORT"] || "8082"
@@ -31,8 +32,14 @@ class WafflexTest <  Minitest::Test
   def test_scripts
     json = IO.read("./testruleset.json")
     
-    ok, err = redis_script :ruleset_write, [], ["", "create", "ruleset", "", json]
-    assert_equal ok, 1, err
+    parsed_in = JSON.parse(json)
+    
+    ok, err = redis_script :ruleset_write, [], ["", "create", "ruleset", "rlst", json]
+    assert_equal 1, ok, err
+    
+    out = redis_script :ruleset_read, [], ["", "ruleset", "rlst"]
+    
+    parsed = JSON.parse(out)
     
     
   end  

@@ -39,7 +39,7 @@
   
   local kbase, key, keyf;
   local function genkeys(new_ruleset_name)
-    kbase = ("%sruleset:%s"):format(prefix, new_ruleset_name or ruleset_name)
+    kbase = ("%sruleset:%s"):format(prefix, new_ruleset_name)
     key = {
       rulesets = prefix.."rulesets",
       ruleset =  kbase,
@@ -63,7 +63,7 @@
       phase_lists =  key.ruleset..":phase:%s:lists"
     }
   end
-  genkeys()
+  genkeys(ruleset_name)
   
   Ruleset.uniqueName = function(thing, thingtbl, ruleset)
     local name, thing_key, n, set_key
