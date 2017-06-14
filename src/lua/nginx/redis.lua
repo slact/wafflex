@@ -1,7 +1,7 @@
 local Redis = require "redis"
 --local mm = require "mm"
 
---luacheck: globals registerRedis connectRedises testRedisConnector
+--luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON
 
 local function parseRedisUrl(url)
   local host, port, pass, db
@@ -30,15 +30,30 @@ local function parseRedisUrl(url)
 end
 
 local redises = {}
-  
-function registerRedis(url)
+local redis_conf = {}
+
+function findRedis(conf_ptr)
+  return redis_conf[conf_ptr]
+end
+
+function registerRedis(url, conf_ptr)
   local exists = redises[url]
-  if exists then return exists end
+  if exists then
+    table.insert(exists.conf_ptrs, conf_ptr)
+    redis_conf[conf_ptr]=exists
+    return exists
+  end
   
   local parsedUrl = parseRedisUrl(url)
   
   local r = Redis.new(parsedUrl.host, parsedUrl.port, parsedUrl.pass, parsedUrl.db)
   redises[parsedUrl.url]=r
+  
+  if not r.conf_ptrs then
+    r.conf_ptrs = {}
+  end
+  table.insert(r.conf_ptrs, conf_ptr)
+  redis_conf[conf_ptr]=r
   return parsedUrl.url
 end
 
@@ -48,6 +63,16 @@ function connectRedises()
   end
 end
 
+function getRedisRulesetJSON(conf_ptr, ruleset_name)
+  local redis = findRedis(conf_ptr)
+  if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
+  local ruleset_json, err  = redis:script("ruleset_read", "", "ruleset", ruleset_name)
+  if ruleset_json == 0 then
+    return nil, err
+  else
+    return ruleset_json
+  end
+end
 
 function testRedisConnector()
   local r = Redis.new("localhost", 8537, nil, 2)

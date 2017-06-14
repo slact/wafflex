@@ -8,8 +8,6 @@ typedef struct {
 } wfx_redis_lua_script_t;
 
 typedef struct {
-  wfx_redis_lua_script_t _ruleset_write_main;
-
   wfx_redis_lua_script_t init;
 
   wfx_redis_lua_script_t ruleset_read;

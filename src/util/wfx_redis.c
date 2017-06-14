@@ -14,7 +14,8 @@ int wfx_redis_add_server_conf(ngx_conf_t *cf, wfx_loc_conf_t *lcf) {
   char      *buf;
   wfx_lua_getfunction(wfx_Lua, "registerRedis");
   lua_pushngxstr(wfx_Lua, &lcf->redis.url);
-  lua_ngxcall(wfx_Lua, 1, 1);
+  lua_pushlightuserdata(wfx_Lua, lcf);
+  lua_ngxcall(wfx_Lua, 2, 1);
   
   lua_tongxstr(wfx_Lua, -1, &str);
   buf = ngx_palloc(cf->pool, str.len);
@@ -24,7 +25,6 @@ int wfx_redis_add_server_conf(ngx_conf_t *cf, wfx_loc_conf_t *lcf) {
   lua_pop(wfx_Lua, 1);
   return 1;
 }
-
 
 int redis_connect(lua_State *L) {
   redisAsyncContext *ctx;

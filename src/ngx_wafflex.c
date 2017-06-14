@@ -261,6 +261,10 @@ ngx_int_t ngx_wafflex_init_runtime(int manager) {
     //we can create all the rulesets now
     lua_getglobal(wfx_Lua, "createDeferredRulesets");
     lua_ngxcall(wfx_Lua, 0, 0);
+    
+    //and the Redis ones
+    lua_getglobal(wfx_Lua, "loadDeferredRedisRulesets");
+    lua_ngxcall(wfx_Lua, 0, 0);
   }
   
   if(manager) {

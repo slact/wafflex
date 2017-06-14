@@ -46,7 +46,11 @@ local function genkeys(new_ruleset_name)
     phases =   kbase..":phases",
     lists =    kbase..":lists",
     rules =    kbase..":rules",
-    limiters = kbase..":limiters"
+    limiters = kbase..":limiters",
+    
+    pubsub = {
+      ruleset = kbase..":pubsub"
+    }
   }
   keyf = {
     list =         key.ruleset..":list:%s",

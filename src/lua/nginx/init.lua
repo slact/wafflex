@@ -5,6 +5,8 @@
 --luacheck: globals deferRulesetRedisLoad loadDeferredRedisRulesets
 --luacheck: globals shutdown printFunctions
 
+--luacheck: globals getRedisRulesetJSON --external crud
+
 --setup package loading
 local package_loader
 package.path = ""
@@ -22,7 +24,7 @@ setmetatable(package.preload, {__index = function(self, name)
 end})
 
 
-return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_cfunc, get_loc_conf_redis)
+return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_cfunc)
   package_loader = package_loader_cfunc
   
   local rulesets = {}
@@ -30,6 +32,8 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
   Parser = require "parser"
   Ruleset = require "ruleset"
   Binding = require "binding"
+  local mm = require "mm"
+  
   
   do
     local ruleset_n = 0
@@ -149,19 +153,20 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
   
     function loadDeferredRedisRulesets()
       local co = coroutine.wrap(function()
-        local redis, ruleset_json, parser, parsed, ruleset
+        local ruleset_json, parser, parsed, ruleset, err
         for name, rs in pairs(deferred_redis_rulesets) do
           for _, config in ipairs(rs) do
             if rulesets[name] then
               ruleset = rulesets[name]
             else
-              redis = get_loc_conf_redis(config.lcf_ptr)
-              assert(redis, "expected a redis here")
-              ruleset_json = redis:script("get_ruleset", name)
-              assert(type(ruleset_json) == "string")
+              ruleset_json, err = getRedisRulesetJSON(config.lcf_ptr, name)
+              if not ruleset_json then error(err) end
+              print(ruleset_json)
               parser = Parser.new()
-              parsed = parser:parseJSON(ruleset_json)
+              parsed, err = parser:parseJSON("ruleset", ruleset_json, name, true)
+              if not parsed then error(err) end
               ruleset = createRuleset(parsed)
+              mm(ruleset)
             end
             ruleset_confset_cfunc(ruleset, config.rcf_ptr)
           end

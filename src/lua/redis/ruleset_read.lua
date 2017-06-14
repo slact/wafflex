@@ -8,14 +8,14 @@ local item_name =     ARGV[4]
 local encode = cjson.encode
 local tinsert = table.insert
 
-local dbg= function(...)
+--[[local dbg= function(...)
   local out = {...}
   for i,v in pairs(out) do
     out[i]=tostring(v)
   end
   redis.call("ECHO", table.concat(out, "    "))
 end
-
+]]
 local Jsonobj; do
   local Jmeta = {__index = {
     use = function(self, ...)
@@ -41,7 +41,6 @@ local Jsonobj; do
     end
   }}
   Jsonobj = function(data)
-    dbg(data)
     return setmetatable({buf={}, data=data or {}}, Jmeta)
   end
 end
@@ -86,7 +85,6 @@ local function redis_gethash(redis_key)
 end
 
 local function as_json(what, name)
-  dbg("AS_JSON", what, name)
   local j, ll
   if what == "rule" then
     j = Jsonobj(redis_gethash(keyf.rule:format(name)))
@@ -104,7 +102,7 @@ local function as_json(what, name)
     if not j then return end
     j:use("name","info","gen")
     ll = redis.call("LRANGE", keyf.list_rules:format(name), 0, -1)
-    if ll then
+    if ll and #ll > 0 then
       j:add("rules", ll)
     else
       j:addRaw("rules", "[]")
@@ -112,7 +110,7 @@ local function as_json(what, name)
   
   elseif what == "phase" then
     ll = redis.call("LRANGE", keyf.phase_lists:format(name), 0, -1)
-    return ll and encode(ll) or "[]"
+    return #ll > 0 and encode(ll) or "[]"
 
   elseif what == "ruleset" then
     j = Jsonobj(redis_gethash(key.ruleset))
