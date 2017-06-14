@@ -268,7 +268,7 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   wfx_ruleset_conf_t   *rcf;
   ngx_str_t            *name = cf->args->elts;
   ngx_int_t             i, n = cf->args->nelts;
-
+  
   if(!lcf->rulesets) {
     lcf->rulesets = ngx_array_create(cf->pool, 4, sizeof(*rcf));
   }
@@ -284,6 +284,7 @@ static char *wfx_conf_ruleset(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
     lua_pushlstring(wfx_Lua, (const char *)name[i].data, name[i].len);
     lua_pushlightuserdata(wfx_Lua, rcf);
     lua_ngxcall(wfx_Lua, 2, 2);
+    
     if (lua_isnil(wfx_Lua, -2)) {
       if(!lcf->redis.enabled) {
         errstr = lua_tostring(wfx_Lua, -1);

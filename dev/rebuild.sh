@@ -224,7 +224,7 @@ if [[ -z $NO_MAKE ]]; then
   
   _sha1_lua_scripts=`sha1sum ./smush_redis_scripts.rb "${_src_dir}"/lua/**/*.lua | sha1sum`
   if [[ $(cat .lua_rebuild_hash) != $_sha1_lua_scripts ]]; then
-    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/_ruleset_write_main.lua ${_src_dir}/lua/nginx/modules/{inspect,dkjson,parser,rulecomponent,ruleset}.lua > ${_src_dir}/lua/redis/ruleset_write.lua
+    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/_ruleset_write_main.lua ${_src_dir}/lua/nginx/modules/{inspect,dkjson,binding,rulecomponent,parser,ruleset}.lua > ${_src_dir}/lua/redis/ruleset_write.lua
     
     if type "luacheck" > /dev/null; then
       pushd ${_src_dir}

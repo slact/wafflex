@@ -1,5 +1,6 @@
-local Binding = require "binding" or {call=function()end}
-local mm = require "mm"
+local Binding = require "binding"
+local json = require "dkjson"
+--local mm = require "mm"
 
 local Component -- forward declaration
 
@@ -48,7 +49,12 @@ local function create_thing_storage(thing_name)
       delete=funcs.delete,
       meta = {
         __jsonval = funcs.jsonval,
-        __jsonorder = funcs.jsonorder or {"action", "condition"}
+        __jsonorder = funcs.jsonorder or {"action", "condition"},
+        __index = {
+          toJSON = function(tbl)
+            return json.encode(tbl, {indent = true})
+          end
+        }
       }
     }
     self.table[name]=added
@@ -241,8 +247,8 @@ Component.condition.add({"limit-break", "limit-check"}, {
     
     if Component.generate_refs then
       if not rule.refs then rule.refs = {} end
-      if not rule.refs.limiters then rule.refs.limiters = {} end
-      table.insert(rule.refs.limiters, data.name)
+      if not rule.refs.limiter then rule.refs.limiter = {} end
+      table.insert(rule.refs.limiter, data.name)
     end
     
     return data

@@ -263,7 +263,6 @@ ngx_int_t ngx_wafflex_init_runtime(int manager) {
     lua_ngxcall(wfx_Lua, 0, 0);
   }
   
-  
   if(manager) {
     wfx_ipc_set_alert_handler("ruleconfig-ruleset-request", ruleconfig_ruleset_request_alert_handler);
   }

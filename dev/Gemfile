@@ -7,3 +7,5 @@ gem 'minitest'
 gem 'minitest-reporters'
 
 gem "hsss"
+
+gem "redis"

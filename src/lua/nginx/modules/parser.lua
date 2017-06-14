@@ -195,7 +195,7 @@ function Parser:parseJSON(element_name, json_str, json_name, unprotected)
   self.name = json_name
   
   local function parse_it()
-    if not data then self:error(err) end
+    if not data then self:error("Error parsing JSON: " .. err) end
     if element_name == "ruleset" then
       return self:parseRuleSet(data)
     elseif element_name == "phase" then

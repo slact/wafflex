@@ -1,6 +1,6 @@
 local module = {c={}}
 --local mm = require "mm"
---luacheck: globals newRedis
+--luacheck: globals newRedis unpack
 
 local Redis = {}
 local rmeta = {__index = Redis}
@@ -17,6 +17,8 @@ local script_hash = {}
   return keys, vals
 end
 ]]
+
+local tunpack = table.unpack or unpack
 
 local function current_coroutine()
   local co, main = coroutine.running()
@@ -161,11 +163,10 @@ function Redis:connect()
         res, err = raw_redis_command(self.ctx, "SCRIPT", "LOAD", src)
         if not res then return fail(("error in script %s\n%s"):format(name, err)) end
         if hash ~= res then return fail("loaded script hash doesn't match") end
-        
-        raw_redis_command(self.ctx, "HSET", "wafflex:scripts", name, hash)
       elseif not res then
         return fail(err)
       end
+      raw_redis_command(self.ctx, "HSET", "wafflex:scripts", name, hash)
     end
     --loaded the scripts. I think that's everything...
     
@@ -262,7 +263,7 @@ function Redis:setStatus(status)
       if cmd.coroutine then
         coroutine.resume(cmd.coroutine, "ready now")
       else
-        redis_command(self, cmd.ctx_name, table.unpack(cmd.args))
+        redis_command(self, cmd.ctx_name, tunpack(cmd.args))
       end
     end
   end
@@ -299,7 +300,7 @@ function Redis:script(name, ...)
   end
   table.insert(args, 2, "EVALSHA")
   table.insert(args, 3, myhash)
-  return self:command(table.unpack(args))
+  return self:command(tunpack(args))
 end
 
 function newRedis(host, port, pass, db)

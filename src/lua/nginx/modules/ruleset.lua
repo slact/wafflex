@@ -1,7 +1,7 @@
 local RuleComponent = require "rulecomponent"
-local Binding = require "binding" or {call=function()end}
+local Binding = require "binding"
 local json = require "dkjson"
-local mm = require "mm"
+--local mm = require "mm"
 
 local Module -- forward declaration
 
@@ -106,16 +106,18 @@ mt.list = {
     end
   end
 }
-  
+
+local actions_array_meta = {__index = {toJSON=function(self) return json.encode(self, {indent = true}) end}}
 mt.rule = {
   new = function(data, ruleset)
     local rule =setmetatable(data, mt.rule)
     if data["if"] then
       data["if"] = RuleComponent.condition.new(rule["if"], ruleset)
     end
+    
     for _,clause in pairs{"then", "else"} do
       if data[clause] then
-        local actions = {}
+        local actions = setmetatable({}, actions_array_meta)
         for _,v in pairs(data[clause]) do
           table.insert(actions, RuleComponent.action.new(v, ruleset))
         end
@@ -391,7 +393,9 @@ Module = {
   
   uniqueName = function(thingname, checktbl, ruleset)
     error("uniqueName must be configured outside the Ruleset module")
-  end
+  end,
+  
+  RuleComponent = RuleComponent
 }
 
 return Module
