@@ -1,5 +1,5 @@
 local module = {c={}}
---local mm = require "mm"
+local mm = require "mm"
 --luacheck: globals newRedis unpack
 
 local Redis = {}
@@ -206,17 +206,43 @@ function Redis:subscribe(channel, callback)
   end
   
   assert(self.pubsub_handlers[channel] == nil, ("already subscribed to \"%s\""):format(channel))
-  assert(type(callback) == "function")
-  assert(type(channel) == "string")
   self.pubsub_handlers[channel]=callback
-  self:sub_command(self.__subscribe_handler, "SUBSCRIBE", channel)
+  assert(type(channel) == "string")
+  assert(type(callback) == "function")
+  
+  local co = current_coroutine()
+  if co then
+    local wrapped_callback = function(...)
+      local ret = self.__subscribe_handler(...)
+      coroutine.resume(co, ...)
+      return ret
+    end
+    
+    self:sub_command(wrapped_callback, "SUBSCRIBE", channel)
+    return coroutine.yield()
+  else
+    return self:sub_command(self.__subscribe_handler, "SUBSCRIBE", channel)
+  end
 end
 
 function Redis:unsubscribe(channel)
   if not self.pubsub_handlers[channel] then
     return nil, "not subscribed to " .. tostring(channel)
   end
-  return self:sub_command(self.__subscribe_handler, "unsubscribe", channel)
+  
+  local co = current_coroutine()
+  if co then
+    local wrapped_callback = function(...)
+      local ret = self.__subscribe_handler(...)
+      coroutine.resume(co, ...)
+      return ret
+    end
+    
+    self:sub_command(wrapped_callback, "UNSUBSCRIBE", channel)
+    return coroutine.yield()
+  else
+    return self:sub_command(self.__subscribe_handler, "UNSUBSCRIBE", channel)
+  end
 end
 
 local function redis_command(self, ctx_name, ...)
@@ -224,7 +250,7 @@ local function redis_command(self, ctx_name, ...)
     return raw_redis_command(self[ctx_name], infer_command_callback_and_args(...))
   else
     local args = {infer_command_callback_and_args(...)}
-    if type(args[1] == "thread") then
+    if type(args[1]) == "thread" then
       --we're in a coroutine
       table.insert(self.pending_commands, {coroutine=args[1]})
       assert(coroutine.yield() == "ready now") --wait until resumed when ready
@@ -260,6 +286,7 @@ function Redis:setStatus(status)
   
   if status == "ready" and prev_status ~= "ready" then
     for _, cmd in ipairs(self.pending_commands) do
+      mm(cmd)
       if cmd.coroutine then
         coroutine.resume(cmd.coroutine, "ready now")
       else

@@ -5,7 +5,7 @@
 --luacheck: globals deferRulesetRedisLoad loadDeferredRedisRulesets
 --luacheck: globals shutdown printFunctions
 
---luacheck: globals getRedisRulesetJSON --external crud
+--luacheck: globals getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe --external crud
 
 --setup package loading
 local package_loader
@@ -150,7 +150,7 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
       table.insert(deferred_redis_rulesets[name], {lcf_ptr=loc_conf_ptr, rcf_ptr = conf_ptr})
       return true
     end
-  
+    
     function loadDeferredRedisRulesets()
       local co = coroutine.wrap(function()
         local ruleset_json, parser, parsed, ruleset, err
@@ -159,8 +159,12 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
             if rulesets[name] then
               ruleset = rulesets[name]
             else
+              redisRulesetSubscribe(config.lcf_ptr, name)
               ruleset_json, err = getRedisRulesetJSON(config.lcf_ptr, name)
-              if not ruleset_json then error(err) end
+              if not ruleset_json then
+                redisRulesetUnsubscribe(config.lcf_ptr, name)
+                error(err)
+              end
               print(ruleset_json)
               parser = Parser.new()
               parsed, err = parser:parseJSON("ruleset", ruleset_json, name, true)

@@ -1,7 +1,7 @@
 local Redis = require "redis"
 --local mm = require "mm"
 
---luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON
+--luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe
 
 local function parseRedisUrl(url)
   local host, port, pass, db
@@ -72,6 +72,24 @@ function getRedisRulesetJSON(conf_ptr, ruleset_name)
   else
     return ruleset_json
   end
+end
+
+function redisRulesetSubscribe(conf_ptr, ruleset_name)
+  local redis = findRedis(conf_ptr)
+  if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
+  --TODO: prefix
+  
+  local updater = function(msg)
+    print("UPDATE NAW")
+    print(msg)
+  end
+  
+  return redis:subscribe(("ruleset:%s:pubsub"):format(ruleset_name), updater)
+end
+function redisRulesetUnsubscribe(conf_ptr, ruleset_name)
+  local redis = findRedis(conf_ptr)
+  if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
+  return redis:unsubscribe(("ruleset:%s:pubsub"):format(ruleset_name))
 end
 
 function testRedisConnector()
