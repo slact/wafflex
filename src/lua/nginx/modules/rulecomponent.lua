@@ -223,6 +223,7 @@ Component.condition.add({"limit-break", "limit-check"}, {
     end
     local condition_name = next(parser:getContext())
     local rule = parser:getContext("rule")
+    local rule_condition = parser:getContext("if")
     
     if not data.key then
       data.key = rule.key
@@ -247,8 +248,9 @@ Component.condition.add({"limit-break", "limit-check"}, {
     
     if Component.generate_refs then
       if not rule.refs then rule.refs = {} end
-      if not rule.refs.limiter then rule.refs.limiter = {} end
-      table.insert(rule.refs.limiter, data.name)
+      if not rule_condition.refs then rule_condition.refs = {} end
+      table.insert(rule.refs.limiter, "limiter:"..data.name)
+      table.insert(rule_condition.refs.limiter, "limiter:"..data.name)
     end
     
     return data

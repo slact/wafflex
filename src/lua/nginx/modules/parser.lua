@@ -423,13 +423,17 @@ function Parser:parseRule(data, name)
     
     local condition
     if data["if"] then
+      self:pushContext(data, "if")
       condition = self:parseCondition(data["if"])
+      self:popContext()
     elseif data["if-any"] or data["if-all"] then
       local conditions = {}
+      self:pushContext(data, "if")
       for _, v in ipairs(data["if-any"] or data["if-all"]) do
         condition = self:assert(self:parseCondition(v))
         table.insert(conditions, condition)
       end
+      self:popContext()
       condition = {[(data["if-any"] and "any" or "all")]=conditions}
       inheritmetatable(condition, data["if"] or data["if-any"] or data["if-all"])
       data["if-any"]=nil

@@ -20,7 +20,14 @@ local Jsonobj; do
   local Jmeta = {__index = {
     use = function(self, ...)
       for _, k in ipairs {...} do
-        self:add(k, self.data[k])
+        local val
+        if type(k) == "table" then
+          val = k[2](self.data[k[1]])
+          k = k[1]
+        else
+          val = self.data[k]
+        end
+        self:add(k, val)
       end
     end,
     useRaw = function(self, ...)
@@ -89,18 +96,18 @@ local function as_json(what, name)
   if what == "rule" then
     j = Jsonobj(redis_gethash(keyf.rule:format(name)))
     if not j then return end
-    j:use("name","info","gen", "key")
+    j:use("name","info",{"gen", tonumber}, "key")
     j:useRaw("if", "then", "else")
 
   elseif what == "limiter" then
     j = Jsonobj(redis_gethash(keyf.limiter:format(name)))
     if not j then return end
-    j:use("name","info","gen","interval","limit","sync-steps","burst","burst-expire")
+    j:use("name","info", {"gen", tonumber}, {"interval", tonumber}, {"limit", tonumber}, {"sync-steps", tonumber}, "burst", {"burst-expire", tonumber})
     
   elseif what == "list" then
     j = Jsonobj(redis_gethash(keyf.list:format(name)))
     if not j then return end
-    j:use("name","info","gen")
+    j:use("name","info",{"gen", tonumber})
     ll = redis.call("LRANGE", keyf.list_rules:format(name), 0, -1)
     if ll and #ll > 0 then
       j:add("rules", ll)

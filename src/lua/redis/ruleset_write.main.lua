@@ -27,6 +27,22 @@ local function redis_hmset(key, tbl, ...)
   end
 end
 
+local function table_keys(tbl)
+  local keys = {}
+  for k, _ in pairs(tbl) do
+    table.insert(keys, k)
+  end
+  return keys
+end
+
+--[[local function tcopy(tbl)
+  local cpy = {}
+  for k, v in pairs(tbl) do
+    cpy[k]=v
+  end
+  return cpy
+end
+]]
 local nextarg; do local n = 0; nextarg = function(how_many)
   local ret = {}; how_many = how_many or 1;
   for i=1,how_many do ret[i]=ARGV[n+i] or false end
@@ -112,16 +128,39 @@ Binding.set("limiter", {
     redis.call("SADD", key.limiters, limiter.name)
     
     if limiter.burst then
-      redis.call("SADD", keyf.limiter_refs:format(limiter.burst.name), "limiter:"..limiter.name)
+      redis.call("ZINCRBY", keyf.limiter_refs:format(limiter.burst.name), 1, "limiter:"..limiter.name)
     end
     
     limiter_created[limiter.name]=true
   end,
-  update = function(limiter)
+  update = function(limiter, diff)
+    local lkey = keyf.limiter:format(limiter.name)
+    if redis.call("EXISTS", lkey) == 0 then error("limiter \"" .. limiter.name .. "\" does not exist") end
     
+    assert(not diff.name, "don't know how to rename limiters yet")
+    
+    limiter.gen = tonumber(limiter.gen or 0) + 1
+    diff.gen = true
+    
+    if diff.burst then
+      redis.call("ZINCRBY", keyf.limiter_refs:format(diff.burst.old.name), -1, "limiter:"..limiter.name)
+      redis.call("ZREMRANGEBYSCORE", keyf.limiter_refs:format(diff.burst.old.name), "-inf", 0)
+      redis.call("ZINCRBY", keyf.limiter_refs:format(diff.burst.new.name), 1, "limiter:"..limiter.name)
+    end
+    
+    redis_hmset(lkey, limiter, table_keys(diff))
   end,
   delete = function(limiter)
+    local lkey = keyf.limiter:format(limiter.name)
+    if redis.call("EXISTS", lkey) == 0 then error("limiter \"" .. limiter.name .. "\" does not exist") end
+    if redis.call("ZCARD", keyf.limiter_refs:format(limiter.name)) > 0 then error("limiter \"" .. limiter.name .. "\" still in use") end
     
+    if limiter.burst then
+      redis.call("ZINCRBY", keyf.limiter_refs:format(limiter.burst.name), -1, "limiter:"..limiter.name)
+      redis.call("ZREMRANGEBYSCORE", keyf.limiter_refs:format(limiter.burst.name), "-inf", 0)
+    end
+    redis.call("SREM", key.limiters, limiter.name)
+    redis.call("DEL", lkey)
   end
 })
 
@@ -134,15 +173,60 @@ Binding.set("list", {
     redis_hmset(lkey, list, "name", "info", "gen")
     
     local list_rules_key = keyf.list_rules:format(list.name)
-    local list_refs_key = keyf.list_refs:format(list.name)
     local list_ref = "list:"..list.name
     for _, rule in ipairs(list.rules) do
       redis.call("RPUSH", list_rules_key, rule.name)
-      redis.call("ZINCRBY", list_refs_key, 1, rule.name)
-      redis.call("SADD", keyf.rule_refs:format(rule.name), list_ref)
+      redis.call("ZINCRBY", keyf.rule_refs:format(rule.name), 1, list_ref)
     end
     
     redis.call("SADD", key.lists, list.name)
+  end,
+  update = function(list, diff)
+    local lkey = keyf.list:format(list.name)
+    if redis.call("EXISTS", lkey) == 0 then error("list \"" .. list.name .. "\" does not exist") end
+    list.gen = tonumber(list.gen or 0) + 1
+    diff.gen = true
+    
+    assert(not diff.name, "don't know how to rename lists yet")
+    
+    if diff.rules then
+      local list_rules_key = keyf.list_rules:format(list.name)
+      local list_ref = "list:"..list.name
+      redis.call("DEL", list_rules_key)
+      for _, rule in ipairs(diff.rules.old) do
+        local rule_refs_key = keyf.rule_refs:format(rule.name)
+        redis.call("ZINCRBY", rule_refs_key, -1, list_ref)
+        redis.call("ZREMRANGEBYSCORE", rule_refs_key, "-inf", 0)
+      end
+      
+      for _, rule in ipairs(diff.rules.old) do
+        redis.call("RPUSH", list_rules_key, rule.name)
+        redis.call("SADD", keyf.rule_refs:format(rule.name), list_ref)
+      end
+      
+      --redis.call("ZREMRANGEBYSCORE", list_refs_key, "-inf" 0)
+      diff.rules = nil
+    end
+    
+    redis_hmset(lkey, list, table_keys(diff))
+  end,
+  delete = function(list)
+    local lkey = keyf.list:format(list.name)
+    local list_refs_key = keyf.list_refs:format(list.name)
+    if redis.call("EXISTS", lkey) == 0 then error("list \"" .. list.name .. "\" does not exist") end
+    if redis.call("ZCARD", list_refs_key) ~= 0 then error("list \"" .. list.name .. "\" is still in use") end
+    
+    local list_rules_key = keyf.list_rules:format(list.name)
+    local list_ref = "list:"..list.name
+    
+    for _, rule_name in ipairs(redis.call("LRANGE", list_rules_key, 0, -1)) do
+      local rule_refs_key = keyf.rule_refs:format(rule_name)
+      redis.call("ZINCRBY", rule_refs_key, -1, list_ref)
+      redis.call("ZREMRANGEBYSCORE", rule_refs_key, "-inf", 0)
+    end
+    
+    redis.call("SREM", key.lists, list.name)
+    redis.call("DEL", lkey, list_rules_key, list_refs_key)
   end
 })
 
@@ -155,11 +239,56 @@ Binding.set("phase", {
     redis_hmset(pkey, phase, "name", "info", "gen")
     
     local phase_lists_key = keyf.phase_lists:format(phase.name)
+    local phase_ref = "phase:"..phase.name
     for _, list in ipairs(phase.lists) do
       redis.call("RPUSH", phase_lists_key, list.name)
+      redis.call("ZINCRBY", keyf.list_refs:format(list.name), 1, phase_ref)
     end
     
     redis.call("SADD", key.phases, phase.name)
+  end,
+  update = function(phase, diff)
+    phase.gen = tonumber(phase.gen or 0) + 1
+    diff.gen = true
+    assert(not diff.name, "don't know how to rename phases yet")
+    
+    local pkey = keyf.phase:format(phase.name)
+    local phase_ref = "phase:"..phase.name
+    
+    if diff.lists then
+      local phase_lists_key = keyf.phase_lists:format(phase.name)
+      local list_refs_key
+      for _, list_name in ipairs(redis.call("LRANGE", phase_lists_key, 0, -1)) do
+        list_refs_key = keyf.list_refs:format(list_name)
+        redis.call("ZINCRBY", list_refs_key, -1, phase_ref)
+        redis.call("ZREMRANGEBYSCORE", list_refs_key, "-inf", 0)
+      end
+      redis.call("DEL", phase_lists_key)
+      
+      for _, list in ipairs(diff.lists.new) do
+        list_refs_key = keyf.list_refs:format(list.name)
+        redis.call("RPUSH", phase_lists_key, list.name)
+        redis.call("ZINCRBY", list_refs_key, 1, phase_ref)
+      end
+      diff.lists = nil
+    end
+    
+    redis_hmset(pkey, phase, table_keys(diff))
+  end,
+  delete = function(phase)
+    local pkey = keyf.phase:format(phase.name)
+    local phase_ref = "phase:"..phase.name
+    
+    local phase_lists_key = keyf.phase_lists:format(phase.name)
+    local list_refs_keys
+    for _, list_name in ipairs(redis.call("LRANGE", phase_lists_key, 0, -1)) do
+      list_refs_keys = keyf.list_refs:format(list_name)
+      redis.call("ZINCRBY", list_refs_keys, -1, phase_ref)
+      redis.call("ZREMRANGEBYSCORE", list_refs_keys, "-inf", 0)
+    end
+    
+    redis.call("SREM", key.phases, phase.name)
+    redis.call("DEL", pkey, phase_lists_key)
   end
 })
 
@@ -176,25 +305,74 @@ Binding.set("rule", {
     if rule["else"] then
       redis.call("HSET", rkey, "else", rule["else"]:toJSON())
     end
-    
     if rule.refs then
       local rule_ref = "rule:"..rule.name
       for ref_type, ref in pairs(rule.refs) do
-        local refkeyf
-        if ref_type == "limiter" then
-          refkeyf = keyf.limiter_refs
-        elseif ref_type == "rule" then
-          refkeyf = keyf.rule_refs
-        else
-          assert("can't handle ref tyoe " .. ref_type)
-        end
+        local refkeyf = assert(keyf[ref_type .. "_refs"])
         for _, ref_name in ipairs(ref) do
-          redis.call("SADD", refkeyf:format(ref_name), rule_ref)
+          redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
         end
       end
     end
-    
     redis.call("SADD", key.rules, rule.name)
+  end,
+  update = function(rule, diff)
+    local rkey = keyf.rule:format(rule.name)
+    if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
+    assert(not diff.name, "don't know how to rename rules yet")
+    rule.gen = tonumber(rule.gen or 0) + 1
+    diff.gen = true
+    
+    local function update_refs(old, new)
+      local ref_kind, ref_name, refkey
+      local rule_ref = "rule:"..rule.name
+      for _, ref in ipairs(old) do
+        ref_kind, ref_name = ref:match("(.+):(.+)")
+        refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
+        redis.call("ZINCRBY", refkey, -1, rule_ref)
+        redis.call("ZREMRANGEBYSCORE", refkey, "-inf", 0)
+      end
+      
+      for _, ref in ipairs(new) do
+        ref_kind, ref_name = ref:match("(.+):(.+)")
+        refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
+        redis.call("ZINCRBY", refkey, 1, rule_ref)
+      end
+    end
+    
+    if diff["if"] then
+      update_refs(diff["if"].old, diff["if"].new)
+      redis.call("HSET", rkey, "if", rule["if"]:toJSON())
+      diff["if"]=nil
+    end
+    if diff["then"] then
+      update_refs(diff["then"].old, diff["then"].new)
+      redis.call("HSET", rkey, "then", rule["then"]:toJSON())
+      diff["then"]=nil
+    end
+    if diff["else"] then
+      update_refs(diff["else"].old, diff["else"].new)
+      redis.call("HSET", rkey, "else", rule["else"]:toJSON())
+      diff["else"]=nil
+    end
+    
+    redis_hmset(rkey, rule, table_keys(diff))
+  end,
+  delete = function(rule)
+    local rkey = keyf.rule:format(rule.name)
+    if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
+    if redis.call("ZCARD", keyf.rule_refs:format(rule.name)) > 0 then error("rule \"" .. rule.name .. "\" still in use") end
+    
+    local rule_ref = "rule:"..rule.name
+    for _, ref in ipairs(rule.refs or {}) do
+      local ref_kind, ref_name = ref:match("(.+):(.+)")
+      local refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
+      redis.call("ZINCRBY", refkey, -1, rule_ref)
+      redis.call("ZREMRANGEBYSCORE", refkey, "-inf", 0)
+    end
+    
+    redis.call("SREM", key.rules, rule.name)
+    redis.call("DEL", rkey)
   end
 })
 
@@ -205,6 +383,29 @@ Binding.set("ruleset", {
     ruleset.gen = 0
     redis_hmset(key.ruleset, ruleset, "name", "info", "gen")
     redis.call("SADD", key.rulesets, ruleset.name)
+  end,
+  update = function(ruleset, diff)
+    if redis.call("SISMEMBER", key.rulesets, ruleset.name) == 0 then error(("ruleset \"%s\" does not exist"):format(ruleset.name)) end
+    assert(not diff.name, "don't know how to rename rulesets yet")
+    assert(not diff.lists, "don't know how to update ruleset lists inline")
+    assert(not diff.limiters, "don't know how to update ruleset limiters inline")
+    assert(not diff.rules, "don't know how to update ruleset rules inline")
+    ruleset.gen = tonumber(ruleset.gen or 0) + 1
+    diff.gen = true
+    
+    redis_hmset(key.ruleset, ruleset, table_keys(diff))
+  end,
+  delete = function(ruleset)
+    if redis.call("SISMEMBER", key.rulesets, ruleset.name) == 0 then error(("ruleset \"%s\" does not exist"):format(ruleset.name)) end
+    --TODO: is this ruleset in use?
+    redis.call("SREM", key.rulesets, ruleset.name)
+    assert(redis.call("SCARD", key.phases) == 0, "some phases still present in ruleset")
+    assert(redis.call("SCARD", key.list) == 0, "some lists still present in ruleset")
+    assert(redis.call("SCARD", key.rule) == 0, "some rules still present in ruleset")
+    assert(redis.call("SCARD", key.limiter) == 0, "some limiters still present in ruleset")
+    
+    redis.call("DEL", key.ruleset)
+    
   end
 })
 
