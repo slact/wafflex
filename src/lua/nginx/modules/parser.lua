@@ -253,36 +253,59 @@ function Parser:parseInterpolatedString(str)
   return {string = str}
 end
 
+local function attr_present(parser, data, attr_name, err)
+  local target = attr_name and data[attr_name] or data
+  if not target then
+    if parser.allow_incomplete then
+      data.incomplete = true
+      parser.incomplete = true
+    else
+      parser:error(err or "missing required attribute \"%s\"", attr_name)
+    end
+    return false
+  else
+    return true
+  end
+end
+
 function Parser:parseRuleSet(data, name)
   self:pushContext(data, "ruleset")
   
   self:assert_type(data, "table", "wrong type for ruleset")
-  parseRulesetThing(self, data, {
-    thing="limiter", key="limiters", type="table",
-    parser_method= self.parseLimiter
-  })
-  self:checkLimiters(data.limiters)
-  
   self.ruleset.name = name or data.name
   
+  if attr_present(self, data, "limiters") then
+    parseRulesetThing(self, data, {
+      thing="limiter", key="limiters", type="table",
+      parser_method= self.parseLimiter
+    })
+    self:checkLimiters(data.limiters)
+  end
+  
   --luacheck: push ignore 432 --don't mind the shadowing
-  parseRulesetThing(self, data, {
-    thing="rule", key="rules",  type="table",
-    parser_method=function(self, data, name)
-      self:pushContext(data, "rule")
-      self:assert(type(data) ~= "string", ("named rule \"%s\" cannot be a string referring to another named rule \"%s\""):format(name, tostring(data)))
-      self:popContext()
-      return self:parseRule(data, name)
-    end
-  })
+  if attr_present(self, data, "rules") then
+    parseRulesetThing(self, data, {
+      thing="rule", key="rules",  type="table",
+      parser_method=function(self, data, name)
+        self:pushContext(data, "rule")
+        self:assert(type(data) ~= "string", ("named rule \"%s\" cannot be a string referring to another named rule \"%s\""):format(name, tostring(data)))
+        self:popContext()
+        return self:parseRule(data, name)
+      end
+    })
+  end
   --luacheck: pop
   
-  parseRulesetThing(self, data, {
-    thing="list", key="lists",  type="table",
-    parser_method= self.parseList
-  })
+  if attr_present(self, data, "lists") then
+    parseRulesetThing(self, data, {
+      thing="list", key="lists",  type="table",
+      parser_method= self.parseList
+    })
+  end
   
-  self.ruleset.phases = self:parsePhaseTable(data.phases)
+  if attr_present(self, data, "phases") then
+    self.ruleset.phases = self:parsePhaseTable(data.phases)
+  end
   --convert debug metatable data to __dbg table whenever possible
   local function move_dbg_data(tbl)
     local meta = getmetatable(tbl)
@@ -342,7 +365,7 @@ function Parser:parseList(data, name)
     return self:assert(self:getList(data), ([[named list "%s" not found]]):format(data))
   end
   self:pushContext(data, "list")
-  local list
+  local list = {}
   if self:jsontype(data) == "object" then
     if name then
       self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
@@ -351,13 +374,19 @@ function Parser:parseList(data, name)
     end
     data = data.rules
   end
-  self:assert_jsontype(data, "array", "rule list must be an array")
-  local rules = {}
-  for _,v in ipairs(data) do
-    table.insert(rules, self:parseRule(v))
+  
+  local rules
+  
+  if attr_present(self, data, nil, "missing rule list") then
+    self:assert_jsontype(data, "array", "rule list must be an array")
+    rules = {}
+    for _,v in ipairs(data) do
+      table.insert(rules, self:parseRule(v))
+    end
   end
   self:popContext()
-  list = {name=name, rules=rules}
+  list.name=name
+  list.rules=rules
   inheritmetatable(list, data)
   return list
 end
@@ -413,6 +442,9 @@ function Parser:parseRule(data, name)
     data["always"]=nil
   elseif next(data) == nil then
     self:error("empty rule not allowed")
+  elseif self.allow_incomplete then
+    data.incomplete = true
+    self.incomplete = true
   else
     self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")
   end
@@ -422,8 +454,12 @@ function Parser:parseRule(data, name)
   end
   
   if data["if"] then
-    data["then"] = self:parseActions(data["then"], "then")
-    data["else"] = self:parseActions(data["else"], "else")
+    if attr_present(self, data, "then") then
+      data["then"] = self:parseActions(data["then"], "then")
+    end
+    if data["else"] or not self.allow_incomplete then
+      data["else"] = self:parseActions(data["else"], "else")
+    end
   end
   if data.key then
     data.key = self:parseInterpolatedString(data.key)
@@ -538,11 +574,16 @@ function Parser:parseLimiter(data, name)
   self:pushContext(data, "limiter")
   
   if not data.name then data.name = name end
-  data.interval = self:parseTimeInterval(data.interval, "interval value")
-  self:assert(data.interval >= 60, "\"interval\" value must be >= 60 seconds")
-  self:assert(data.limit, "missing \"limit\" value")
-  data.limit = self:assert(tonumber(data.limit), "invalid \"limit\" value, must be a number")
-  self:assert(data.limit >= 0, "\"limit\" value must be >= 0")
+  
+  if attr_present(self, data, "interval") then
+    data.interval = self:parseTimeInterval(data.interval, "interval value")
+    self:assert(data.interval >= 60, "\"interval\" value must be >= 60 seconds")
+  end
+  
+  if attr_present(self, data, "limit") then
+    data.limit = self:assert(tonumber(data.limit), "invalid \"limit\" value, must be a number")
+    self:assert(data.limit >= 0, "\"limit\" value must be >= 0")
+  end
   
   if data.sync_steps then
     data.sync_steps = self:assert(tonumber(data.sync_steps), "invalid \"sync-steps\" value")
@@ -605,6 +646,9 @@ local function newparser(opt)
         return ret
       end})
     end
+  end
+  if opt.allow_incomplete then
+    parser.allow_incomplete = true
   end
 
   setmetatable(parser, Parser_meta)

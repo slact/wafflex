@@ -80,7 +80,6 @@ static wfx_binding_t wfx_list_binding = {
   "list",
   list_create,
   NULL,
-  NULL,
   list_delete
 };
 

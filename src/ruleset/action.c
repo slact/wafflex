@@ -23,7 +23,6 @@ wfx_action_t *action_create(lua_State *L, size_t data_sz, wfx_action_eval_pt eva
   (binding).name = buf; \
   (binding).create = action->create; \
   (binding).update = NULL; \
-  (binding).replace = NULL; \
   (binding).delete = action->destroy
 
 void wfx_action_bindings_set(lua_State *L) {

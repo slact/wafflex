@@ -169,10 +169,22 @@ mt.limiter = {
   end
 }
 
+local function updateThing(self, thing_type, findThing, name, data)
+  --assumes data is already valid
+  local thing = findThing(self, name)
+  if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
+  local delta = {}
+  for k, v in pairs(data) do
+    delta[k]={old=thing[k], new=v}
+    thing[k]=v
+  end
+  Binding.call(thing_type, "update", thing, delta)
+  return thing
+end
+
 function Ruleset:findLimiter(name)
   return self.limiters[thing_name(name)]
 end
-
 function Ruleset:addLimiter(data, limiters_in)
   if data.__already_loaded_as_burst_limiter then
     data.__already_loaded_as_burst_limiter = nil
@@ -192,7 +204,15 @@ function Ruleset:addLimiter(data, limiters_in)
   Binding.call("limiter", "create", limiter)
   return limiter
 end
+function Ruleset:updateLimiter(name, data)
+  if data.burst then
+    local burst = self:findLimiter(data.burst)
+    assert(burst, ("unknown burst limiter \"%s\""):format(thing_name(data.burst)))
+    data.burst = burst
+  end
 
+  return updateThing(self, "limiter", self.findLimiter, name, data)
+end
 function Ruleset:deleteLimiter(limiter)
   assert(self.limiters[limiter.name] == limiter, "tried deleting unexpected limiter of the same name")
   --TODO: check which rules use this limiter
@@ -218,7 +238,9 @@ function Ruleset:addRule(data)
   Binding.call("rule", "create", rule)
   return rule
 end
-
+function Ruleset:updateRule(name, data)
+  return updateThing(self, "rule", self.findRule, name, data)
+end
 function Ruleset:deleteRule(rule)
   assert(self.rules[rule.name] == rule, "tried deleting unexpected rule of the same name")
   for list_name, list in pairs(self.lists) do
@@ -250,6 +272,7 @@ function Ruleset:findList(name)
 end
 
 function Ruleset:addList(data)
+  assert(data.rules)
   if not data.name then
     data.name = self:uniqueName("list")
   else
@@ -264,7 +287,17 @@ function Ruleset:addList(data)
   Binding.call("list", "create", list)
   return list
 end
-
+function Ruleset:updateList(name, data)
+  if data.rules then
+    data = data.rules
+    if data.name then assert(name == data.name) end
+  end
+  for i, rule_data in ipairs(data.rules) do
+    data.rules[i]= self:findRule(rule_data.name) or self:addRule(rule_data)
+  end
+  
+  return updateThing(self, "list", self.findList, name, data)
+end
 function Ruleset:deleteList(list)
   assert(self.lists[list.name] == list, "tried deleting unexpected list of the same name")
   for phase_name, phase in pairs(self.phases) do
@@ -276,22 +309,41 @@ function Ruleset:deleteList(list)
   Binding.call("list", "delete", list)
 end
 
-function Ruleset:setPhaseTable(data)
-  if self.phases then
-    for _, phase in pairs(self.phases) do
-      Binding.call("phase", "delete", phase)
-    end
+local possible_phases = {request=true}
+function Ruleset:addPhase(data, name)
+  local lists
+  if data.name then -- {name: phaseName, lists: [...]}
+    if name then assert(name == data.name) end
+    lists = data.lists
+  else  -- [ lists ]
+    assert(name)
+    lists = data
   end
-  self.phases = {}
-  for k,v in pairs(data) do
-    local phase = mt.phase.new(k, data)
-    for i, list in pairs(v) do
-      phase.lists[i]=self:findList(list) or self:addList(list)
+  
+  assert(possible_phases[name], ("unknown phase \"%s\""):format(name))
+  assert(not self.phases[name], ("phase \"%s\" already exists"):format(name))
+  
+  local err
+  for i, list in ipairs(lists) do
+    if type(list) == "string" then
+      list, err = self:findList(list)
+    else
+      list, err = self:findList(list)
+      if not list then
+        list, err = self:addList(list)
+      end
     end
-    self.phases[k]=phase
-    Binding.call("phase", "create", phase)
+    if not list then return nil, err or ("can't find list \"%s\" for phase \"%s\""):format(list, name) end
+    lists[i]=list
   end
-  return self.phases
+  local phase = mt.phase.new(name, lists)
+  Binding.call("phase", "create", phase)
+  return phase
+end
+function Ruleset:deletePhase(name)
+  local phase = assert(self.phases[name], ("phase \"%s\" does not exist"):format(name))
+  Binding.call("phase", "delete", phase)
+  self.phases[name]=nil
 end
 
 function Ruleset:uniqueName(thing)
@@ -334,7 +386,9 @@ end
 
 function Ruleset:destroy()
   --clear phases
-  self:setPhaseTable({})
+  for name, _ in pairs(self.phases) do
+    self:deletePhase(name)
+  end
   
   --clear lists
   for _, list in pairs(self.lists) do
@@ -361,7 +415,7 @@ Module = {
       rules=setmetatable({}, mt.rules),
       lists=setmetatable({}, mt.lists),
       limiters=setmetatable({}, mt.limiters),
-      phases={},
+      phases=setmetatable({}, mt.phases),
       name = data and data.name or nil
     }, mt.ruleset)
 
@@ -381,7 +435,9 @@ Module = {
         ruleset:addList(v)
       end
       
-      ruleset:setPhaseTable(data.phases)
+      for n, v in pairs(data.phases) do
+        ruleset:addPhase(v, n)
+      end
     end
     Binding.call("ruleset", "create", ruleset)
     return ruleset

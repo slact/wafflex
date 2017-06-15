@@ -68,7 +68,6 @@ static wfx_binding_t wfx_string_binding = {
   "string",
   string_create,
   NULL,
-  NULL,
   string_destroy
 };
 

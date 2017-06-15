@@ -141,7 +141,6 @@ static wfx_binding_t wfx_rule_binding = {
   "rule",
   rule_create,
   NULL,
-  NULL,
   rule_delete
 };
 

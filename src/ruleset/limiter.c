@@ -153,7 +153,6 @@ static wfx_binding_t wfx_limiter_binding = {
   "limiter",
   limiter_create,
   NULL,
-  NULL,
   limiter_delete
 };
 

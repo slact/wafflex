@@ -78,7 +78,6 @@ void condition_stack_set_tail_data(wfx_evaldata_t *ed, void *d) {
   (binding).name = buf; \
   (binding).create = cond->create; \
   (binding).update = NULL; \
-  (binding).replace = NULL; \
   (binding).delete = cond->destroy
 
 void wfx_condition_bindings_set(lua_State *L) {;

@@ -37,22 +37,6 @@ local calls = {
     end
     return true
   end,
-  replace = function(replace_callback, self, replacee, ...)
-    if type(self) ~= "table" then
-      return nil, ("expected 'self'(replacement) to be table, got %s)"):format(type(self))
-    end
-    if type(self) ~= "table" then
-      return nil, ("expected 'replacee' to be table, got %s)"):format(type(replacee))
-    end
-    if self.ruleset ~= replacee.ruleset then
-      return nil, "replacement ruleset differs from replacee ruleset"
-    end
-    local ref = replace_callback(self, replacee, ...)
-    if type(ref) == "userdata" then
-      self.__binding = ref
-    end
-    return true
-  end,
   delete = function(delete_callback, self, ...)
     if type(self) ~= "table" then
       return nil, ("expected 'self' to be table, got %s)"):format(type(self))
@@ -63,20 +47,18 @@ local calls = {
   end
 }
 
-function Binding.set(name, create, replace, update, delete)
+function Binding.set(name, create, update, delete)
   assert(not rawget(binds, name), ("binding %s already set"):format(name))
   assert(type(name)=="string", "binding name must be a string, got " .. type(name))
-  if type(create) == "table" and replace == nil and update == nil and delete == nil then
+  if type(create) == "table" and update == nil and delete == nil then
     local tbl = create
     create = tbl.create
-    replace = tbl.replace
     update = tbl.update
     delete = tbl.delete
   end
   
   local callbacks = {
     create = create,
-    replace = replace,
     update = update,
     delete = delete
   }

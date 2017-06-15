@@ -77,7 +77,6 @@ static wfx_binding_t wfx_phase_binding = {
   "phase",
   phase_create,
   NULL,
-  NULL,
   phase_delete
 };
 

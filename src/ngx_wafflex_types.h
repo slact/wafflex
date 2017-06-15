@@ -6,7 +6,6 @@
 typedef struct {
   const char           *name;
   lua_CFunction         create;
-  lua_CFunction         replace;
   lua_CFunction         update;
   lua_CFunction         delete;
 } wfx_binding_t;

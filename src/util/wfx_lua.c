@@ -290,13 +290,6 @@ void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding) {
   else {
     lua_pushnil(L);
   }
-  if(binding->replace) {
-    snprintf(buf, 255, "%s replace", binding->name);
-    wfx_lua_register_named(L, binding->replace, buf);
-  }
-  else {
-    lua_pushnil(L);
-  }
   if(binding->update) {
     snprintf(buf, 255, "%s update", binding->name);
     wfx_lua_register_named(L, binding->update, buf);
@@ -312,7 +305,7 @@ void wfx_lua_binding_set(lua_State *L, wfx_binding_t *binding) {
     lua_pushnil(L);
   }
   
-  lua_ngxcall(L,5,0);
+  lua_ngxcall(L,4,0);
 }
 
 //debug stuff

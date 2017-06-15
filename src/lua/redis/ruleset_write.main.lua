@@ -43,14 +43,11 @@ local function genkeys(new_ruleset_name)
   key = {
     rulesets = prefix.."rulesets",
     ruleset =  kbase,
+    ruleset_pubsub = kbase..":pubsub",
     phases =   kbase..":phases",
     lists =    kbase..":lists",
     rules =    kbase..":rules",
     limiters = kbase..":limiters",
-    
-    pubsub = {
-      ruleset = kbase..":pubsub"
-    }
   }
   keyf = {
     list =         key.ruleset..":list:%s",
@@ -62,6 +59,7 @@ local function genkeys(new_ruleset_name)
     
     limiter =      key.ruleset..":limiter:%s",
     limiter_refs = key.ruleset..":limiter:%s:refs",
+    limiter_pubsub=key.ruleset..":limiter:%s:pubsub",
     
     phase =        key.ruleset..":phase:%s",
     phase_lists =  key.ruleset..":phase:%s:lists"
@@ -118,6 +116,12 @@ Binding.set("limiter", {
     end
     
     limiter_created[limiter.name]=true
+  end,
+  update = function(limiter)
+    
+  end,
+  delete = function(limiter)
+    
   end
 })
 
@@ -215,7 +219,7 @@ actions = {
       local json_in = nextarg(1)
       
       local p = Parser.new()
-      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset", true)
+      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset")
       if not parsed then
         return {0, err}
       end
@@ -228,6 +232,20 @@ actions = {
       
       return {1}
     end,
+    update = function()
+      if not ruleset_name or #ruleset_name == 0 then return {0, ("no ruleset name given")} end
+      if redis.call("EXISTS", key.ruleset) == 0 then
+        return {0, ("ruleset \"%s\" does not exist"):format(ruleset_name)}
+      end
+      
+      local json_in = nextarg(1)
+      
+      local p = Parser.new({incomplete=true})
+      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name)
+      if not parsed then
+        return {0, err}
+      end
+    end,
     delete = function()
       local name = nextarg(1)
       error("can'd do this yet" .. name, ruleset_name)
@@ -235,15 +253,48 @@ actions = {
   },
   list = {
     create = function()
-    
+      local json_in, list_name = nextarg(2)
+      if not list_name then list_name = "" end
+      
+      if #list_name > 0 and redis.call("EXISTS", keyf.list:format(list_name)) == 1 then
+        return {0, ("rule \"%s\" already exists"):format(list_name)}
+      end
+      
+      local p = Parser.new()
+      local parsed, err = p:parseJSON("list", json_in, list_name)
+      if not parsed then
+        return {0, err}
+      end
+      
+      local list = Ruleset.newList(parsed)
+      hmm(list)
+      
+      return {1}
     end,
     delete = function()
-    
+      
     end
   },
   rule = {
     create = function()
-    
+      local json_in, rule_name = nextarg(2)
+      if not rule_name then rule_name = "" end
+      
+      if #rule_name > 0 and redis.call("EXISTS", keyf.rule:format(rule_name)) == 1 then
+        return {0, ("rule \"%s\" already exists"):format(rule_name)}
+      end
+      
+      local p = Parser.new()
+      local parsed, err = p:parseJSON("rule", json_in, rule_name)
+      if not parsed then
+        return {0, err}
+      end
+      
+      local rule = Ruleset.newRule(parsed)
+      
+      hmm(rule)
+      return {1}
+      
     end,
     delete = function()
     
@@ -251,10 +302,25 @@ actions = {
   },
   limiter = {
     create = function()
-    
+      local json_in, limiter_name = nextarg(2)
+      if not limiter_name then limiter_name = "" end
+      
+      if #limiter_name > 0 and redis.call("EXISTS", keyf.rule:format(#limiter_name)) == 1 then
+        return {0, ("rule \"%s\" already exists"):format(#limiter_name)}
+      end
+      
+      local p = Parser.new()
+      local parsed, err = p:parseJSON("rule", json_in, #limiter_name)
+      if not parsed then
+        return {0, err}
+      end
+      
+      local rule = Ruleset.newRule(parsed)
+      hmm(rule)
+      return {1}
     end,
     delete = function()
-    
+      
     end
   }
 }
