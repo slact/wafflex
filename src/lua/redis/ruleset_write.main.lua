@@ -27,6 +27,17 @@ local function redis_hmset(key, tbl, ...)
   end
 end
 
+local function redis_gethash(redis_key)
+  local res = redis.call("HGETALL", redis_key)
+  if type(res)~="table" then return nil end
+  local h, k = {}, nil
+  for _, v in ipairs(res) do
+    if k == nil then k=v
+    else h[k]=v; k=nil end
+  end
+  return h
+end
+
 local function table_keys(tbl)
   local keys = {}
   for k, _ in pairs(tbl) do
@@ -112,6 +123,8 @@ Ruleset.uniqueName = function(thing, thingtbl, ruleset)
     return name
   end
 end
+
+local skip_binding = false
 
 local limiter_created = {} --needed because limiters can reference other limiters
 Binding.set("limiter", {
@@ -294,6 +307,7 @@ Binding.set("phase", {
 
 Binding.set("rule", {
   create = function(rule)
+    if rule.external then return end
     local rkey = keyf.rule:format(rule.name)
     if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" already exists") end
     rule.gen = 0
@@ -409,6 +423,8 @@ Binding.set("ruleset", {
   end
 })
 
+
+
 local actions
 actions = {
   ruleset = {
@@ -443,9 +459,11 @@ actions = {
       
       local p = Parser.new({incomplete=true})
       local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name)
-      if not parsed then
-        return {0, err}
-      end
+      if not parsed then return {0, err} end
+      
+      local rs = redis_gethash(key.ruleset)
+      rs.external = true
+      rs = Ruleset.new(rs)
     end,
     delete = function()
       local name = nextarg(1)

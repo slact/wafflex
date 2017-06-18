@@ -423,19 +423,19 @@ Module = {
     
     if data then
       --load data
-      for _, v in pairs(data.limiters) do
+      for _, v in pairs(data.limiters or {}) do
         ruleset:addLimiter(v, data.limiters)
       end
       
-      for _, v in pairs(data.rules) do
+      for _, v in pairs(data.rules or {}) do
         ruleset:addRule(v)
       end
       
-      for _, v in pairs(data.lists) do
+      for _, v in pairs(data.lists or {}) do
         ruleset:addList(v)
       end
       
-      for n, v in pairs(data.phases) do
+      for n, v in pairs(data.phases or {}) do
         ruleset:addPhase(v, n)
       end
     end
