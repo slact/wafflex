@@ -1,6 +1,10 @@
 #!/usr/bin/ruby
+require 'rubygems'
+require 'bundler/setup'
+
 require 'minitest'
 require 'minitest/reporters'
+
 require "minitest/autorun"
 Minitest::Reporters.use! [Minitest::Reporters::SpecReporter.new(:color => true)]
 require 'securerandom'
