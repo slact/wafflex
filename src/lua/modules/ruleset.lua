@@ -349,8 +349,10 @@ function Ruleset:addPhase(data, name)
     if type(list) == "string" then
       list, err = self:findList(list)
     else
-      list, err = self:findList(list)
-      if not list then
+      local found_list = self:findList(list)
+      if found_list then
+        list = found_list
+      else
         list, err = self:addList(list)
       end
     end

@@ -319,11 +319,11 @@ Binding.set("rule", {
     end
     if rule.refs then
       local rule_ref = "rule:"..rule.name
-      for ref_type, ref in pairs(rule.refs) do
-        local refkeyf = assert(keyf[ref_type .. "_refs"])
-        for _, ref_name in ipairs(ref) do
-          redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
-        end
+      hmm(rule.refs)
+      for _, ref in ipairs(rule.refs) do
+        local ref_type, ref_name = ref:match "([^:]+):(.+)"
+        local refkeyf = assert(keyf[ref_type .. "_refs"], "keyf \"" .. tostring(ref_type).."_refs" .. "\" missing " .. inspect(keyf))
+        redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
       end
     end
     redis.call("SADD", key.rules, rule.name)
@@ -492,7 +492,7 @@ actions = {
       local json_in = nextarg()
       
       local p = Parser.new()
-      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset")
+      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset", true)
       if not parsed then
         return {0, err}
       end
@@ -501,7 +501,6 @@ actions = {
       end
       
       local rs = Ruleset.new(parsed)
-      hmm(rs)
       
       return {1}
     end,
@@ -529,7 +528,6 @@ actions = {
       end
       
       local list = Ruleset.newList(parsed)
-      hmm(list)
       
       return {1}
     end,
@@ -558,7 +556,6 @@ actions = {
       
       local rule = Ruleset.newRule(parsed)
       
-      hmm(rule)
       return {1}
     end,
     update = function()
@@ -575,17 +572,16 @@ actions = {
       if not limiter_name then limiter_name = "" end
       
       if #limiter_name > 0 and redis.call("EXISTS", keyf.rule:format(#limiter_name)) == 1 then
-        return {0, ("rule \"%s\" already exists"):format(#limiter_name)}
+        return {0, ("limiter \"%s\" already exists"):format(#limiter_name)}
       end
       
       local p = Parser.new()
-      local parsed, err = p:parseJSON("rule", json_in, #limiter_name)
+      local parsed, err = p:parseJSON("limiter", json_in, #limiter_name)
       if not parsed then
         return {0, err}
       end
       
-      local rule = Ruleset.newRule(parsed)
-      hmm(rule)
+      local rule = Ruleset.newLimiter(parsed)
       return {1}
     end,
     update = function()

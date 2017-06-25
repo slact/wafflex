@@ -249,8 +249,8 @@ Component.condition.add({"limit-break", "limit-check"}, {
     if Component.generate_refs then
       if not rule.refs then rule.refs = {} end
       if not rule_condition.refs then rule_condition.refs = {} end
-      table.insert(rule.refs.limiter, "limiter:"..data.name)
-      table.insert(rule_condition.refs.limiter, "limiter:"..data.name)
+      table.insert(rule.refs, "limiter:"..data.name)
+      table.insert(rule_condition.refs, "limiter:"..data.name)
     end
     
     return data

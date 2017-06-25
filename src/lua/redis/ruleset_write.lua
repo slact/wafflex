@@ -319,11 +319,11 @@
       end
       if rule.refs then
         local rule_ref = "rule:"..rule.name
-        for ref_type, ref in pairs(rule.refs) do
-          local refkeyf = assert(keyf[ref_type .. "_refs"])
-          for _, ref_name in ipairs(ref) do
-            redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
-          end
+        hmm(rule.refs)
+        for _, ref in ipairs(rule.refs) do
+          local ref_type, ref_name = ref:match "([^:]+):(.+)"
+          local refkeyf = assert(keyf[ref_type .. "_refs"], "keyf \"" .. tostring(ref_type).."_refs" .. "\" missing " .. inspect(keyf))
+          redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
         end
       end
       redis.call("SADD", key.rules, rule.name)
@@ -492,7 +492,7 @@
         local json_in = nextarg()
         
         local p = Parser.new()
-        local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset")
+        local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset", true)
         if not parsed then
           return {0, err}
         end
@@ -615,32 +615,2648 @@ end
 --luacheck: ignore
 
 module("inspect", function()
-local a={_VERSION='inspect.lua 3.1.0',_URL='http://github.com/kikito/inspect.lua',_DESCRIPTION='human-readable representations of tables',_LICENSE="MIT LICENSE; Copyright (c) 2013 Enrique García Cota"}local tostring=tostring;a.KEY=setmetatable({},{__tostring=function()return'inspect.KEY'end})a.METATABLE=setmetatable({},{__tostring=function()return'inspect.METATABLE'end})local function b(c)if c:match('"')and not c:match("'")then return"'"..c.."'"end;return'"'..c:gsub('"','\\"')..'"'end;local d={["\a"]="\\a",["\b"]="\\b",["\f"]="\\f",["\n"]="\\n",["\r"]="\\r",["\t"]="\\t",["\v"]="\\v"}local e={}for f=0,31 do local g=string.char(f)if not d[g]then d[g]="\\"..f;e[g]=string.format("\\%03d",f)end end;local function h(c)return c:gsub("\\","\\\\"):gsub("(%c)%f[0-9]",e):gsub("%c",d)end;local function i(c)return type(c)=='string'and c:match("^[_%a][_%a%d]*$")end;local function j(k,l)return type(k)=='number'and 1<=k and k<=l and math.floor(k)==k end;local m={['number']=1,['boolean']=2,['string']=3,['table']=4,['function']=5,['userdata']=6,['thread']=7}local function n(o,p)local q,r=type(o),type(p)if q==r and(q=='string'or q=='number')then return o<p end;local s,t=m[q],m[r]if s and t then return m[q]<m[r]elseif s then return true elseif t then return false end;return q<r end;local function u(v)local w=1;local x=rawget(v,w)while x~=nil do w=w+1;x=rawget(v,w)end;return w-1 end;local function y(v)local z={}local l=u(v)for k,A in pairs(v)do if not j(k,l)then table.insert(z,k)end end;table.sort(z,n)return z,l end;local function B(v,C)local D=type(C)=='table'and rawget(C,'__tostring')local c,E;if type(D)=='function'then E,c=pcall(D,v)c=E and c or'error: '..tostring(c)end;if type(c)=='string'and#c>0 then return c end end;local function F(v,G)G=G or{}if type(v)=='table'then if not G[v]then G[v]=1;for k,x in pairs(v)do F(k,G)F(x,G)end;F(getmetatable(v),G)else G[v]=G[v]+1 end end;return G end;local H=function(I)local J,w={},#I;for f=1,w do J[f]=I[f]end;return J,w end;local function K(L,...)local z={...}local M,w=H(L)for f=1,#z do M[w+f]=z[f]end;return M end;local function N(O,P,L,Q)if P==nil then return nil end;if Q[P]then return Q[P]end;local R=O(P,L)if type(R)=='table'then local S={}Q[P]=S;local T;for k,x in pairs(R)do T=N(O,k,K(L,k,a.KEY),Q)if T~=nil then S[T]=N(O,x,K(L,T),Q)end end;local C=N(O,getmetatable(R),K(L,a.METATABLE),Q)setmetatable(S,C)R=S end;return R end;local U={}local V={__index=U}function U:puts(...)local W={...}local X=self.buffer;local w=#X;for f=1,#W do w=w+1;X[w]=W[f]end end;function U:down(Y)self.level=self.level+1;Y()self.level=self.level-1 end;function U:tabify()self:puts(self.newline,string.rep(self.indent,self.level))end;function U:alreadyVisited(x)return self.ids[x]~=nil end;function U:getId(x)local Z=self.ids[x]if not Z then local _=type(x)Z=(self.maxIds[_]or 0)+1;self.maxIds[_]=Z;self.ids[x]=Z end;return tostring(Z)end;function U:putKey(k)if i(k)then return self:puts(k)end;self:puts("[")self:putValue(k)self:puts("]")end;function U:putTable(v)if v==a.KEY or v==a.METATABLE then self:puts(tostring(v))elseif self:alreadyVisited(v)then self:puts('<table ',self:getId(v),'>')elseif self.level>=self.depth then self:puts('{...}')else if self.tableAppearances[v]>1 then self:puts('<',self:getId(v),'>')end;local a0,l=y(v)local C=getmetatable(v)local a1=B(v,C)self:puts('{')self:down(function()if a1 then self:puts(' -- ',h(a1))if l>=1 then self:tabify()end end;local a2=0;for f=1,l do if a2>0 then self:puts(',')end;self:puts(' ')self:putValue(v[f])a2=a2+1 end;for A,k in ipairs(a0)do if a2>0 then self:puts(',')end;self:tabify()self:putKey(k)self:puts(' = ')self:putValue(v[k])a2=a2+1 end;if C then if a2>0 then self:puts(',')end;self:tabify()self:puts('<metatable> = ')self:putValue(C)end end)if#a0>0 or C then self:tabify()elseif l>0 then self:puts(' ')end;self:puts('}')end end;function U:putValue(x)local _=type(x)if _=='string'then self:puts(b(h(x)))elseif _=='number'or _=='boolean'or _=='nil'then self:puts(tostring(x))elseif _=='table'then self:putTable(x)else self:puts('<',_,' ',self:getId(x),'>')end end;function a.inspect(a3,a4)a4=a4 or{}local a5=a4.depth or math.huge;local a6=a4.newline or'\n'local a7=a4.indent or'  'local O=a4.process;if O then a3=N(O,a3,{},{})end;local a8=setmetatable({depth=a5,level=0,buffer={},ids={},maxIds={},newline=a6,indent=a7,tableAppearances=F(a3)},V)a8:putValue(a3)return table.concat(a8.buffer)end;setmetatable(a,{__call=function(A,...)return a.inspect(...)end})return a
+  local inspect ={
+    _VERSION = 'inspect.lua 3.1.0',
+    _URL     = 'http://github.com/kikito/inspect.lua',
+    _DESCRIPTION = 'human-readable representations of tables',
+    _LICENSE = "MIT LICENSE; Copyright (c) 2013 Enrique García Cota"
+  }
+  
+  local tostring = tostring
+  
+  inspect.KEY       = setmetatable({}, {__tostring = function() return 'inspect.KEY' end})
+  inspect.METATABLE = setmetatable({}, {__tostring = function() return 'inspect.METATABLE' end})
+  
+  -- Apostrophizes the string if it has quotes, but not aphostrophes
+  -- Otherwise, it returns a regular quoted string
+  local function smartQuote(str)
+    if str:match('"') and not str:match("'") then
+      return "'" .. str .. "'"
+    end
+    return '"' .. str:gsub('"', '\\"') .. '"'
+  end
+  
+  -- \a => '\\a', \0 => '\\0', 31 => '\31'
+  local shortControlCharEscapes = {
+    ["\a"] = "\\a",  ["\b"] = "\\b", ["\f"] = "\\f", ["\n"] = "\\n",
+    ["\r"] = "\\r",  ["\t"] = "\\t", ["\v"] = "\\v"
+  }
+  local longControlCharEscapes = {} -- \a => nil, \0 => \000, 31 => \031
+  for i=0, 31 do
+    local ch = string.char(i)
+    if not shortControlCharEscapes[ch] then
+      shortControlCharEscapes[ch] = "\\"..i
+      longControlCharEscapes[ch]  = string.format("\\%03d", i)
+    end
+  end
+  
+  local function escape(str)
+    return (str:gsub("\\", "\\\\")
+               :gsub("(%c)%f[0-9]", longControlCharEscapes)
+               :gsub("%c", shortControlCharEscapes))
+  end
+  
+  local function isIdentifier(str)
+    return type(str) == 'string' and str:match( "^[_%a][_%a%d]*$" )
+  end
+  
+  local function isSequenceKey(k, sequenceLength)
+    return type(k) == 'number'
+       and 1 <= k
+       and k <= sequenceLength
+       and math.floor(k) == k
+  end
+  
+  local defaultTypeOrders = {
+    ['number']   = 1, ['boolean']  = 2, ['string'] = 3, ['table'] = 4,
+    ['function'] = 5, ['userdata'] = 6, ['thread'] = 7
+  }
+  
+  local function sortKeys(a, b)
+    local ta, tb = type(a), type(b)
+  
+    -- strings and numbers are sorted numerically/alphabetically
+    if ta == tb and (ta == 'string' or ta == 'number') then return a < b end
+  
+    local dta, dtb = defaultTypeOrders[ta], defaultTypeOrders[tb]
+    -- Two default types are compared according to the defaultTypeOrders table
+    if dta and dtb then return defaultTypeOrders[ta] < defaultTypeOrders[tb]
+    elseif dta     then return true  -- default types before custom ones
+    elseif dtb     then return false -- custom types after default ones
+    end
+  
+    -- custom types are sorted out alphabetically
+    return ta < tb
+  end
+  
+  -- For implementation reasons, the behavior of rawlen & # is "undefined" when
+  -- tables aren't pure sequences. So we implement our own # operator.
+  local function getSequenceLength(t)
+    local len = 1
+    local v = rawget(t,len)
+    while v ~= nil do
+      len = len + 1
+      v = rawget(t,len)
+    end
+    return len - 1
+  end
+  
+  local function getNonSequentialKeys(t)
+    local keys = {}
+    local sequenceLength = getSequenceLength(t)
+    for k,_ in pairs(t) do
+      if not isSequenceKey(k, sequenceLength) then table.insert(keys, k) end
+    end
+    table.sort(keys, sortKeys)
+    return keys, sequenceLength
+  end
+  
+  local function getToStringResultSafely(t, mt)
+    local __tostring = type(mt) == 'table' and rawget(mt, '__tostring')
+    local str, ok
+    if type(__tostring) == 'function' then
+      ok, str = pcall(__tostring, t)
+      str = ok and str or 'error: ' .. tostring(str)
+    end
+    if type(str) == 'string' and #str > 0 then return str end
+  end
+  
+  local function countTableAppearances(t, tableAppearances)
+    tableAppearances = tableAppearances or {}
+  
+    if type(t) == 'table' then
+      if not tableAppearances[t] then
+        tableAppearances[t] = 1
+        for k,v in pairs(t) do
+          countTableAppearances(k, tableAppearances)
+          countTableAppearances(v, tableAppearances)
+        end
+        countTableAppearances(getmetatable(t), tableAppearances)
+      else
+        tableAppearances[t] = tableAppearances[t] + 1
+      end
+    end
+  
+    return tableAppearances
+  end
+  
+  local copySequence = function(s)
+    local copy, len = {}, #s
+    for i=1, len do copy[i] = s[i] end
+    return copy, len
+  end
+  
+  local function makePath(path, ...)
+    local keys = {...}
+    local newPath, len = copySequence(path)
+    for i=1, #keys do
+      newPath[len + i] = keys[i]
+    end
+    return newPath
+  end
+  
+  local function processRecursive(process, item, path, visited)
+  
+      if item == nil then return nil end
+      if visited[item] then return visited[item] end
+  
+      local processed = process(item, path)
+      if type(processed) == 'table' then
+        local processedCopy = {}
+        visited[item] = processedCopy
+        local processedKey
+  
+        for k,v in pairs(processed) do
+          processedKey = processRecursive(process, k, makePath(path, k, inspect.KEY), visited)
+          if processedKey ~= nil then
+            processedCopy[processedKey] = processRecursive(process, v, makePath(path, processedKey), visited)
+          end
+        end
+  
+        local mt  = processRecursive(process, getmetatable(processed), makePath(path, inspect.METATABLE), visited)
+        setmetatable(processedCopy, mt)
+        processed = processedCopy
+      end
+      return processed
+  end
+  
+  
+  
+  -------------------------------------------------------------------
+  
+  local Inspector = {}
+  local Inspector_mt = {__index = Inspector}
+  
+  function Inspector:puts(...)
+    local args   = {...}
+    local buffer = self.buffer
+    local len    = #buffer
+    for i=1, #args do
+      len = len + 1
+      buffer[len] = args[i]
+    end
+  end
+  
+  function Inspector:down(f)
+    self.level = self.level + 1
+    f()
+    self.level = self.level - 1
+  end
+  
+  function Inspector:tabify()
+    self:puts(self.newline, string.rep(self.indent, self.level))
+  end
+  
+  function Inspector:alreadyVisited(v)
+    return self.ids[v] ~= nil
+  end
+  
+  function Inspector:getId(v)
+    local id = self.ids[v]
+    if not id then
+      local tv = type(v)
+      id              = (self.maxIds[tv] or 0) + 1
+      self.maxIds[tv] = id
+      self.ids[v]     = id
+    end
+    return tostring(id)
+  end
+  
+  function Inspector:putKey(k)
+    if isIdentifier(k) then return self:puts(k) end
+    self:puts("[")
+    self:putValue(k)
+    self:puts("]")
+  end
+  
+  function Inspector:putTable(t)
+    if t == inspect.KEY or t == inspect.METATABLE then
+      self:puts(tostring(t))
+    elseif self:alreadyVisited(t) then
+      self:puts('<table ', self:getId(t), '>')
+    elseif self.level >= self.depth then
+      self:puts('{...}')
+    else
+      if self.tableAppearances[t] > 1 then self:puts('<', self:getId(t), '>') end
+  
+      local nonSequentialKeys, sequenceLength = getNonSequentialKeys(t)
+      local mt                = getmetatable(t)
+      local toStringResult    = getToStringResultSafely(t, mt)
+  
+      self:puts('{')
+      self:down(function()
+        if toStringResult then
+          self:puts(' -- ', escape(toStringResult))
+          if sequenceLength >= 1 then self:tabify() end
+        end
+  
+        local count = 0
+        for i=1, sequenceLength do
+          if count > 0 then self:puts(',') end
+          self:puts(' ')
+          self:putValue(t[i])
+          count = count + 1
+        end
+  
+        for _,k in ipairs(nonSequentialKeys) do
+          if count > 0 then self:puts(',') end
+          self:tabify()
+          self:putKey(k)
+          self:puts(' = ')
+          self:putValue(t[k])
+          count = count + 1
+        end
+  
+        if mt then
+          if count > 0 then self:puts(',') end
+          self:tabify()
+          self:puts('<metatable> = ')
+          self:putValue(mt)
+        end
+      end)
+  
+      if #nonSequentialKeys > 0 or mt then -- result is multi-lined. Justify closing }
+        self:tabify()
+      elseif sequenceLength > 0 then -- array tables have one extra space before closing }
+        self:puts(' ')
+      end
+  
+      self:puts('}')
+    end
+  end
+  
+  function Inspector:putValue(v)
+    local tv = type(v)
+  
+    if tv == 'string' then
+      self:puts(smartQuote(escape(v)))
+    elseif tv == 'number' or tv == 'boolean' or tv == 'nil' then
+      self:puts(tostring(v))
+    elseif tv == 'table' then
+      self:putTable(v)
+    else
+      self:puts('<',tv,' ',self:getId(v),'>')
+    end
+  end
+  
+  -------------------------------------------------------------------
+  
+  function inspect.inspect(root, options)
+    options       = options or {}
+  
+    local depth   = options.depth   or math.huge
+    local newline = options.newline or '\n'
+    local indent  = options.indent  or '  '
+    local process = options.process
+  
+    if process then
+      root = processRecursive(process, root, {}, {})
+    end
+  
+    local inspector = setmetatable({
+      depth            = depth,
+      level            = 0,
+      buffer           = {},
+      ids              = {},
+      maxIds           = {},
+      newline          = newline,
+      indent           = indent,
+      tableAppearances = countTableAppearances(root)
+    }, Inspector_mt)
+  
+    inspector:putValue(root)
+  
+    return table.concat(inspector.buffer)
+  end
+  
+  setmetatable(inspect, { __call = function(_, ...) return inspect.inspect(...) end })
+  
+  return inspect
+  
 
 end)
 
 module("dkjson", function()
-local a=false;local b=false;local c='json'local pairs,type,tostring,tonumber,getmetatable,setmetatable,rawset=pairs,type,tostring,tonumber,getmetatable,setmetatable,rawset;local error,require,pcall,select=error,require,pcall,select;local d,e=math.floor,math.huge;local f,g,h,i,j,k,l,m=string.rep,string.gsub,string.sub,string.byte,string.char,string.find,string.len,string.format;local n=string.match;local o=table.concat;local p={version="dkjson 2.5"}if b then _G[c]=p end;local q=nil;pcall(function()local r=require"debug".getmetatable;if r then getmetatable=r end end)p.null=setmetatable({},{__tojson=function()return"null"end})local function s(t)local u,v,w=0,0,0;for x,y in pairs(t)do if x=='n'and type(y)=='number'then w=y;if y>u then u=y end else if type(x)~='number'or x<1 or d(x)~=x then return false end;if x>u then u=x end;v=v+1 end end;if u>10 and u>w and u>v*2 then return false end;return true,u end;local z={["\""]="\\\"",["\\"]="\\\\",["\b"]="\\b",["\f"]="\\f",["\n"]="\\n",["\r"]="\\r",["\t"]="\\t"}local function A(B)local C=z[B]if C then return C end;local D,E,F,G=i(B,1,4)D,E,F,G=D or 0,E or 0,F or 0,G or 0;if D<=0x7f then C=D elseif 0xc0<=D and D<=0xdf and E>=0x80 then C=(D-0xc0)*0x40+E-0x80 elseif 0xe0<=D and D<=0xef and E>=0x80 and F>=0x80 then C=((D-0xe0)*0x40+E-0x80)*0x40+F-0x80 elseif 0xf0<=D and D<=0xf7 and E>=0x80 and F>=0x80 and G>=0x80 then C=(((D-0xf0)*0x40+E-0x80)*0x40+F-0x80)*0x40+G-0x80 else return""end;if C<=0xffff then return m("\\u%.4x",C)elseif C<=0x10ffff then C=C-0x10000;local H,I=0xD800+d(C/0x400),0xDC00+C%0x400;return m("\\u%.4x\\u%.4x",H,I)else return""end end;local function J(K,L,M)if k(K,L)then return g(K,L,M)else return K end end;local function N(C)C=J(C,"[%z\1-\31\"\\\127]",A)if k(C,"[\194\216\220\225\226\239]")then C=J(C,"\194[\128-\159\173]",A)C=J(C,"\216[\128-\132]",A)C=J(C,"\220\143",A)C=J(C,"\225\158[\180\181]",A)C=J(C,"\226\128[\140-\143\168-\175]",A)C=J(C,"\226\129[\160-\175]",A)C=J(C,"\239\187\191",A)C=J(C,"\239\191[\176-\191]",A)end;return"\""..C.."\""end;p.quotestring=N;local function O(K,P,v)local Q,R=k(K,P,1,true)if Q then return h(K,1,Q-1)..v..h(K,R+1,-1)else return K end end;local S,T;local function U()S=n(tostring(0.5),"([^05+])")T="[^0-9%-%+eE"..g(S,"[%^%$%(%)%%%.%[%]%*%+%-%?]","%%%0").."]+"end;U()local function V(W)return O(J(tostring(W),T,""),S,".")end;local function X(K)local W=tonumber(O(K,".",S))if not W then U()W=tonumber(O(K,".",S))end;return W end;local function Y(Z,_,a0)_[a0+1]="\n"_[a0+2]=f("  ",Z)a0=a0+2;return a0 end;function p.addnewline(a1)if a1.indent then a1.bufferlen=Y(a1.level or 0,a1.buffer,a1.bufferlen or#a1.buffer)end end;local a2;local function a3(a4,C,a5,a6,Z,_,a0,a7,a8,a1)local a9=type(a4)if a9~='string'and a9~='number'then return nil,"type '"..a9 .."' is not supported as a key by JSON."end;if a5 then a0=a0+1;_[a0]=","end;if a6 then a0=Y(Z,_,a0)end;_[a0+1]=N(a4)_[a0+2]=":"return a2(C,a6,Z,_,a0+2,a7,a8,a1)end;local function aa(ab,_,a1)local a0=a1.bufferlen;if type(ab)=='string'then a0=a0+1;_[a0]=ab end;return a0 end;local function ac(ad,C,a1,_,a0,ae)ae=ae or ad;local af=a1.exception;if not af then return nil,ae else a1.bufferlen=a0;local ag,ah=af(ad,C,a1,ae)if not ag then return nil,ah or ae end;return aa(ag,_,a1)end end;function p.encodeexception(ad,C,a1,ae)return N("<"..ae..">")end;a2=function(C,a6,Z,_,a0,a7,a8,a1)local ai=type(C)local aj=getmetatable(C)aj=type(aj)=='table'and aj;local ak=aj and aj.__jsonval;if ak then if type(ak)=="function"then C=ak(C)else C=ak end;ai=type(C)end;local al=aj and aj.__tojson;if al then if a7[C]then return ac('reference cycle',C,a1,_,a0)end;a7[C]=true;a1.bufferlen=a0;local ag,ah=al(C,a1)if not ag then return ac('custom encoder failed',C,a1,_,a0,ah)end;a7[C]=nil;a0=aa(ag,_,a1)elseif C==nil then a0=a0+1;_[a0]="null"elseif ai=='number'then local am;if C~=C or C>=e or-C>=e then am="null"else am=V(C)end;a0=a0+1;_[a0]=am elseif ai=='boolean'then a0=a0+1;_[a0]=C and"true"or"false"elseif ai=='string'then a0=a0+1;_[a0]=N(C)elseif ai=='table'then if a7[C]then return ac('reference cycle',C,a1,_,a0)end;a7[C]=true;Z=Z+1;local an,v=s(C)if v==0 and aj and aj.__jsontype=='object'then an=false end;local ah;if an then a0=a0+1;_[a0]="["for Q=1,v do a0,ah=a2(C[Q],a6,Z,_,a0,a7,a8,a1)if not a0 then return nil,ah end;if Q<v then a0=a0+1;_[a0]=","end end;a0=a0+1;_[a0]="]"else local a5=false;a0=a0+1;_[a0]="{"local ao=aj and aj.__jsonorder or a8;if ao then if type(ao)=="function"then ao=ao(C)end;local ap={}v=#ao;for Q=1,v do local x=ao[Q]local y=C[x]if y then ap[x]=true;a0,ah=a3(x,y,a5,a6,Z,_,a0,a7,a8,a1)a5=true end end;for x,y in pairs(C)do if not ap[x]then a0,ah=a3(x,y,a5,a6,Z,_,a0,a7,a8,a1)if not a0 then return nil,ah end;a5=true end end else for x,y in pairs(C)do a0,ah=a3(x,y,a5,a6,Z,_,a0,a7,a8,a1)if not a0 then return nil,ah end;a5=true end end;if a6 then a0=Y(Z-1,_,a0)end;a0=a0+1;_[a0]="}"end;a7[C]=nil else return ac('unsupported type',C,a1,_,a0,"type '"..ai.."' is not supported by JSON.")end;return a0 end;function p.encode(C,a1)a1=a1 or{}local aq=a1.buffer;local _=aq or{}a1.buffer=_;U()local ag,ah=a2(C,a1.indent,a1.level or 0,_,a1.bufferlen or 0,a1.tables or{},a1.keyorder,a1)if not ag then error(ah,2)elseif aq==_ then a1.bufferlen=ag;return true else a1.bufferlen=nil;a1.buffer=nil;return o(_)end end;local function ar(K,as)local at,au,av=1,1,0;while true do au=k(K,"\n",au,true)if au and au<as then at=at+1;av=au;au=au+1 else break end end;return"line "..at..", column "..as-av end;local function aw(K,ax,as)return nil,l(K)+1,"unterminated "..ax.." at "..ar(K,as)end;local function ay(K,au)while true do au=k(K,"%S",au)if not au then return nil end;local az=h(K,au,au+1)if az=="\239\187"and h(K,au+2,au+2)=="\191"then au=au+3 elseif az=="//"then au=k(K,"[\n\r]",au+2)if not au then return nil end elseif az=="/*"then au=k(K,"*/",au+2)if not au then return nil end;au=au+2 else return au end end end;local aA={["\""]="\"",["\\"]="\\",["/"]="/",["b"]="\b",["f"]="\f",["n"]="\n",["r"]="\r",["t"]="\t"}local function aB(C)if C<0 then return nil elseif C<=0x007f then return j(C)elseif C<=0x07ff then return j(0xc0+d(C/0x40),0x80+d(C)%0x40)elseif C<=0xffff then return j(0xe0+d(C/0x1000),0x80+d(C/0x40)%0x40,0x80+d(C)%0x40)elseif C<=0x10ffff then return j(0xf0+d(C/0x40000),0x80+d(C/0x1000)%0x40,0x80+d(C/0x40)%0x40,0x80+d(C)%0x40)else return nil end end;local function aC(K,au)local aD=au+1;local _,v={},0;while true do local aE=k(K,"[\"\\]",aD)if not aE then return aw(K,"string",au)end;if aE>aD then v=v+1;_[v]=h(K,aD,aE-1)end;if h(K,aE,aE)=="\""then aD=aE+1;break else local aF=h(K,aE+1,aE+1)local C;if aF=="u"then C=tonumber(h(K,aE+2,aE+5),16)if C then local aG;if 0xD800<=C and C<=0xDBff then if h(K,aE+6,aE+7)=="\\u"then aG=tonumber(h(K,aE+8,aE+11),16)if aG and 0xDC00<=aG and aG<=0xDFFF then C=(C-0xD800)*0x400+aG-0xDC00+0x10000 else aG=nil end end end;C=C and aB(C)if C then if aG then aD=aE+12 else aD=aE+6 end end end end;if not C then C=aA[aF]or aF;aD=aE+2 end;v=v+1;_[v]=C end end;if v==1 then return _[1],aD elseif v>1 then return o(_),aD else return"",aD end end;local aH;local function aI(t,aJ,K,au)if type(aJ)=="function"then aJ=aJ(K,au)if type(aJ)~="table"then return t end end;return setmetatable(t,aJ)end;local function aK(ax,aL,K,aM,aN,aO,aP)local aQ=l(K)local t,v={},0;local au=aM+1;if ax=='object'then aI(t,aO,K,aM)else aI(t,aP,K,aM)end;while true do au=ay(K,au)if not au then return aw(K,ax,aM)end;local aR=h(K,au,au)if aR==aL then return t,au+1 end;local aS,aT;aS,au,aT=aH(K,au,aN,aO,aP)if aT then return nil,au,aT end;au=ay(K,au)if not au then return aw(K,ax,aM)end;aR=h(K,au,au)if aR==":"then if aS==nil then return nil,au,"cannot use nil as table index (at "..ar(K,au)..")"end;au=ay(K,au+1)if not au then return aw(K,ax,aM)end;local aU;aU,au,aT=aH(K,au,aN,aO,aP)if aT then return nil,au,aT end;t[aS]=aU;au=ay(K,au)if not au then return aw(K,ax,aM)end;aR=h(K,au,au)else v=v+1;t[v]=aS end;if aR==","then au=au+1 end end end;aH=function(K,au,aN,aO,aP)au=au or 1;au=ay(K,au)if not au then return nil,l(K)+1,"no valid JSON value (reached the end)"end;local aR=h(K,au,au)if aR=="{"then return aK('object',"}",K,au,aN,aO,aP)elseif aR=="["then return aK('array',"]",K,au,aN,aO,aP)elseif aR=="\""then return aC(K,au)else local aV,aW=k(K,"^%-?[%d%.]+[eE]?[%+%-]?%d*",au)if aV then local aX=X(h(K,aV,aW))if aX then return aX,aW+1 end end;aV,aW=k(K,"^%a%w*",au)if aV then local aY=h(K,aV,aW)if aY=="true"then return true,aW+1 elseif aY=="false"then return false,aW+1 elseif aY=="null"then return aN,aW+1 end end;return nil,au,"no valid JSON value at "..ar(K,au)end end;local function aZ(...)if select("#",...)>0 then return...else return{__jsontype='object'},{__jsontype='array'}end end;function p.decode(K,au,aN,...)local aO,aP=aZ(...)return aH(K,au,aN,aO,aP)end;function p.use_lpeg()local a_=require("lpeg")if a_.version()=="0.11"then error"due to a bug in LPeg 0.11, it cannot be used for JSON matching"end;local b0=a_.match;local b1,b2,b3=a_.P,a_.S,a_.R;local function b4(K,au,ah,a1)if not a1.msg then a1.msg=ah.." at "..ar(K,au)a1.pos=au end;return false end;local function b5(ah)return a_.Cmt(a_.Cc(ah)*a_.Carg(2),b4)end;local b6=b1"//"*(1-b2"\n\r")^0;local b7=b1"/*"*(1-b1"*/")^0*b1"*/"local b8=(b2" \n\r\t"+b1"\239\187\191"+b6+b7)^0;local b9=1-b2"\"\\\n\r"local ba=b1"\\"*a_.C(b2"\"\\/bfnrt"+b5"unsupported escape sequence")/aA;local bb=b3("09","af","AF")local function bc(bd,au,be,bf)be,bf=tonumber(be,16),tonumber(bf,16)if 0xD800<=be and be<=0xDBff and 0xDC00<=bf and bf<=0xDFFF then return true,aB((be-0xD800)*0x400+bf-0xDC00+0x10000)else return false end end;local function bg(bh)return aB(tonumber(bh,16))end;local bi=b1"\\u"*a_.C(bb*bb*bb*bb)local bj=a_.Cmt(bi*bi,bc)+bi/bg;local bk=bj+ba+b9;local bl=b1"\""*a_.Cs(bk^0)*(b1"\""+b5"unterminated string")local bm=b1"-"^-1*(b1"0"+b3"19"*b3"09"^0)local bn=b1"."*b3"09"^0;local bo=b2"eE"*b2"+-"^-1*b3"09"^1;local bp=bm*bn^-1*bo^-1/X;local bq=b1"true"*a_.Cc(true)+b1"false"*a_.Cc(false)+b1"null"*a_.Carg(1)local br=bp+bl+bq;local bs,bt;local function bu(K,au,aN,a1)local bv,bw;local bx;local by,bz={},0;repeat bv,bw,bx=b0(bs,K,au,aN,a1)if not bx then break end;au=bx;bz=bz+1;by[bz]=bv until bw=='last'return au,setmetatable(by,a1.arraymeta)end;local function bA(K,au,aN,a1)local bv,a4,bw;local bx;local by={}repeat a4,bv,bw,bx=b0(bt,K,au,aN,a1)if not bx then break end;au=bx;by[a4]=bv until bw=='last'return au,setmetatable(by,a1.objectmeta)end;local bB=b1"["*a_.Cmt(a_.Carg(1)*a_.Carg(2),bu)*b8*(b1"]"+b5"']' expected")local bC=b1"{"*a_.Cmt(a_.Carg(1)*a_.Carg(2),bA)*b8*(b1"}"+b5"'}' expected")local bD=b8*(bB+bC+br)local bE=bD+b8*b5"value expected"bs=bD*b8*(b1","*a_.Cc'cont'+a_.Cc'last')*a_.Cp()local bF=a_.Cg(b8*bl*b8*(b1":"+b5"colon expected")*bE)bt=bF*b8*(b1","*a_.Cc'cont'+a_.Cc'last')*a_.Cp()local bG=bE*a_.Cp()function p.decode(K,au,aN,...)local a1={}a1.objectmeta,a1.arraymeta=aZ(...)local bv,bH=b0(bG,K,au,aN,a1)if a1.msg then return nil,a1.pos,a1.msg else return bv,bH end end;p.use_lpeg=function()return p end;p.using_lpeg=true;return p end;if a then pcall(p.use_lpeg)end;return p
+  --David Kolf's JSON module for Lua 5.1/5.2
+  -- small hack to generate object and array metatables, 
+  -- and key ordering callbacks by slact
+  
+  local always_try_using_lpeg = false
+  local register_global_module_table = false
+  local global_module_name = 'json'
+  
+  --luacheck: ignore
+  
+  --[==[
+  
+  David Kolf's JSON module for Lua 5.1/5.2
+  
+  Version 2.5
+  
+  
+  For the documentation see the corresponding readme.txt or visit
+  <http://dkolf.de/src/dkjson-lua.fsl/>.
+  
+  You can contact the author by sending an e-mail to 'david' at the
+  domain 'dkolf.de'.
+  
+  
+  Copyright (C) 2010-2013 David Heiko Kolf
+  
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+  
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+  
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+  NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+  
+  --]==]
+  
+  -- global dependencies:
+  local pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset =
+        pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset
+  local error, require, pcall, select = error, require, pcall, select
+  local floor, huge = math.floor, math.huge
+  local strrep, gsub, strsub, strbyte, strchar, strfind, strlen, strformat =
+        string.rep, string.gsub, string.sub, string.byte, string.char,
+        string.find, string.len, string.format
+  local strmatch = string.match
+  local concat = table.concat
+  
+  local json = { version = "dkjson 2.5" }
+  
+  if register_global_module_table then
+    _G[global_module_name] = json
+  end
+  
+  local _ENV = nil -- blocking globals in Lua 5.2
+  
+  pcall (function()
+    -- Enable access to blocked metatables.
+    -- Don't worry, this module doesn't change anything in them.
+    local debmeta = require "debug".getmetatable
+    if debmeta then getmetatable = debmeta end
+  end)
+  
+  json.null = setmetatable ({}, {
+    __tojson = function () return "null" end
+  })
+  
+  local function isarray (tbl)
+    local max, n, arraylen = 0, 0, 0
+    for k,v in pairs (tbl) do
+      if k == 'n' and type(v) == 'number' then
+        arraylen = v
+        if v > max then
+          max = v
+        end
+      else
+        if type(k) ~= 'number' or k < 1 or floor(k) ~= k then
+          return false
+        end
+        if k > max then
+          max = k
+        end
+        n = n + 1
+      end
+    end
+    if max > 10 and max > arraylen and max > n * 2 then
+      return false -- don't create an array with too many holes
+    end
+    return true, max
+  end
+  
+  local escapecodes = {
+    ["\""] = "\\\"", ["\\"] = "\\\\", ["\b"] = "\\b", ["\f"] = "\\f",
+    ["\n"] = "\\n",  ["\r"] = "\\r",  ["\t"] = "\\t"
+  }
+  
+  local function escapeutf8 (uchar)
+    local value = escapecodes[uchar]
+    if value then
+      return value
+    end
+    local a, b, c, d = strbyte (uchar, 1, 4)
+    a, b, c, d = a or 0, b or 0, c or 0, d or 0
+    if a <= 0x7f then
+      value = a
+    elseif 0xc0 <= a and a <= 0xdf and b >= 0x80 then
+      value = (a - 0xc0) * 0x40 + b - 0x80
+    elseif 0xe0 <= a and a <= 0xef and b >= 0x80 and c >= 0x80 then
+      value = ((a - 0xe0) * 0x40 + b - 0x80) * 0x40 + c - 0x80
+    elseif 0xf0 <= a and a <= 0xf7 and b >= 0x80 and c >= 0x80 and d >= 0x80 then
+      value = (((a - 0xf0) * 0x40 + b - 0x80) * 0x40 + c - 0x80) * 0x40 + d - 0x80
+    else
+      return ""
+    end
+    if value <= 0xffff then
+      return strformat ("\\u%.4x", value)
+    elseif value <= 0x10ffff then
+      -- encode as UTF-16 surrogate pair
+      value = value - 0x10000
+      local highsur, lowsur = 0xD800 + floor (value/0x400), 0xDC00 + (value % 0x400)
+      return strformat ("\\u%.4x\\u%.4x", highsur, lowsur)
+    else
+      return ""
+    end
+  end
+  
+  local function fsub (str, pattern, repl)
+    -- gsub always builds a new string in a buffer, even when no match
+    -- exists. First using find should be more efficient when most strings
+    -- don't contain the pattern.
+    if strfind (str, pattern) then
+      return gsub (str, pattern, repl)
+    else
+      return str
+    end
+  end
+  
+  local function quotestring (value)
+    -- based on the regexp "escapable" in https://github.com/douglascrockford/JSON-js
+    value = fsub (value, "[%z\1-\31\"\\\127]", escapeutf8)
+    if strfind (value, "[\194\216\220\225\226\239]") then
+      value = fsub (value, "\194[\128-\159\173]", escapeutf8)
+      value = fsub (value, "\216[\128-\132]", escapeutf8)
+      value = fsub (value, "\220\143", escapeutf8)
+      value = fsub (value, "\225\158[\180\181]", escapeutf8)
+      value = fsub (value, "\226\128[\140-\143\168-\175]", escapeutf8)
+      value = fsub (value, "\226\129[\160-\175]", escapeutf8)
+      value = fsub (value, "\239\187\191", escapeutf8)
+      value = fsub (value, "\239\191[\176-\191]", escapeutf8)
+    end
+    return "\"" .. value .. "\""
+  end
+  json.quotestring = quotestring
+  
+  local function replace(str, o, n)
+    local i, j = strfind (str, o, 1, true)
+    if i then
+      return strsub(str, 1, i-1) .. n .. strsub(str, j+1, -1)
+    else
+      return str
+    end
+  end
+  
+  -- locale independent num2str and str2num functions
+  local decpoint, numfilter
+  
+  local function updatedecpoint ()
+    decpoint = strmatch(tostring(0.5), "([^05+])")
+    -- build a filter that can be used to remove group separators
+    numfilter = "[^0-9%-%+eE" .. gsub(decpoint, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0") .. "]+"
+  end
+  
+  updatedecpoint()
+  
+  local function num2str (num)
+    return replace(fsub(tostring(num), numfilter, ""), decpoint, ".")
+  end
+  
+  local function str2num (str)
+    local num = tonumber(replace(str, ".", decpoint))
+    if not num then
+      updatedecpoint()
+      num = tonumber(replace(str, ".", decpoint))
+    end
+    return num
+  end
+  
+  local function addnewline2 (level, buffer, buflen)
+    buffer[buflen+1] = "\n"
+    buffer[buflen+2] = strrep ("  ", level)
+    buflen = buflen + 2
+    return buflen
+  end
+  
+  function json.addnewline (state)
+    if state.indent then
+      state.bufferlen = addnewline2 (state.level or 0,
+                             state.buffer, state.bufferlen or #(state.buffer))
+    end
+  end
+  
+  local encode2 -- forward declaration
+  
+  local function addpair (key, value, prev, indent, level, buffer, buflen, tables, globalorder, state)
+    local kt = type (key)
+    if kt ~= 'string' and kt ~= 'number' then
+      return nil, "type '" .. kt .. "' is not supported as a key by JSON."
+    end
+    if prev then
+      buflen = buflen + 1
+      buffer[buflen] = ","
+    end
+    if indent then
+      buflen = addnewline2 (level, buffer, buflen)
+    end
+    buffer[buflen+1] = quotestring (key)
+    buffer[buflen+2] = ":"
+    return encode2 (value, indent, level, buffer, buflen + 2, tables, globalorder, state)
+  end
+  
+  local function appendcustom(res, buffer, state)
+    local buflen = state.bufferlen
+    if type (res) == 'string' then
+      buflen = buflen + 1
+      buffer[buflen] = res
+    end
+    return buflen
+  end
+  
+  local function exception(reason, value, state, buffer, buflen, defaultmessage)
+    defaultmessage = defaultmessage or reason
+    local handler = state.exception
+    if not handler then
+      return nil, defaultmessage
+    else
+      state.bufferlen = buflen
+      local ret, msg = handler (reason, value, state, defaultmessage)
+      if not ret then return nil, msg or defaultmessage end
+      return appendcustom(ret, buffer, state)
+    end
+  end
+  
+  function json.encodeexception(reason, value, state, defaultmessage)
+    return quotestring("<" .. defaultmessage .. ">")
+  end
+  
+  encode2 = function (value, indent, level, buffer, buflen, tables, globalorder, state)
+    local valtype = type (value)
+    local valmeta = getmetatable (value)
+    valmeta = type (valmeta) == 'table' and valmeta -- only tables
+    local replacementjsonval = valmeta and valmeta.__jsonval
+    if replacementjsonval then
+      if type(replacementjsonval) == "function" then
+        value = replacementjsonval(value)
+      else
+        value = replacementjsonval
+      end
+      valtype = type (value)
+    end
+    
+    local valtojson = valmeta and valmeta.__tojson
+    if valtojson then
+      if tables[value] then
+        return exception('reference cycle', value, state, buffer, buflen)
+      end
+      tables[value] = true
+      state.bufferlen = buflen
+      local ret, msg = valtojson (value, state)
+      if not ret then return exception('custom encoder failed', value, state, buffer, buflen, msg) end
+      tables[value] = nil
+      buflen = appendcustom(ret, buffer, state)
+    elseif value == nil then
+      buflen = buflen + 1
+      buffer[buflen] = "null"
+    elseif valtype == 'number' then
+      local s
+      if value ~= value or value >= huge or -value >= huge then
+        -- This is the behaviour of the original JSON implementation.
+        s = "null"
+      else
+        s = num2str (value)
+      end
+      buflen = buflen + 1
+      buffer[buflen] = s
+    elseif valtype == 'boolean' then
+      buflen = buflen + 1
+      buffer[buflen] = value and "true" or "false"
+    elseif valtype == 'string' then
+      buflen = buflen + 1
+      buffer[buflen] = quotestring (value)
+    elseif valtype == 'table' then
+      if tables[value] then
+        return exception('reference cycle', value, state, buffer, buflen)
+      end
+      tables[value] = true
+      level = level + 1
+      local isa, n = isarray (value)
+      if n == 0 and valmeta and valmeta.__jsontype == 'object' then
+        isa = false
+      end
+      local msg
+      if isa then -- JSON array
+        buflen = buflen + 1
+        buffer[buflen] = "["
+        for i = 1, n do
+          buflen, msg = encode2 (value[i], indent, level, buffer, buflen, tables, globalorder, state)
+          if not buflen then return nil, msg end
+          if i < n then
+            buflen = buflen + 1
+            buffer[buflen] = ","
+          end
+        end
+        buflen = buflen + 1
+        buffer[buflen] = "]"
+      else -- JSON object
+        local prev = false
+        buflen = buflen + 1
+        buffer[buflen] = "{"
+        local order = valmeta and valmeta.__jsonorder or globalorder
+        if order then
+          if type(order) == "function" then order = order(value) end
+          local used = {}
+          n = #order
+          for i = 1, n do
+            local k = order[i]
+            local v = value[k]
+            if v then
+              used[k] = true
+              buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
+              prev = true -- add a seperator before the next element
+            end
+          end
+          for k,v in pairs (value) do
+            if not used[k] then
+              buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
+              if not buflen then return nil, msg end
+              prev = true -- add a seperator before the next element
+            end
+          end
+        else -- unordered
+          for k,v in pairs (value) do
+            buflen, msg = addpair (k, v, prev, indent, level, buffer, buflen, tables, globalorder, state)
+            if not buflen then return nil, msg end
+            prev = true -- add a seperator before the next element
+          end
+        end
+        if indent then
+          buflen = addnewline2 (level - 1, buffer, buflen)
+        end
+        buflen = buflen + 1
+        buffer[buflen] = "}"
+      end
+      tables[value] = nil
+    else
+      return exception ('unsupported type', value, state, buffer, buflen,
+        "type '" .. valtype .. "' is not supported by JSON.")
+    end
+    return buflen
+  end
+  
+  function json.encode (value, state)
+    state = state or {}
+    local oldbuffer = state.buffer
+    local buffer = oldbuffer or {}
+    state.buffer = buffer
+    updatedecpoint()
+    local ret, msg = encode2 (value, state.indent, state.level or 0,
+                     buffer, state.bufferlen or 0, state.tables or {}, state.keyorder, state)
+    if not ret then
+      error (msg, 2)
+    elseif oldbuffer == buffer then
+      state.bufferlen = ret
+      return true
+    else
+      state.bufferlen = nil
+      state.buffer = nil
+      return concat (buffer)
+    end
+  end
+  
+  local function loc(str, where)
+    local line, pos, linepos = 1, 1, 0
+    while true do
+      pos = strfind (str, "\n", pos, true)
+      if pos and pos < where then
+        line = line + 1
+        linepos = pos
+        pos = pos + 1
+      else
+        break
+      end
+    end
+    return "line " .. line .. ", column " .. (where - linepos)
+  end
+  
+  local function unterminated (str, what, where)
+    return nil, strlen (str) + 1, "unterminated " .. what .. " at " .. loc (str, where)
+  end
+  
+  local function scanwhite (str, pos)
+    while true do
+      pos = strfind (str, "%S", pos)
+      if not pos then return nil end
+      local sub2 = strsub (str, pos, pos + 1)
+      if sub2 == "\239\187" and strsub (str, pos + 2, pos + 2) == "\191" then
+        -- UTF-8 Byte Order Mark
+        pos = pos + 3
+      elseif sub2 == "//" then
+        pos = strfind (str, "[\n\r]", pos + 2)
+        if not pos then return nil end
+      elseif sub2 == "/*" then
+        pos = strfind (str, "*/", pos + 2)
+        if not pos then return nil end
+        pos = pos + 2
+      else
+        return pos
+      end
+    end
+  end
+  
+  local escapechars = {
+    ["\""] = "\"", ["\\"] = "\\", ["/"] = "/", ["b"] = "\b", ["f"] = "\f",
+    ["n"] = "\n", ["r"] = "\r", ["t"] = "\t"
+  }
+  
+  local function unichar (value)
+    if value < 0 then
+      return nil
+    elseif value <= 0x007f then
+      return strchar (value)
+    elseif value <= 0x07ff then
+      return strchar (0xc0 + floor(value/0x40),
+                      0x80 + (floor(value) % 0x40))
+    elseif value <= 0xffff then
+      return strchar (0xe0 + floor(value/0x1000),
+                      0x80 + (floor(value/0x40) % 0x40),
+                      0x80 + (floor(value) % 0x40))
+    elseif value <= 0x10ffff then
+      return strchar (0xf0 + floor(value/0x40000),
+                      0x80 + (floor(value/0x1000) % 0x40),
+                      0x80 + (floor(value/0x40) % 0x40),
+                      0x80 + (floor(value) % 0x40))
+    else
+      return nil
+    end
+  end
+  
+  local function scanstring (str, pos)
+    local lastpos = pos + 1
+    local buffer, n = {}, 0
+    while true do
+      local nextpos = strfind (str, "[\"\\]", lastpos)
+      if not nextpos then
+        return unterminated (str, "string", pos)
+      end
+      if nextpos > lastpos then
+        n = n + 1
+        buffer[n] = strsub (str, lastpos, nextpos - 1)
+      end
+      if strsub (str, nextpos, nextpos) == "\"" then
+        lastpos = nextpos + 1
+        break
+      else
+        local escchar = strsub (str, nextpos + 1, nextpos + 1)
+        local value
+        if escchar == "u" then
+          value = tonumber (strsub (str, nextpos + 2, nextpos + 5), 16)
+          if value then
+            local value2
+            if 0xD800 <= value and value <= 0xDBff then
+              -- we have the high surrogate of UTF-16. Check if there is a
+              -- low surrogate escaped nearby to combine them.
+              if strsub (str, nextpos + 6, nextpos + 7) == "\\u" then
+                value2 = tonumber (strsub (str, nextpos + 8, nextpos + 11), 16)
+                if value2 and 0xDC00 <= value2 and value2 <= 0xDFFF then
+                  value = (value - 0xD800)  * 0x400 + (value2 - 0xDC00) + 0x10000
+                else
+                  value2 = nil -- in case it was out of range for a low surrogate
+                end
+              end
+            end
+            value = value and unichar (value)
+            if value then
+              if value2 then
+                lastpos = nextpos + 12
+              else
+                lastpos = nextpos + 6
+              end
+            end
+          end
+        end
+        if not value then
+          value = escapechars[escchar] or escchar
+          lastpos = nextpos + 2
+        end
+        n = n + 1
+        buffer[n] = value
+      end
+    end
+    if n == 1 then
+      return buffer[1], lastpos
+    elseif n > 1 then
+      return concat (buffer), lastpos
+    else
+      return "", lastpos
+    end
+  end
+  
+  local scanvalue -- forward declaration
+  
+  local function set_scantable_metatable (tbl, meta, str, pos)
+    if type(meta)=="function" then
+      meta = meta(str, pos)
+      if type(meta) ~= "table" then
+        return tbl
+      end
+    end
+    return setmetatable(tbl, meta)
+  end
+  
+  local function scantable (what, closechar, str, startpos, nullval, objectmeta, arraymeta)
+    local len = strlen (str)
+    local tbl, n = {}, 0
+    local pos = startpos + 1
+    if what == 'object' then
+      set_scantable_metatable(tbl, objectmeta, str, startpos)
+    else
+      set_scantable_metatable(tbl, arraymeta, str, startpos)
+    end
+    while true do
+      pos = scanwhite (str, pos)
+      if not pos then return unterminated (str, what, startpos) end
+      local char = strsub (str, pos, pos)
+      if char == closechar then
+        return tbl, pos + 1
+      end
+      local val1, err
+      val1, pos, err = scanvalue (str, pos, nullval, objectmeta, arraymeta)
+      if err then return nil, pos, err end
+      pos = scanwhite (str, pos)
+      if not pos then return unterminated (str, what, startpos) end
+      char = strsub (str, pos, pos)
+      if char == ":" then
+        if val1 == nil then
+          return nil, pos, "cannot use nil as table index (at " .. loc (str, pos) .. ")"
+        end
+        pos = scanwhite (str, pos + 1)
+        if not pos then return unterminated (str, what, startpos) end
+        local val2
+        val2, pos, err = scanvalue (str, pos, nullval, objectmeta, arraymeta)
+        if err then return nil, pos, err end
+        tbl[val1] = val2
+        pos = scanwhite (str, pos)
+        if not pos then return unterminated (str, what, startpos) end
+        char = strsub (str, pos, pos)
+      else
+        n = n + 1
+        tbl[n] = val1
+      end
+      if char == "," then
+        pos = pos + 1
+      end
+    end
+  end
+  
+  scanvalue = function (str, pos, nullval, objectmeta, arraymeta)
+    pos = pos or 1
+    pos = scanwhite (str, pos)
+    if not pos then
+      return nil, strlen (str) + 1, "no valid JSON value (reached the end)"
+    end
+    local char = strsub (str, pos, pos)
+    if char == "{" then
+      return scantable ('object', "}", str, pos, nullval, objectmeta, arraymeta)
+    elseif char == "[" then
+      return scantable ('array', "]", str, pos, nullval, objectmeta, arraymeta)
+    elseif char == "\"" then
+      return scanstring (str, pos)
+    else
+      local pstart, pend = strfind (str, "^%-?[%d%.]+[eE]?[%+%-]?%d*", pos)
+      if pstart then
+        local number = str2num (strsub (str, pstart, pend))
+        if number then
+          return number, pend + 1
+        end
+      end
+      pstart, pend = strfind (str, "^%a%w*", pos)
+      if pstart then
+        local name = strsub (str, pstart, pend)
+        if name == "true" then
+          return true, pend + 1
+        elseif name == "false" then
+          return false, pend + 1
+        elseif name == "null" then
+          return nullval, pend + 1
+        end
+      end
+      return nil, pos, "no valid JSON value at " .. loc (str, pos)
+    end
+  end
+  
+  local function optionalmetatables(...)
+    if select("#", ...) > 0 then
+      return ...
+    else
+      return {__jsontype = 'object'}, {__jsontype = 'array'}
+    end
+  end
+  
+  function json.decode (str, pos, nullval, ...)
+    local objectmeta, arraymeta = optionalmetatables(...)
+    return scanvalue (str, pos, nullval, objectmeta, arraymeta)
+  end
+  
+  function json.use_lpeg ()
+    local g = require ("lpeg")
+  
+    if g.version() == "0.11" then
+      error "due to a bug in LPeg 0.11, it cannot be used for JSON matching"
+    end
+  
+    local pegmatch = g.match
+    local P, S, R = g.P, g.S, g.R
+  
+    local function ErrorCall (str, pos, msg, state)
+      if not state.msg then
+        state.msg = msg .. " at " .. loc (str, pos)
+        state.pos = pos
+      end
+      return false
+    end
+  
+    local function Err (msg)
+      return g.Cmt (g.Cc (msg) * g.Carg (2), ErrorCall)
+    end
+  
+    local SingleLineComment = P"//" * (1 - S"\n\r")^0
+    local MultiLineComment = P"/*" * (1 - P"*/")^0 * P"*/"
+    local Space = (S" \n\r\t" + P"\239\187\191" + SingleLineComment + MultiLineComment)^0
+  
+    local PlainChar = 1 - S"\"\\\n\r"
+    local EscapeSequence = (P"\\" * g.C (S"\"\\/bfnrt" + Err "unsupported escape sequence")) / escapechars
+    local HexDigit = R("09", "af", "AF")
+    local function UTF16Surrogate (match, pos, high, low)
+      high, low = tonumber (high, 16), tonumber (low, 16)
+      if 0xD800 <= high and high <= 0xDBff and 0xDC00 <= low and low <= 0xDFFF then
+        return true, unichar ((high - 0xD800)  * 0x400 + (low - 0xDC00) + 0x10000)
+      else
+        return false
+      end
+    end
+    local function UTF16BMP (hex)
+      return unichar (tonumber (hex, 16))
+    end
+    local U16Sequence = (P"\\u" * g.C (HexDigit * HexDigit * HexDigit * HexDigit))
+    local UnicodeEscape = g.Cmt (U16Sequence * U16Sequence, UTF16Surrogate) + U16Sequence/UTF16BMP
+    local Char = UnicodeEscape + EscapeSequence + PlainChar
+    local String = P"\"" * g.Cs (Char ^ 0) * (P"\"" + Err "unterminated string")
+    local Integer = P"-"^(-1) * (P"0" + (R"19" * R"09"^0))
+    local Fractal = P"." * R"09"^0
+    local Exponent = (S"eE") * (S"+-")^(-1) * R"09"^1
+    local Number = (Integer * Fractal^(-1) * Exponent^(-1))/str2num
+    local Constant = P"true" * g.Cc (true) + P"false" * g.Cc (false) + P"null" * g.Carg (1)
+    local SimpleValue = Number + String + Constant
+    local ArrayContent, ObjectContent
+  
+    -- The functions parsearray and parseobject parse only a single value/pair
+    -- at a time and store them directly to avoid hitting the LPeg limits.
+    local function parsearray (str, pos, nullval, state)
+      local obj, cont
+      local npos
+      local t, nt = {}, 0
+      repeat
+        obj, cont, npos = pegmatch (ArrayContent, str, pos, nullval, state)
+        if not npos then break end
+        pos = npos
+        nt = nt + 1
+        t[nt] = obj
+      until cont == 'last'
+      return pos, setmetatable (t, state.arraymeta)
+    end
+  
+    local function parseobject (str, pos, nullval, state)
+      local obj, key, cont
+      local npos
+      local t = {}
+      repeat
+        key, obj, cont, npos = pegmatch (ObjectContent, str, pos, nullval, state)
+        if not npos then break end
+        pos = npos
+        t[key] = obj
+      until cont == 'last'
+      return pos, setmetatable (t, state.objectmeta)
+    end
+  
+    local Array = P"[" * g.Cmt (g.Carg(1) * g.Carg(2), parsearray) * Space * (P"]" + Err "']' expected")
+    local Object = P"{" * g.Cmt (g.Carg(1) * g.Carg(2), parseobject) * Space * (P"}" + Err "'}' expected")
+    local Value = Space * (Array + Object + SimpleValue)
+    local ExpectedValue = Value + Space * Err "value expected"
+    ArrayContent = Value * Space * (P"," * g.Cc'cont' + g.Cc'last') * g.Cp()
+    local Pair = g.Cg (Space * String * Space * (P":" + Err "colon expected") * ExpectedValue)
+    ObjectContent = Pair * Space * (P"," * g.Cc'cont' + g.Cc'last') * g.Cp()
+    local DecodeValue = ExpectedValue * g.Cp ()
+  
+    function json.decode (str, pos, nullval, ...)
+      local state = {}
+      state.objectmeta, state.arraymeta = optionalmetatables(...)
+      local obj, retpos = pegmatch (DecodeValue, str, pos, nullval, state)
+      if state.msg then
+        return nil, state.pos, state.msg
+      else
+        return obj, retpos
+      end
+    end
+  
+    -- use this function only once:
+    json.use_lpeg = function () return json end
+  
+    json.using_lpeg = true
+  
+    return json -- so you can get the module using json = require "dkjson".use_lpeg()
+  end
+  
+  if always_try_using_lpeg then
+    pcall (json.use_lpeg)
+  end
+  
+  return json
+  
 
 end)
 
 module("binding", function()
-local a={}local b={bindings=a,require_create_userdata=false,require_binding=false}setmetatable(a,{__index=function(c,d)if b.require_binding then error("missing binding for "..tostring(d))end end})local e={create=function(f,self,...)if type(self)~="table"then return nil,("expected 'self' to be table, got %s)"):format(type(self))end;local g=f(self,...)if(b.require_create_userdata or g)and type(g)~="userdata"then return nil,("expected userdata, got %s"):format(type(g))elseif type(g)=="userdata"then self.__binding=g end;return true end,update=function(h,self,i,j,...)if type(self)~="table"then return nil,("expected 'self' to be table, got %s)"):format(type(self))end;if type(i)~="string"then return nil,("expected 'update_name' to be string, got %s)"):format(type(self))end;local g=h(self,i,j,...)if type(g)=="userdata"then self.__binding=g end;return true end,delete=function(k,self,...)if type(self)~="table"then return nil,("expected 'self' to be table, got %s)"):format(type(self))end;assert(type(self.__binding)=="userdata",("expected seld.__binding userdata, got %s"):format(type(self.__binding)))k(self.__binding,self,...)return true end}function b.set(l,m,n,o)assert(not rawget(a,l),("binding %s already set"):format(l))assert(type(l)=="string","binding name must be a string, got "..type(l))if type(m)=="table"and n==nil and o==nil then local p=m;m=p.create;n=p.update;o=p.delete end;local q={create=m,update=n,delete=o}for r,s in pairs(q)do assert(type(s)=="function"or type(s)==nil,("\"%s\" binding \"%s\" callback must be function or nil, was %s"):format(l,r,type(s)))end;a[l]=q end;function b.call(t,u,...)local q=a[t]if not q then return end;local v=e[u]if not v then error(("unknown binding call \"%s\" for \"%s\""):format(u,t))end;if not q[u]then error(("no callback for binding call \"%s\" for \"%s\""):format(u,t))end;local w,x=v(q[u],...)if not w then error(("Binding \"%s\" call \"%s\" error: %s"):format(t,u,x))end;return w end;return b
+  local binds = {}
+  local Binding = {
+    bindings = binds,
+    require_create_userdata = false,
+    require_binding = false
+  }
+  setmetatable(binds, {__index = function(t,k)
+    if Binding.require_binding then
+      error("missing binding for " .. tostring(k))
+    end
+  end})
+  --local mm = require "mm"
+  
+  local calls = {
+    create = function(create_callback, self, ...)
+      if type(self) ~= "table" then
+        return nil, ("expected 'self' to be table, got %s)"):format(type(self))
+      end
+      local ref = create_callback(self, ...)
+      if (Binding.require_create_userdata or ref) and type(ref) ~= "userdata" then
+        return nil, ("expected userdata, got %s"):format(type(ref))
+      elseif type(ref) == "userdata" then
+        self.__binding = ref
+      end
+      return true
+    end,
+    update = function(update_callback, self, update_name, update_data, ...)
+      if type(self) ~= "table" then
+        return nil, ("expected 'self' to be table, got %s)"):format(type(self))
+      end
+      if type(update_name) ~= "string" then
+        return nil, ("expected 'update_name' to be string, got %s)"):format(type(self))
+      end
+      local ref = update_callback(self, update_name, update_data, ...)
+      if type(ref) == "userdata" then
+        self.__binding = ref
+      end
+      return true
+    end,
+    delete = function(delete_callback, self, ...)
+      if type(self) ~= "table" then
+        return nil, ("expected 'self' to be table, got %s)"):format(type(self))
+      end
+      assert(type(self.__binding) == "userdata", ("expected seld.__binding userdata, got %s"):format(type(self.__binding)))
+      delete_callback(self.__binding, self, ...)
+      return true
+    end
+  }
+  
+  function Binding.set(name, create, update, delete)
+    assert(not rawget(binds, name), ("binding %s already set"):format(name))
+    assert(type(name)=="string", "binding name must be a string, got " .. type(name))
+    if type(create) == "table" and update == nil and delete == nil then
+      local tbl = create
+      create = tbl.create
+      update = tbl.update
+      delete = tbl.delete
+    end
+    
+    local callbacks = {
+      create = create,
+      update = update,
+      delete = delete
+    }
+    
+    for n,f in pairs(callbacks) do
+      assert(type(f) == "function" or type(f) == nil, ("\"%s\" binding \"%s\" callback must be function or nil, was %s"):format(name, n, type(f)))
+    end
+    
+    binds[name]=callbacks
+  end
+  function Binding.call(binding_name, call_name, ...)
+    local callbacks = binds[binding_name]
+    if not callbacks then return end
+    local binding_call = calls[call_name]
+    if not binding_call then
+      error(("unknown binding call \"%s\" for \"%s\""):format(call_name, binding_name))
+    end
+    if not callbacks[call_name] then
+      error(("no callback for binding call \"%s\" for \"%s\""):format(call_name, binding_name))
+    end
+    local ok, err = binding_call(callbacks[call_name], ...)
+    if not ok then
+      error(("Binding \"%s\" call \"%s\" error: %s"):format(binding_name, call_name, err))
+    end
+    return ok
+  end
+  
+  return Binding
 
 end)
 
 module("rulecomponent", function()
-local a=require"binding"local b=require"dkjson"local c;local function d(e)return e:sub(1,1)=="#"and e:sub(2)or e end;local f={__index=function(self,g)local h=d(g)if h~=g then return self[d(g)]end end}local function i(j)local self={table=setmetatable({},f)}local function k(l,m)local n,o=next(l)if type(n)=="number"then m:error("invalid data value, expected {\"key\":value}, got {\"key\"}")elseif type(n)~="string"then m:error("unexpected data type %s",type(n))end;local p=self.table[n]if m then m:assert(p,("Unknown %s \"%s\""):format(j,n))else assert(p,("Unknown %s \"%s\""):format(j,n))end;return n,o end;function self.add(n,q)if type(n)=="table"then for r,s in pairs(n)do self.add(s,q)end;return true end;assert(q.parse,("%s missing parse callback"):format(j))assert(self.table[n]==nil,("%s %s already exists"):format(j,n))local t={parse=q.parse,init=q.init,delete=q.delete,meta={__jsonval=q.jsonval,__jsonorder=q.jsonorder or{"action","condition"},__index={toJSON=function(u)return b.encode(u,{indent=true})end}}}self.table[n]=t;return true end;function self.parse(l,m)local n,o=k(l,m)o=self.table[n].parse(o,m)or o;return{[n]=o}end;function self.new(l,v)local n,o=k(l)n=d(n)local w=self.table[n]local p=setmetatable({[j]=n,data=o},w.meta)if w.init then local x=w.init(o,p,v)if x then p.data=x end end;a.call(("%s:%s"):format(j,n),"create",p)return p end;function self.delete(p,v)local n=p[j]or p.name;local w=self.table[n]print(j.." DELETE THING "..n.." "..tostring(w.delete))if w.delete then w.delete(p.data,v)end;a.call(("%s:%s"):format(j,n),"delete",p)end;return self end;c={condition=i("condition"),action=i("action")}c.condition.add("any",{parse=function(l,m)m:assert_jsontype(l,"array","\"any\" condition value must be an array of conditions")for y,s in ipairs(l)do local z=m:parseCondition(s)l[y]=z end end,init=function(l,p,v)for y,s in ipairs(l)do l[y]=c.condition.new(s,v)end end,delete=function(l,v)for r,A in ipairs(l)do c.condition.delete(A,v)end end,jsonval=function(self)return{any=self.data}end})c.condition.add("all",{parse=function(l,m)m:assert_jsontype(l,"array","\"all\" condition value must be an array of conditions")for y,s in ipairs(l)do local z=m:parseCondition(s)l[y]=z end end,init=function(l,v)for y,s in ipairs(l)do l[y]=c.condition.new(s,v)end end,delete=function(l,v)for r,A in ipairs(l)do c.condition.delete(A,v)end end,jsonval=function(self)return{all=self.data}end})c.condition.add({"true","false"},{parse=function(l,m)end,jsonval=function(self)return self.condition end})c.condition.add("tag-check",{parse=function(l,m)m:assert_type(l,"string","\"tag-check\" value must be a string")return m:parseInterpolatedString(l)end,init=function(l)a.call("string","create",l)end,delete=function(l)a.call("string","delete",l)end,jsonval=function(self)return{["tag-check"]=self.data.string}end})c.condition.add("match",{parse=function(l,m)m:assert_jsontype(l,"array","\"match\" value must be an array of strings")for y,s in ipairs(l)do m:assert_jsontype(s,"string","\"match\" value must be an array of strings")l[y]=m:parseInterpolatedString(s)end end,init=function(l)local B=function(e)local C=0;for r in e.string:gmatch("%$")do C=C+1 end;return C end;local D=function(E,F)return B(E)<B(F)end;table.sort(l,D)for r,e in ipairs(l)do a.call("string","create",e)end end,delete=function(l)for r,e in ipairs(l)do a.call("string","delete",e)end end,jsonval=function(self)local G={}for r,e in ipairs(self.data)do table.insert(G,e.string)end;return{match=G}end})local H={__jsonorder={"name","key","increment"}}c.condition.add({"limit-break","limit-check"},{parse=function(l,m)if type(l)=="string"then l={name=l}elseif type(l)~="table"then m:error("invalid value type %s",type(l))end;local I=next(m:getContext())local J=m:getContext("rule")local K=m:getContext("if")if not l.key then l.key=J.key end;m:assert(l.key,"limiter \"key\" missing, and no default \"key\" in rule")m:assert_type(l.key,"string","invalid limiter \"key\" type")l.key=m:parseInterpolatedString(l.key)if not l.increment then if I=="limit-break"then l.increment=1 elseif I=="limit-check"then l.increment=0 end end;l.increment=m:assert(tonumber(l.increment),"invalid or empty \"increment\" value")m:assert(l.increment>=0,"\"increment\" must be >= 0")m:assert(l.name,"name missing")m:assert_type(l.name,"string","invalid \"name\" type")if c.generate_refs then if not J.refs then J.refs={}end;if not K.refs then K.refs={}end;table.insert(J.refs.limiter,"limiter:"..l.name)table.insert(K.refs.limiter,"limiter:"..l.name)end;return l end,init=function(l,p,v)local L=v:findLimiter(l.name)if not L then error("unknown limiter "..l.name)end;l.name=nil;l.limiter=L;if l.key then a.call("string","create",l.key)end end,delete=function(l)if l.key then a.call("string","delete",l.key)end end,jsonval=function(self)local M={}for N,s in pairs(self.data)do M[N]=s end;if M.derived_key then M.derived_key=nil;M.key=nil elseif M.key then M.key=M.key.string end;M.name=M.limiter.name;M.limiter=nil;setmetatable(M,H)local O={[self.condition]=M}return O end})c.condition.add(".delay",{parse=function(l,m)m:assert_jsontype(l,"number","delay by <number> please")end})c.action.add("tag",{parse=function(l,m)m:assert_jsontype(l,"string","\"tag\" value must be a string")return m:parseInterpolatedString(l)end,init=function(l)a.call("string","create",l)end,delete=function(l)a.call("string","delete",l)end,jsonval=function(self)return{tag=self.data.string}end})c.action.add("accept",{parse=function(l,m)m:assert_type(l,"table","\"accept\" value must be an object")m:assert_table_size(l,0,"\"accept\" value must be empty")end})c.action.add("reject",{parse=function(l,m)m:assert_type(l,"table","\"reject\" value must be an object")end})c.action.add("wait",{parse=function(l,m)m:assert_jsontype(l,"number","\"wait\" value must be a number")end})return c
+  local Binding = require "binding"
+  local json = require "dkjson"
+  --local mm = require "mm"
+  
+  local Component -- forward declaration
+  
+  local function ignore_leading_hash(str)
+    return str:sub(1,1)=="#" and str:sub(2) or str
+  end
+  
+  local thingstorage_meta = {__index = function(self, key)
+    local unhashed = ignore_leading_hash(key)
+    if unhashed ~= key then
+      return self[ignore_leading_hash(key)]
+    end
+  end}
+  
+  local function create_thing_storage(thing_name)
+    local self = {table = setmetatable({}, thingstorage_meta)}
+    
+    local function unpack_thing(data, parser)
+      local name, val = next(data)
+      if type(name) == "number" then
+        parser:error("invalid data value, expected {\"key\":value}, got {\"key\"}")
+      elseif type(name) ~= "string" then
+        parser:error("unexpected data type %s", type(name))
+      end
+      local thing = self.table[name]
+      if parser then
+        parser:assert(thing, ("Unknown %s \"%s\""):format(thing_name, name))
+      else
+        assert(thing, ("Unknown %s \"%s\""):format(thing_name, name))
+      end
+      return name, val
+    end
+    
+    function self.add(name, funcs)
+      if type(name) == "table" then
+        for _,v in pairs(name) do
+          self.add(v, funcs)
+        end
+        return true
+      end
+      assert(funcs.parse, ("%s missing parse callback"):format(thing_name))
+      assert(self.table[name] == nil, ("%s %s already exists"):format(thing_name, name))
+      local added = {
+        parse=funcs.parse,
+        init=funcs.init,
+        delete=funcs.delete,
+        meta = {
+          __jsonval = funcs.jsonval,
+          __jsonorder = funcs.jsonorder or {"action", "condition"},
+          __index = {
+            toJSON = function(tbl)
+              return json.encode(tbl, {indent = true})
+            end
+          }
+        }
+      }
+      self.table[name]=added
+      
+      return true
+    end
+    
+    function self.parse(data, parser)
+      local name, val = unpack_thing(data, parser)
+      val = self.table[name].parse(val, parser) or val
+      return {[name]=val}
+    end
+    
+    function self.new(data, ruleset)
+      local name, val = unpack_thing(data)
+      name = ignore_leading_hash(name)
+      local thing_preset = self.table[name]
+      local thing = setmetatable({[thing_name]=name, data=val}, thing_preset.meta)
+      if thing_preset.init then
+        local replacement_data = thing_preset.init(val, thing, ruleset)
+        if replacement_data then
+          thing.data = replacement_data
+        end
+      end
+      Binding.call(("%s:%s"):format(thing_name, name), "create", thing)
+      return thing
+    end
+    
+    function self.delete(thing, ruleset)
+      local name = thing[thing_name] or thing.name
+      local thing_preset = self.table[name]
+      print(thing_name .. " DELETE THING " .. name .. " " .. tostring(thing_preset.delete))
+      if thing_preset.delete then
+        thing_preset.delete(thing.data, ruleset)
+      end
+      Binding.call(("%s:%s"):format(thing_name, name), "delete", thing)
+    end
+    
+    return self
+  end
+  
+  Component = {
+    condition = create_thing_storage("condition"),
+    action = create_thing_storage("action")
+  }
+  
+  --now let's add some basic conditions and actions
+  Component.condition.add("any", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "array", "\"any\" condition value must be an array of conditions")
+      for i, v in ipairs(data) do
+        local condition = parser:parseCondition(v)
+        data[i]=condition
+      end
+    end,
+    init = function(data, thing, ruleset)
+      for i, v in ipairs(data) do
+        data[i] = Component.condition.new(v, ruleset)
+      end
+    end,
+    delete = function(data, ruleset)
+      for _, cond in ipairs(data) do
+        Component.condition.delete(cond, ruleset)
+      end
+    end,
+    jsonval = function(self)
+      return {any=self.data}
+    end
+  })
+  
+  Component.condition.add("all", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "array", "\"all\" condition value must be an array of conditions")
+      for i, v in ipairs(data) do
+        local condition = parser:parseCondition(v)
+        data[i]=condition
+      end
+    end,
+    init = function(data, ruleset)
+      for i, v in ipairs(data) do
+        data[i] = Component.condition.new(v, ruleset)
+      end
+    end,
+    delete = function(data, ruleset)
+      for _, cond in ipairs(data) do
+        Component.condition.delete(cond, ruleset)
+      end
+    end,
+    jsonval = function(self)
+      return {all=self.data}
+    end
+  })
+  
+  Component.condition.add({"true", "false"}, {
+    parse = function(data, parser)
+    --parser:assert(next(data) == nil, "\"true\" condition must have empty parameters")
+    end,
+    jsonval = function(self)
+      return self.condition
+    end
+  })
+  
+  Component.condition.add("tag-check", {
+    parse = function(data, parser)
+      parser:assert_type(data, "string", "\"tag-check\" value must be a string")
+      return parser:parseInterpolatedString(data)
+    end,
+    init = function(data)
+      Binding.call("string", "create", data)
+    end,
+    delete = function(data)
+      Binding.call("string", "delete", data)
+    end,
+    jsonval=function(self)
+      return {["tag-check"]=self.data.string}
+    end
+  })
+  
+  Component.condition.add("match", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "array", "\"match\" value must be an array of strings")
+      for i, v in ipairs(data) do
+        parser:assert_jsontype(v, "string", "\"match\" value must be an array of strings")
+        data[i]=parser:parseInterpolatedString(v)
+      end
+    end,
+    init = function(data)
+      local complexity = function(str)
+        local n = 0
+        for _ in str.string:gmatch("%$") do
+          n=n+1
+        end
+        return n
+      end
+      local simplefirst = function(str1, str2)
+        return complexity(str1) < complexity(str2)
+      end
+      table.sort(data, simplefirst)
+      for _, str in ipairs(data) do
+        Binding.call("string", "create", str)
+      end
+    end,
+    delete = function(data)
+      for _, str in ipairs(data) do
+        Binding.call("string", "delete", str)
+      end
+    end,
+    jsonval = function(self)
+      local strings = {}
+      for _, str in ipairs(self.data) do
+        table.insert(strings, str.string)
+      end
+      return {match=strings}
+    end
+  })
+  
+  local limit_thing_meta = {__jsonorder={"name", "key", "increment"}}
+  
+  --limiter conditions
+  Component.condition.add({"limit-break", "limit-check"}, {
+    parse = function(data, parser)
+      if type(data) == "string" then
+        data = {name=data}
+      elseif type(data) ~= "table" then
+        parser:error("invalid value type %s", type(data))
+      end
+      local condition_name = next(parser:getContext())
+      local rule = parser:getContext("rule")
+      local rule_condition = parser:getContext("if")
+      
+      if not data.key then
+        data.key = rule.key
+      end
+      parser:assert(data.key, "limiter \"key\" missing, and no default \"key\" in rule")
+      parser:assert_type(data.key, "string", "invalid limiter \"key\" type")
+      
+      data.key = parser:parseInterpolatedString(data.key)
+      
+      if not data.increment then
+        if condition_name == "limit-break" then
+          data.increment = 1
+        elseif condition_name == "limit-check" then
+          data.increment = 0
+        end
+      end
+      data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
+      parser:assert(data.increment >= 0, "\"increment\" must be >= 0")
+      
+      parser:assert(data.name, "name missing")
+      parser:assert_type(data.name, "string", "invalid \"name\" type")
+      
+      if Component.generate_refs then
+        if not rule.refs then rule.refs = {} end
+        if not rule_condition.refs then rule_condition.refs = {} end
+        table.insert(rule.refs, "limiter:"..data.name)
+        table.insert(rule_condition.refs, "limiter:"..data.name)
+      end
+      
+      return data
+    end,
+    init = function(data, thing, ruleset)
+      local limiter = ruleset:findLimiter(data.name)
+      if not limiter then error("unknown limiter " .. data.name) end
+      data.name = nil
+      data.limiter = limiter
+      if data.key then
+        Binding.call("string", "create", data.key)
+      end
+    end,
+    delete = function(data)
+      if data.key then
+        Binding.call("string", "delete", data.key)
+      end
+    end,
+    jsonval = function(self)
+      local cpy = {}
+      for k,v in pairs(self.data) do
+        cpy[k]=v
+      end
+      if cpy.derived_key then
+        cpy.derived_key = nil
+        cpy.key = nil
+      elseif cpy.key then
+        cpy.key = cpy.key.string
+      end
+      cpy.name = cpy.limiter.name
+      cpy.limiter = nil
+      setmetatable(cpy, limit_thing_meta)
+      local ret = {[self.condition]=cpy}
+      return ret
+    end
+  })
+  
+  Component.condition.add(".delay", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "number", "delay by <number> please")
+    end
+  })
+  
+  --some actions, too
+  Component.action.add("tag", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "string", "\"tag\" value must be a string")
+      return parser:parseInterpolatedString(data)
+    end,
+    init = function(data)
+      Binding.call("string", "create", data)
+    end,
+    delete = function(data)
+      Binding.call("string", "delete", data)
+    end,
+    jsonval = function(self)
+      return {tag=self.data.string}
+    end
+  })
+  
+  Component.action.add("accept", {parse = function(data, parser)
+    parser:assert_type(data, "table", "\"accept\" value must be an object")
+    parser:assert_table_size(data, 0, "\"accept\" value must be empty")
+  end})
+  Component.action.add("reject", {parse = function(data, parser)
+    parser:assert_type(data, "table", "\"reject\" value must be an object")
+    --parser:assert_table_size(data, 0, "\"reject\" value must be empty")
+  end})
+  
+  Component.action.add("wait", {
+    parse = function(data, parser)
+      parser:assert_jsontype(data, "number", "\"wait\" value must be a number")
+    end
+  })
+  
+  return Component
 
 end)
 
 module("parser", function()
-local a=require"rulecomponent"local b=require"dkjson"local function c(d,e,f)local g=e[f.key]d:pushContext(g,f.key)local h=d.ruleset;if g then d:assert_type(g,f.type,"wrong type for ruleset %s, expected %s, got %s",f.key,f.type,d:jsontype(g))local i,j;for k,l in pairs(g)do d:assert_type(k,"string","wrong key type for %s, expected string, got %s %s",f.thing,d:jsontype(k),tostring(k))i,j=f.parser_method(d,l,k)d:assert(i,j)d:assert(h[f.key][i.name]==nil,"%s %s already exists",f.thing,i.name)h[f.key][i.name]=i end end;d:popContext()return true end;local function m(n,o)if type(n)==type(o)then setmetatable(n,getmetatable(o))end end;local p;do local q=setmetatable({},{__mode="k"})p=function(r,s)local t,u,v=1,1,0;local w=q[r]if w and w.pos<s then t=w.line;u=w.pos end;while true do u=r:find("\n",u,true)if u and u<s then t=t+1;v=u;u=u+1 else break end end;return t,s-v end end;local function x(y)return function(r,s)local t,z=p(r,s)return{__pos=s,__line=t,__column=z,__jsontype=y,__jsonmeta=true}end end;local A={}function A:jsontype(B)if type(B)=="table"then local C=getmetatable(B)return C and C.__jsontype or nil else return type(B)end end;function A:assert(D,j,...)if not D then self:error(j,...)end;return D end;function A:assert_type(B,E,j,...)if j then return self:assert(type(B)==E,j,...)else return self:assert(type(B)==E,"expected type '%s', got '%s'",E,type(B))end end;function A:assert_jsontype(B,E,j,...)if j then return self:assert(self:jsontype(B)==E,j,...)else return self:assert(self:jsontype(B)==E,"expected JSON type '%s', got '%s'",E,self:jsontype(B))end end;function A:assert_table_size(B,F,j,...)self:assert_type(B,"table")local G=0;for H,H in pairs(B)do G=G+1 end;if G~=F then if j then self:error(j,...)else self:error("wrong table size, expected %i, got %i",F,G)end end;return B end;local function I(J)local K=getmetatable(J)if K.__line and K.__column then return K.__line,K.__column end end;local function L(J)local t,M=I(J)if t and M then return("line %s column %i"):format(t,M)else return nil end end;function A:error(j,...)if not j then j="unknown error"end;if select("#",...)>0 then j=j:format(...)end;local N={}for O=#self.ctx_stack,1,-1 do local P=self.ctx_stack[O]if P.name then table.insert(N,P.name)end;local Q=L(P.ctx)if Q then if self.name then table.insert(N,self.name)end;error(("%s at %s: %s"):format(table.concat(N," in "),Q,j))end end;if self.name then table.insert(N,self.name)end;if#N>0 then error(("%s: %s"):format(table.concat(N," in "),j))else error(j)end end;function A:setInterpolationChecker(R)self.interpolation_checker=R end;function A:checkInterpolatedString(r)if self.interpolation_checker then self.interpolation_checker(r,self)end;return true end;function A:pushContext(S,T)table.insert(self.ctx_stack,{ctx=S,name=T})self.context=self.ctx_stack[#self.ctx_stack]return self end;function A:popContext()table.remove(self.ctx_stack,#self.ctx_stack)self.context=self.ctx_stack[#self.ctx_stack]end;function A:getContext(T)if not T then return self.context and self.context.ctx end;for O=#self.ctx_stack,1,-1 do local P=self.ctx_stack[O]if P.name==T then return P.ctx end end;return nil end;function A:printContext()for O=#self.ctx_stack,1,-1 do local P=self.ctx_stack[O]print(P.name or"<?>",self:jsontype(P.ctx)or"<?>",L(P.ctx)or"")end end;function A:parseFile(U,V)local W,j=io.open(U,"rb")if not W then return nil,j end;local X=W:read("*a")W:close()self.name=U;return self:parseJSON("ruleset",X,"file "..U,V)end;function A:parseJSON(Y,Z,_,V)self:assert_type(Z,"string","expected a JSON string")local g,H,j=b.decode(Z,1,b.null,x("object"),x("array"))self.name=_;local function a0()if not g then self:error("Error parsing JSON: "..j)end;if Y=="ruleset"then return self:parseRuleSet(g)elseif Y=="phase"then return self:parsePhase(g)elseif Y=="limiter"then return self:parseLimiter(g)elseif Y=="list"then return self:parseList(g)elseif Y=="rule"then return self:parseRule(g)end end;if V then return a0()else local a1,a2=pcall(a0)if not a1 then return nil,a2:match("[^:]*:%d+: (.*)")or a2 else return a2 end end end;function A:parseInterpolatedString(r)for a3 in r:gmatch("%$%b{}")do if not a3:match("^%${[%w_]+}")then self:error("invalid variable \"%s\" in interpolated string",a3)end end;for a3 in r:gmatch("%${?[%w_]*}?")do if a3:sub(2,2)=="{"then if a3:sub(-1)~="}"then self:error("missing '}' in interpolated string")end;a3=a3:sub(3,-2)if a3==""then self:error("invalid variable ${} in interpolated string")elseif a3:match("^%d%d+")then self:error("invalid regex capture \"%s\" in interpolated string. 1-9 only (nginx quirk)",a3)elseif a3:match("^%d.+")then self:error("invalid variable \"%s\" in interpolated string. can't sart with a number (nginx quirk)",a3)end else a3=a3:sub(2,-1)end;if a3==""then self:error("invalid empty variable in interpolated string")end end;return{string=r}end;local function a4(d,g,a5,j)local a6=a5 and g[a5]or g;if not a6 then if d.allow_incomplete then g.incomplete=true;d.incomplete=true else d:error(j or"missing required attribute \"%s\"",a5)end;return false else return true end end;function A:parseRuleSet(g,T)self:pushContext(g,"ruleset")self:assert_type(g,"table","wrong type for ruleset")self.ruleset.name=T or g.name;if a4(self,g,"limiters")then c(self,g,{thing="limiter",key="limiters",type="table",parser_method=self.parseLimiter})self:checkLimiters(g.limiters)end;if a4(self,g,"rules")then c(self,g,{thing="rule",key="rules",type="table",parser_method=function(self,g,T)self:pushContext(g,"rule")self:assert(type(g)~="string",("named rule \"%s\" cannot be a string referring to another named rule \"%s\""):format(T,tostring(g)))self:popContext()return self:parseRule(g,T)end})end;if a4(self,g,"lists")then c(self,g,{thing="list",key="lists",type="table",parser_method=self.parseList})end;if a4(self,g,"phases")then self.ruleset.phases=self:parsePhaseTable(g.phases)end;local function a7(J)local a8=getmetatable(J)if a8 and a8.__jsonmeta then setmetatable(J,{line=a8.__line,col=a8.__column})end;for H,l in pairs(J)do if type(l)=="table"then a7(l)end end end;a7(self.ruleset)return self.ruleset end;function A:parsePhaseTable(g)self:assert(g~=nil,"missing phase table (\"phases\" attribute)")self:assert_jsontype(g,"object","phase table must be an object")self:pushContext(g,"phase table")for a9,aa in pairs(g)do self:assert_type(a9,"string","phase table entries must be strings")if self:jsontype(aa)=="array"then for O,ab in ipairs(aa)do if type(ab)=="string"or self:jsontype(ab)=="array"or self:jsontype(ab)=="object"then aa[O]=self:parseList(ab)else self:error("invalid rule list type: %s",self:jsontype(ab))end end elseif type(aa)=="string"then g[a9]={self:parseList(aa)}elseif self:jsontype(aa)=="object"then g[a9]=self:parseList(aa)end end;self:popContext()return g end;function A:getList(T)local ab=self.ruleset.lists[T]if not ab and self.external then ab=self.external.lists[T]end;return ab end;function A:parseList(g,T)if type(g)=="string"then return self:assert(self:getList(g),([[named list "%s" not found]]):format(g))end;self:pushContext(g,"list")local ab={}if self:jsontype(g)=="object"then if T then self:assert(T==g.name,"rule list 'name' attribute must match outside list name")else T=tostring(g.name)end;g=g.rules end;local ac;if a4(self,g,nil,"missing rule list")then self:assert_jsontype(g,"array","rule list must be an array")ac={}for H,l in ipairs(g)do table.insert(ac,self:parseRule(l))end end;self:popContext()ab.name=T;ab.rules=ac;m(ab,g)return ab end;function A:getRule(T)local ad=self.ruleset.rules[T]if not ad and self.external then ad=self.external.rules[T]end;return ad end;function A:parseRule(g,T)self:pushContext(g,"rule")local ae;if type(g)=="string"then ae=self:getRule(g)self:assert(ae,([[named rule "%s" not found]]):format(g))self:popContext()return ae end;self:assert_type(g,"table","invalid rule data type: "..type(g))self:assert_jsontype(g,"object",("invalid rule data type: %s"):format(self:jsontype(g)))if g["if"]or g["if-any"]or g["if-all"]or g["then"]then self:assert(not g["always"],[["always" clause can't be present in if/then rule]])self:assert(not g["switch"],[["switch" clause can't be present in if/then rule]])end;if g["then"]then if g["if"]and(g["if-any"]or g["if-all"])or g["if-any"]and g["if-all"]then self:error("only one of \"if\", \"if-any\" or \"if-all\" allowed in if/then rule")end;local af;if g["if"]then self:pushContext(g,"if")af=self:parseCondition(g["if"])self:popContext()elseif g["if-any"]or g["if-all"]then local ag={}self:pushContext(g,"if")for H,l in ipairs(g["if-any"]or g["if-all"])do af=self:assert(self:parseCondition(l))table.insert(ag,af)end;self:popContext()af={[g["if-any"]and"any"or"all"]=ag}m(af,g["if"]or g["if-any"]or g["if-all"])g["if-any"]=nil;g["if-all"]=nil end;g["if"]=af elseif g["always"]then g["if"]={["true"]={}}g["then"]=g["always"]g["always"]=nil elseif next(g)==nil then self:error("empty rule not allowed")elseif self.allow_incomplete then g.incomplete=true;self.incomplete=true else self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")end;if not g.name then g.name=T end;if g["if"]then if a4(self,g,"then")then g["then"]=self:parseActions(g["then"],"then")end;if g["else"]or not self.allow_incomplete then g["else"]=self:parseActions(g["else"],"else")end end;if g.key then g.key=self:parseInterpolatedString(g.key)end;self:popContext()return g end;function A:parseCondition(g)self:pushContext(g,"condition")local af;if type(g)=="string"then af={[g]={}}elseif type(g)=="table"then self:assert_jsontype(g,"object","condition cannot be an array, must be an object")self:assert_table_size(g,1,"condition object must have exactly one attribute (the condition name)")af=g else self:error("wrong type (%s) for condition",type(g))end;self:popContext()self:pushContext(g,"condition "..next(af))af=a.condition.parse(af,self)self:popContext()m(af,g)return af end;function A:parseAction(g)self:pushContext(g,"action")local ah;if type(g)=="string"then ah={[g]={}}elseif self:jsontype(g)=="object"then self:assert(next(g,next(g))==nil,"action object must have only 1 attribute -- the action name")ah=g else self:error("action must be string on 1-attribute object, but instead was a %s",self:jsontype(g))end;self:popContext()self:pushContext(g,("\"%s\" action"):format(next(ah)))m(ah,g)ah=a.action.parse(ah,self)self:popContext()return ah end;function A:parseActions(g,T)if g==nil then return{}end;self:pushContext(g,T and("\"%s\" actions"):format(T)or nil)local ai={}m(ai,g)if self:jsontype(g)=="object"or type(g)=="string"or#g==0 and next(g)~=nil then table.insert(ai,self:parseAction(g))elseif type(g)=="table"then for H,l in ipairs(g)do table.insert(ai,self:parseAction(l))end end;self:popContext()return ai end;function A:parseTimeInterval(g,j)if j then j=" for "..j end;local aj=self:jsontype(g)if aj=="number"then return g elseif aj=="string"then local ak,al=g:match("^([%d.]+)([%w_]*)")local am;ak=tonumber(ak)self:assert(ak and al,("invalid time string \"%s\"%s"):format(g,j))if al=="ms"or al:match("^millisec(ond(s?))?")then am=.01 elseif al==""or al=="s"or al:match("^sec(ond(s?))?")then am=1 elseif al=="m"or al:match("^min(ute(s)?)?")then am=60 elseif al=="h"or al:match("^hour(s?)")then am=3600 elseif al=="d"or al:match("^day(s)?")then am=86400 elseif al=="w"or al=="wk"or al:match("^week(s)?")then am=604800 elseif al=="M"or al:match("^month(s)?")then am=2628001 else self:error("unknown time unit \"%s\"%s",al,j)end;return ak*am else self:error("invalid time inteval type \"%s\"%s",self:jsontype(g),j)end end;function A:getLimiter(T)local an=self.ruleset.limiters[T]if not an and self.external then an=self.external.limiters[T]end;return an end;function A:parseLimiter(g,T)self:pushContext(g,"limiter")if not g.name then g.name=T end;if a4(self,g,"interval")then g.interval=self:parseTimeInterval(g.interval,"interval value")self:assert(g.interval>=60,"\"interval\" value must be >= 60 seconds")end;if a4(self,g,"limit")then g.limit=self:assert(tonumber(g.limit),"invalid \"limit\" value, must be a number")self:assert(g.limit>=0,"\"limit\" value must be >= 0")end;if g.sync_steps then g.sync_steps=self:assert(tonumber(g.sync_steps),"invalid \"sync-steps\" value")end;if g.burst then self:assert_type(g.burst,"string","invalid \"burst\" value type")end;if g["burst-expire"]then g.burst_expire=self:parseTimeInterval(g["burst-expire"],"burst_expire value")g["burst-expire"]=nil end;self:assert_type(g.name,"string","invalid limiter name")self:popContext()return g end;function A:checkLimiters(g)if not g then return true end;self:pushContext(g,"limiters")for H,l in pairs(g)do self:pushContext(l,("limiter \"%s\""):format(l.name))if l.burst then self:assert(g[l.burst],("limiter references unknown burst limiter \"%s\""):format(l.burst))end;self:popContext()end;self:popContext()end;local ao={__index=A}local function ap(f)local d={name="<?>",ctx_stack={},ruleset={limiters={},rules={},lists={},phases={}}}f=f or{}if f.external then d.external={}for k,G in pairs{lists="list",rules="rule",limiters="limiter"}do local aq=f.external[G]d.external[k]=setmetatable({},{__index=function(J,ar)local i=aq(ar)if i then if type(i)~="table"then i={name=ar,external=true}else error("how do?...")end end;J[ar]=i;return i end})end end;if f.allow_incomplete then d.allow_incomplete=true end;setmetatable(d,ao)return d end;return{new=ap,RuleComponent=a}
+  local RuleComponent = require "rulecomponent"
+  local json = require "dkjson"
+  --local mm = require "mm"
+  
+  local function parseRulesetThing(parser, data_in, opt)
+    local data = data_in[opt.key]
+    parser:pushContext(data, opt.key)
+    local ruleset = parser.ruleset
+    
+    if data then
+      parser:assert_type(data, opt.type, "wrong type for ruleset %s, expected %s, got %s", opt.key, opt.type, parser:jsontype(data))
+      local ret, err
+      for k,v in pairs(data) do
+        parser:assert_type(k, "string", "wrong key type for %s, expected string, got %s %s", opt.thing, parser:jsontype(k), tostring(k))
+        ret, err = opt.parser_method(parser, v, k)
+        parser:assert(ret, err)
+        parser:assert(ruleset[opt.key][ret.name] == nil, "%s %s already exists", opt.thing, ret.name)
+        ruleset[opt.key][ret.name]=ret
+      end
+    end
+    parser:popContext()
+    return true
+  end
+  
+  local function inheritmetatable(dst, src)
+    if type(dst) == type(src) then
+      setmetatable(dst, getmetatable(src))
+    end
+  end
+  
+  local getloc; do --location caching
+    local lc = setmetatable({}, {__mode="k"}) -- weak keys
+    getloc = function(str, where)
+      local line, pos, linepos = 1, 1, 0
+      local prev = lc[str]
+      if prev and prev.pos < where then
+        line = prev.line
+        pos = prev.pos
+      end
+      while true do
+        pos = str:find("\n", pos, true)
+        if pos and pos < where then
+          line = line + 1
+          linepos = pos
+          pos = pos + 1
+        else
+          break
+        end
+      end
+      return line, (where - linepos) -- line, column
+    end
+  end
+  
+  local function jsonmeta(what)
+    return function(str, where)
+      local line, column = getloc(str, where)
+      return {__pos=where,__line=line, __column=column,  __jsontype = what, __jsonmeta = true}
+    end
+  end
+  
+  local Parser = {}
+  
+  function Parser:jsontype(var)
+    if type(var) == "table" then
+      local m = getmetatable(var)
+      return m and m.__jsontype or nil
+    else
+      return type(var)
+    end
+  end
+  function Parser:assert(cond, err, ...)
+    if not cond then self:error(err, ...) end
+    return cond
+  end
+  function Parser:assert_type(var, expected_type, err, ...)
+    if err then
+      return self:assert(type(var) == expected_type, err, ...)
+    else
+      return self:assert(type(var) == expected_type, "expected type '%s', got '%s'", expected_type, type(var))
+    end
+  end
+  function Parser:assert_jsontype(var, expected_type, err, ...)
+    if err then
+      return self:assert(self:jsontype(var) == expected_type, err, ...)
+    else
+      return self:assert(self:jsontype(var) == expected_type,"expected JSON type '%s', got '%s'", expected_type, self:jsontype(var))
+    end
+  end
+  function Parser:assert_table_size(var, expected_size, err, ...)
+    self:assert_type(var, "table")
+    local n = 0
+    for _, _ in pairs(var) do
+      n = n + 1
+    end
+    if n ~= expected_size then
+      if err then
+        self:error(err, ...)
+      else
+        self:error("wrong table size, expected %i, got %i", expected_size, n)
+      end
+    end
+    return var
+  end
+  
+  local function getlc(tbl)
+    local mt = getmetatable(tbl)
+    if mt.__line and mt.__column then
+      return mt.__line, mt.__column
+    end
+  end
+  
+  local function getlc_str(tbl)
+    local line, col = getlc(tbl)
+    if line and col then
+      return ("line %s column %i"):format(line, col)
+    else
+      return nil
+    end
+  end
+  
+  function Parser:error(err, ...)
+    
+    if not err then err = "unknown error" end
+    if select("#", ...) > 0 then
+      err = err:format(...)
+    end
+    
+    local nested_names = {}
+    
+    for i=#self.ctx_stack,1,-1 do
+      local cur = self.ctx_stack[i]
+      if cur.name then table.insert(nested_names, cur.name) end
+      local lc_str = getlc_str(cur.ctx)
+      if lc_str then
+        if self.name then table.insert(nested_names, self.name) end
+        error(("%s at %s: %s"):format(table.concat(nested_names, " in "), lc_str, err))
+      end
+    end
+    if self.name then table.insert(nested_names, self.name) end
+    if #nested_names > 0 then
+      error(("%s: %s"):format(table.concat(nested_names, " in "), err))
+    else
+      error(err)
+    end
+  end
+  
+  function Parser:setInterpolationChecker(func)
+    self.interpolation_checker = func
+  end
+  function Parser:checkInterpolatedString(str)
+    if self.interpolation_checker then
+      self.interpolation_checker(str, self)
+    end
+    return true
+  end
+  
+  function Parser:pushContext(ctx, name)
+    table.insert(self.ctx_stack, {ctx=ctx, name=name})
+    self.context = self.ctx_stack[#self.ctx_stack]
+    return self
+  end
+  function Parser:popContext()
+    table.remove(self.ctx_stack, #self.ctx_stack)
+    self.context = self.ctx_stack[#self.ctx_stack]
+  end
+  function Parser:getContext(name)
+    if not name then return self.context and self.context.ctx end
+    for i=#self.ctx_stack, 1, -1 do
+      local cur = self.ctx_stack[i]
+      if cur.name==name then
+        return cur.ctx
+      end
+    end
+    return nil
+  end
+  function Parser:printContext()
+    for i=#self.ctx_stack, 1, -1 do
+      local cur = self.ctx_stack[i]
+      print(cur.name or "<?>", self:jsontype(cur.ctx) or "<?>", getlc_str(cur.ctx) or "")
+    end
+  end
+  
+  function Parser:parseFile(path, unprotected)
+    local file, err = io.open(path, "rb") -- r read mode and b binary mode
+    if not file then return nil, err end
+    local content = file:read("*a") -- *a or *all reads the whole file
+    file:close()
+    self.name = path
+    return self:parseJSON("ruleset", content, "file " .. path, unprotected)
+  end
+  
+  function Parser:parseJSON(element_name, json_str, json_name, unprotected)
+    self:assert_type(json_str, "string", "expected a JSON string")
+    local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
+    self.name = json_name
+    
+    local function parse_it()
+      if not data then self:error("Error parsing JSON: " .. err) end
+      if element_name == "ruleset" then
+        return self:parseRuleSet(data)
+      elseif element_name == "phase" then
+        return self:parsePhase(data)
+      elseif element_name == "limiter" then
+        return self:parseLimiter(data)
+      elseif element_name == "list" then
+        return self:parseList(data)
+      elseif element_name == "rule" then
+        return self:parseRule(data)
+      end
+    end
+    
+    if unprotected then
+      return parse_it()
+    else
+      local ok, res = pcall(parse_it)
+      if not ok then
+        return nil, (res:match("[^:]*:%d+: (.*)") or res)
+      else
+        return res
+      end
+    end
+  end
+  
+  function Parser:parseInterpolatedString(str)
+    --validate the string
+    for sub in str:gmatch("%$%b{}") do
+      if not sub:match("^%${[%w_]+}") then
+        self:error("invalid variable \"%s\" in interpolated string", sub)
+      end
+    end
+    for sub in str:gmatch("%${?[%w_]*}?") do
+      if sub:sub(2,2) == "{" then
+        if sub:sub(-1) ~="}" then --unterminated bracket
+          self:error("missing '}' in interpolated string")
+        end
+        sub=sub:sub(3, -2)
+        if sub == "" then
+          self:error("invalid variable ${} in interpolated string")
+        elseif sub:match("^%d%d+") then
+          self:error("invalid regex capture \"%s\" in interpolated string. 1-9 only (nginx quirk)", sub)
+        elseif sub:match("^%d.+") then
+          self:error("invalid variable \"%s\" in interpolated string. can't sart with a number (nginx quirk)", sub)
+        end
+      else
+        sub=sub:sub(2, -1)
+      end
+      if sub == "" then
+        self:error("invalid empty variable in interpolated string")
+      end
+      
+    end
+    
+    return {string = str}
+  end
+  
+  local function attr_present(parser, data, attr_name, err)
+    local target = attr_name and data[attr_name] or data
+    if not target then
+      if parser.allow_incomplete then
+        data.incomplete = true
+        parser.incomplete = true
+      else
+        parser:error(err or "missing required attribute \"%s\"", attr_name)
+      end
+      return false
+    else
+      return true
+    end
+  end
+  
+  function Parser:parseRuleSet(data, name)
+    self:pushContext(data, "ruleset")
+    
+    self:assert_type(data, "table", "wrong type for ruleset")
+    self.ruleset.name = name or data.name
+    
+    if attr_present(self, data, "limiters") then
+      parseRulesetThing(self, data, {
+        thing="limiter", key="limiters", type="table",
+        parser_method= self.parseLimiter
+      })
+      self:checkLimiters(data.limiters)
+    end
+    
+    --luacheck: push ignore 432 --don't mind the shadowing
+    if attr_present(self, data, "rules") then
+      parseRulesetThing(self, data, {
+        thing="rule", key="rules",  type="table",
+        parser_method=function(self, data, name)
+          self:pushContext(data, "rule")
+          self:assert(type(data) ~= "string", ("named rule \"%s\" cannot be a string referring to another named rule \"%s\""):format(name, tostring(data)))
+          self:popContext()
+          return self:parseRule(data, name)
+        end
+      })
+    end
+    --luacheck: pop
+    
+    if attr_present(self, data, "lists") then
+      parseRulesetThing(self, data, {
+        thing="list", key="lists",  type="table",
+        parser_method= self.parseList
+      })
+    end
+    
+    if attr_present(self, data, "phases") then
+      self.ruleset.phases = self:parsePhaseTable(data.phases)
+    end
+    --convert debug metatable data to __dbg table whenever possible
+    local function move_dbg_data(tbl)
+      local meta = getmetatable(tbl)
+      if meta and meta.__jsonmeta then
+        setmetatable(tbl, {line=meta.__line, col=meta.__column})
+      end
+      for _, v in pairs(tbl) do
+        if type(v) == "table" then
+          move_dbg_data(v)
+        end
+      end
+    end
+    move_dbg_data(self.ruleset)
+    
+    return self.ruleset
+  end
+  
+  function Parser:parsePhaseTable(data)
+    self:assert(data ~= nil, "missing phase table (\"phases\" attribute)")
+    self:assert_jsontype(data, "object", "phase table must be an object")
+    self:pushContext(data, "phase table")
+    
+    for phase_name, phase_data in pairs(data) do
+      self:assert_type(phase_name, "string", "phase table entries must be strings")
+      if self:jsontype(phase_data) == "array" then
+        for i, list in ipairs(phase_data) do
+          if type(list)=="string" or self:jsontype(list) == "array" or self:jsontype(list) == "object" then
+            phase_data[i]=self:parseList(list)
+          else
+            self:error("invalid rule list type: %s", self:jsontype(list))
+          end
+        end
+      elseif type(phase_data) == "string" then
+        --singe named list
+        data[phase_name]={ self:parseList(phase_data) }
+      elseif self:jsontype(phase_data)=="object" then
+        --single long-form list
+        data[phase_name]=self:parseList(phase_data)
+      end
+    end
+    
+    self:popContext()
+    
+    return data
+  end
+  
+  function Parser:getList(name)
+    local list = self.ruleset.lists[name]
+    if not list and self.external then
+      list = self.external.lists[name]
+    end
+    return list
+  end
+  
+  function Parser:parseList(data, name)
+    if type(data)=="string" then
+      return self:assert(self:getList(data), ([[named list "%s" not found]]):format(data))
+    end
+    self:pushContext(data, "list")
+    local list = {}
+    if self:jsontype(data) == "object" then
+      if name then
+        self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
+      else
+        name = tostring(data.name)
+      end
+      data = data.rules
+    end
+    
+    local rules
+    
+    if attr_present(self, data, nil, "missing rule list") then
+      self:assert_jsontype(data, "array", "rule list must be an array")
+      rules = {}
+      for _,v in ipairs(data) do
+        table.insert(rules, self:parseRule(v))
+      end
+    end
+    self:popContext()
+    list.name=name
+    list.rules=rules
+    inheritmetatable(list, data)
+    return list
+  end
+  
+  function Parser:getRule(name)
+    local r = self.ruleset.rules[name]
+    if not r and self.external then
+      r = self.external.rules[name]
+    end
+    return r
+  end
+  
+  function Parser:parseRule(data, name)
+    self:pushContext(data, "rule")
+    local rule
+    if type(data) == "string" then
+      rule = self:getRule(data)
+      self:assert(rule, ([[named rule "%s" not found]]):format(data))
+      self:popContext()
+      return rule
+    end
+    self:assert_type(data, "table", "invalid rule data type: " .. type(data))
+    self:assert_jsontype(data, "object", ("invalid rule data type: %s"):format(self:jsontype(data)))
+    
+    if ((data["if"] or data["if-any"] or data["if-all"]) or data["then"]) then
+      self:assert(not data["always"], [["always" clause can't be present in if/then rule]])
+      self:assert(not data["switch"], [["switch" clause can't be present in if/then rule]])
+    end
+    
+    if data["then"] then
+      if (data["if"] and (data["if-any"] or data["if-all"])) or (data["if-any"] and data["if-all"]) then
+        self:error("only one of \"if\", \"if-any\" or \"if-all\" allowed in if/then rule")
+      end
+      
+      local condition
+      if data["if"] then
+        self:pushContext(data, "if")
+        condition = self:parseCondition(data["if"])
+        self:popContext()
+      elseif data["if-any"] or data["if-all"] then
+        local conditions = {}
+        self:pushContext(data, "if")
+        for _, v in ipairs(data["if-any"] or data["if-all"]) do
+          condition = self:assert(self:parseCondition(v))
+          table.insert(conditions, condition)
+        end
+        self:popContext()
+        condition = {[(data["if-any"] and "any" or "all")]=conditions}
+        inheritmetatable(condition, data["if"] or data["if-any"] or data["if-all"])
+        data["if-any"]=nil
+        data["if-all"]=nil
+      end
+      data["if"]=condition
+    elseif data["always"] then
+      data["if"]={["true"]={}}
+      data["then"]=data["always"]
+      data["always"]=nil
+    elseif next(data) == nil then
+      self:error("empty rule not allowed")
+    elseif self.allow_incomplete then
+      data.incomplete = true
+      self.incomplete = true
+    else
+      self:error("rule must have at least an \"if\", \"then\", or \"always\" attribute")
+    end
+    
+    if not data.name then
+      data.name = name
+    end
+    
+    if data["if"] then
+      if attr_present(self, data, "then") then
+        data["then"] = self:parseActions(data["then"], "then")
+      end
+      if data["else"] or not self.allow_incomplete then
+        data["else"] = self:parseActions(data["else"], "else")
+      end
+    end
+    if data.key then
+      data.key = self:parseInterpolatedString(data.key)
+    end
+    
+    self:popContext()
+    --reuse metatable for debugging purposes
+    return data
+  end
+  
+  function Parser:parseCondition(data)
+    self:pushContext(data, "condition")
+    local condition
+    if type(data) == "string" then
+      condition = {[data]={}}
+    elseif type(data) == "table" then
+      self:assert_jsontype(data, "object", "condition cannot be an array, must be an object")
+      self:assert_table_size(data, 1, "condition object must have exactly one attribute (the condition name)")
+      condition = data
+    else
+      self:error("wrong type (%s) for condition", type(data))
+    end
+    self:popContext()
+    -- be more specific with condition name
+    self:pushContext(data, "condition " .. (next(condition)))
+    condition = RuleComponent.condition.parse(condition, self)
+    self:popContext()
+    inheritmetatable(condition, data)
+    return condition
+  end
+    
+  function Parser:parseAction(data)
+    self:pushContext(data, "action")
+    local action
+    if type(data) == "string" then
+      action = {[data]={}}
+    elseif self:jsontype(data) == "object" then
+      self:assert(next(data, next(data)) == nil, "action object must have only 1 attribute -- the action name")
+      action = data
+    else
+      self:error("action must be string on 1-attribute object, but instead was a %s", self:jsontype(data))
+    end
+    self:popContext()
+    --we can be more specific about the action name now
+    self:pushContext(data, ("\"%s\" action"):format(next(action)))
+    inheritmetatable(action, data)
+    action = RuleComponent.action.parse(action, self)
+    self:popContext()
+    return action
+  end
+  
+  function Parser:parseActions(data, name)
+    if data == nil then
+      return {}
+    end
+    self:pushContext(data, name and ("\"%s\" actions"):format(name) or nil)
+    local actions = {}
+    inheritmetatable(actions, data)
+    if self:jsontype(data) == "object" or type(data)=="string" or (#data == 0 and next(data) ~= nil) then
+      table.insert(actions, self:parseAction(data))
+    elseif type(data) == "table" then
+      for _, v in ipairs(data) do
+        table.insert(actions, self:parseAction(v))
+      end
+    end
+    self:popContext()
+    return actions
+  end
+  
+  function Parser:parseTimeInterval(data, err)
+    if err then err = " for " .. err end
+    local typ = self:jsontype(data)
+    if typ == "number" then
+      return data
+    elseif typ == "string" then
+      local num, unit = data:match("^([%d.]+)([%w_]*)")
+      local scale
+      num = tonumber(num)
+      self:assert(num and unit, ("invalid time string \"%s\"%s"):format(data, err))
+      if unit == "ms" or unit:match("^millisec(ond(s?))?") then
+        scale = .01
+      elseif unit == "" or unit == "s" or unit:match("^sec(ond(s?))?") then
+        scale = 1
+      elseif unit == "m" or unit:match("^min(ute(s)?)?") then
+        scale = 60
+      elseif unit == "h" or unit:match("^hour(s?)") then
+        scale = 3600
+      elseif unit == "d" or unit:match("^day(s)?") then
+        scale = 86400
+      elseif unit == "w" or unit == "wk" or unit:match("^week(s)?") then
+        scale = 604800
+      elseif unit == "M" or unit:match("^month(s)?") then
+        scale = 2628001
+      else
+        self:error("unknown time unit \"%s\"%s", unit, err)
+      end
+      return num * scale
+    else
+      self:error("invalid time inteval type \"%s\"%s", self:jsontype(data), err)
+    end
+  end
+  
+  function Parser:getLimiter(name)
+    local lim = self.ruleset.limiters[name]
+    if not lim and self.external then
+      lim = self.external.limiters[name]
+    end
+    return lim
+  end
+  
+  function Parser:parseLimiter(data, name)
+    self:pushContext(data, "limiter")
+    
+    if not data.name then data.name = name end
+    
+    if attr_present(self, data, "interval") then
+      data.interval = self:parseTimeInterval(data.interval, "interval value")
+      self:assert(data.interval >= 60, "\"interval\" value must be >= 60 seconds")
+    end
+    
+    if attr_present(self, data, "limit") then
+      data.limit = self:assert(tonumber(data.limit), "invalid \"limit\" value, must be a number")
+      self:assert(data.limit >= 0, "\"limit\" value must be >= 0")
+    end
+    
+    if data.sync_steps then
+      data.sync_steps = self:assert(tonumber(data.sync_steps), "invalid \"sync-steps\" value")
+    end
+    if data.burst then
+      self:assert_type(data.burst, "string", "invalid \"burst\" value type")
+    end
+    if data["burst-expire"] then
+      data.burst_expire = self:parseTimeInterval(data["burst-expire"], "burst_expire value")
+      data["burst-expire"] = nil
+    end
+    
+    self:assert_type(data.name, "string", "invalid limiter name")
+    self:popContext()
+    return data
+  end
+  function Parser:checkLimiters(data)
+    if not data then return true end
+    self:pushContext(data, "limiters")
+    for _, v in pairs(data) do
+      self:pushContext(v, ("limiter \"%s\""):format(v.name))
+      if v.burst then
+        --make sure the burst value refers to a known limiter
+        self:assert(data[v.burst], ("limiter references unknown burst limiter \"%s\""):format(v.burst))
+      end
+      self:popContext()
+    end
+    self:popContext()
+  end
+  
+  local Parser_meta = {__index = Parser}
+  
+  local function newparser(opt)
+    local parser = {
+      name = "<?>",
+      ctx_stack = {},
+      ruleset = {
+        limiters = {},
+        rules = {},
+        lists = {},
+        phases ={},
+      }
+    }
+    
+    opt = opt or {}
+    if opt.external then
+      parser.external = {}
+      for k, n in pairs{lists="list", rules="rule", limiters="limiter"} do
+        local fn = opt.external[n]
+        parser.external[k]=setmetatable({}, {__index = function(tbl, key)
+          local ret = fn(key)
+          if ret then
+            if type(ret) ~= "table" then
+              ret = {name=key, external=true}
+            else
+              error("how do?...")
+            end
+          end
+          tbl[key]=ret
+          return ret
+        end})
+      end
+    end
+    if opt.allow_incomplete then
+      parser.allow_incomplete = true
+    end
+  
+    setmetatable(parser, Parser_meta)
+    return parser
+  end
+  
+  return {
+    new = newparser,
+    RuleComponent = RuleComponent
+  }
 
 end)
 
 module("ruleset", function()
-local a=require"rulecomponent"local b=require"binding"local c=require"dkjson"local d;local e=function(f,g)local h={}for i,j in pairs(f)do h[i]=j end;if g then return h else return setmetatable(h,getmetatable(f))end end;local function k(l,f,m)assert(m.name,("a %s must have a name"):format(l))assert(not f[m.name],("%s \"%s\" already exists"):format(l,m.name))end;local function n(o)if type(o)=="string"then return o elseif type(o)=="table"then return o.name else return o end end;local function p(f,q)local h={}setmetatable(h,getmetatable(f))for i,j in pairs(f)do if not q[i]then h[i]=j end end;return h end;local function r(f)local s={}for i in pairs(f)do table.insert(s,i)end;table.sort(s)return s end;local t={}local u={}u.ruleset={__index=t,__jsonorder={"name","info","phases","limiters","lists","rules"}}u.phase={new=function(v,m)return setmetatable({name=v,lists=m},u.phase)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonval=function(self)local w={}for x,y in pairs(self.lists)do table.insert(w,y.name)end;return w end}u.rules={__jsonorder=r}u.lists={__jsonorder=r}u.limiters={__jsonorder=r}u.list={new=function(m)return setmetatable(m,u.list)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","rules"},__jsonval=function(self)local z={}for x,A in pairs(self.rules)do table.insert(z,A.name)end;if self.info then return setmetatable({info=self.info,rules=z},getmetatable(self))else return setmetatable(z,getmetatable(self))end end}local B={__index={toJSON=function(self)return c.encode(self,{indent=true})end}}u.rule={new=function(m,C)local A=setmetatable(m,u.rule)if m["if"]then m["if"]=a.condition.new(A["if"],C)end;for x,D in pairs{"then","else"}do if m[D]then local E=setmetatable({},B)for x,j in pairs(m[D])do table.insert(E,a.action.new(j,C))end;m[D]=E end end;return m end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","key","if","if-any","if-all","then","else"},__jsonval=function(self)if#self["else"]<=1 or#self["then"]<=1 or self.key or self["if"].condition=="any"or self["if"].condition=="all"or self["refs"]then local F=e(self)if self["if"].condition=="any"then F["if-any"]=F["if"].data;F["if"]=nil end;if self["if"].condition=="all"then F["if-all"]=F["if"].data;F["if"]=nil end;if#self["then"]==0 then F["then"]=nil end;if#self["then"]==1 then F["then"]=self["then"][1]end;if#self["else"]==0 then F["else"]=nil end;if#self["else"]==1 then F["else"]=self["else"][1]end;if self.key then self.key=self.key.string end;if F.refs then F.refs=nil end;return F end;return self end}u.limiter={new=function(m)return setmetatable(m,u.limiter)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","limit","interval","burst","burst-expire"},__jsonval=function(self)if self.burst then local h=e(self)h.burst=h.burst["name"]return h end;return self end}local function G(self,H,I,v,m)local o=I(self,v)if not o then return nil,("%s \"%s\" not found."):format(H,v)end;local J={}for i,j in pairs(m)do J[i]={old=o[i],new=j}o[i]=j end;if next(J)then b.call(H,"update",o,J)end;return o end;function t:findLimiter(v)return self.limiters[n(v)]end;function t:addLimiter(m,K)if m.__already_loaded_as_burst_limiter then m.__already_loaded_as_burst_limiter=nil;return nil end;k("limiter",self.limiters,m)local L=u.limiter.new(m)self.limiters[m.name]=L;if L.burst then local M=self:findLimiter(L.burst)if not M then M=self:addLimiter(K[L.burst],K)K[L.burst].__already_loaded_as_burst_limiter=true;L.burst=M end end;b.call("limiter","create",L)return L end;function t:updateLimiter(v,m)if m.burst then local N=self:findLimiter(m.burst)assert(N,("unknown burst limiter \"%s\""):format(n(m.burst)))m.burst=N end;return G(self,"limiter",self.findLimiter,v,m)end;function t:deleteLimiter(L)assert(self.limiters[L.name]==L,"tried deleting unexpected limiter of the same name")self.limiters[L.name]=nil;b.call("limiter","delete",L)end;function t:findRule(v)return self.rules[n(v)]end;function t:addRule(m)if not m.name then m.name=self:uniqueName("rule")else k("rule",self.rules,m)end;local A=u.rule.new(m,self)self.rules[m.name]=A;b.call("rule","create",A)return A end;function t:updateRule(v,m)return G(self,"rule",self.findRule,v,m)end;function t:deleteRule(A)assert(self.rules[A.name]==A,"tried deleting unexpected rule of the same name")for O,y in pairs(self.lists)do for x,P in ipairs(y)do assert(P~=A,("can't delete rule \"%s\", it's used in list \"%s\""):format(A.name,O))end end;self.rules[A.name]=nil;if A["if"]then a.condition.delete(A["if"],self)end;for x,D in pairs{"then","else"}do if A[D]then local E=A[D]for x,Q in pairs(E)do a.action.delete(Q,self)end;A[D]={}end end;b.call("rule","delete",A)end;function t:findList(v)return self.lists[n(v)]end;function t:addList(m)assert(m.rules)if not m.name then m.name=self:uniqueName("list")else k("list",self.lists,m)end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;local y=u.list.new(m)self.lists[m.name]=y;b.call("list","create",y)return y end;function t:updateList(v,m)if m.insertRule then local y=assert(self:findList(v or m.name),"List not found")local A=assert(self:findRule(m.insertRule.name),"Rule to insert not found")assert(m.insertRule.index,"Rule index missing")if y.rules then table.insert(y.rules,m.insertRule.index or#y.rules,A)end;b.call("list","update",y,{insertRule=m.insertRule})m.insertRule=nil end;if m.removeRule then local y=assert(self:findList(v or m.name),"List not found")assert(tonumber(m.removeRule.index),"Rule index missing or not a number")if y.rules then table.remove(y.rules,m.removeRule.index)end;b.call("list","update",y,{removeRule=m.removeRule})m.removeRule=nil end;if m.rules then m=m.rules;if m.name then assert(v==m.name)end end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;return G(self,"list",self.findList,v,m)end;function t:deleteList(y)assert(self.lists[y.name]==y,"tried deleting unexpected list of the same name")for T,U in pairs(self.phases)do for x,V in ipairs(U)do assert(V~=y,("can't delete list \"%s\", it's used in phase \"%s\""):format(y.name,T))end end;self.lists[y.name]=nil;b.call("list","delete",y)end;local W={request=true}function t:addPhase(m,v)local w;if m.name then if v then assert(v==m.name)end;w=m.lists else assert(v)w=m end;assert(W[v],("unknown phase \"%s\""):format(v))assert(not self.phases[v],("phase \"%s\" already exists"):format(v))local X;for R,y in ipairs(w)do if type(y)=="string"then y,X=self:findList(y)else y,X=self:findList(y)if not y then y,X=self:addList(y)end end;if not y then return nil,X or("can't find list \"%s\" for phase \"%s\""):format(y,v)end;w[R]=y end;local U=u.phase.new(v,w)b.call("phase","create",U)return U end;function t:deletePhase(v)local U=assert(self.phases[v],("phase \"%s\" does not exist"):format(v))b.call("phase","delete",U)self.phases[v]=nil end;function t:uniqueName(o)local Y={ruleset={},rule=self.rules,list=self.lists,limiter=self.limiters}local Z=Y[o]if Z==nil then error("don't knoq how to generate unique name for "..tostring(o))end;return assert(d.uniqueName(o,Z,self),"unique name can't be nil")end;function t:toJSON()local _={name=self.name,info=self.info,rules=e(self.rules),lists=e(self.lists),limiters=e(self.limiters),phases=self.phases}setmetatable(_,u.ruleset)local a0={name=true}for x,a1 in ipairs({"rules","lists","limiters","phases"})do local a2=_[a1]or{}for i,o in pairs(a2)do a2[i]=p(o,a0)end end;return c.encode(_,{indent=true})end;function t:destroy()for v,x in pairs(self.phases)do self:deletePhase(v)end;for x,y in pairs(self.lists)do self:deleteList(y)end;for x,A in pairs(self.rules)do self:deleteRule(A)end;for x,L in pairs(self.limiters)do self:deleteLimiter(L)end;b.call("ruleset","delete",self)end;d={new=function(m)local C=setmetatable({rules=setmetatable({},u.rules),lists=setmetatable({},u.lists),limiters=setmetatable({},u.limiters),phases=setmetatable({},u.phases),name=m and m.name or nil},u.ruleset)if not C.name then C.name=C:uniqueName("ruleset")end;if m then for x,j in pairs(m.limiters or{})do C:addLimiter(j,m.limiters)end;for x,j in pairs(m.rules or{})do C:addRule(j)end;for x,j in pairs(m.lists or{})do C:addList(j)end;for a3,j in pairs(m.phases or{})do C:addPhase(j,a3)end end;b.call("ruleset","create",C)return C end,newLimiter=u.limiter.new,newPhase=u.phase.new,newList=u.list.new,newRule=u.rule.new,uniqueName=function(a4,Z,C)error("uniqueName must be configured outside the Ruleset module")end,RuleComponent=a}return d
+  local RuleComponent = require "rulecomponent"
+  local Binding = require "binding"
+  local json = require "dkjson"
+  --local mm = require "mm"
+  
+  local Module -- forward declaration
+  
+  local tcopy = function(tbl, skipmetatable)
+    local cpy = {}
+    for k,v in pairs(tbl) do
+      cpy[k]=v
+    end
+    if skipmetatable then
+      return cpy
+    else
+      return setmetatable(cpy, getmetatable(tbl))
+    end
+  end
+  
+  local function assert_unique_name(what, tbl, data)
+    assert(data.name, ("a %s must have a name"):format(what))
+    assert(not tbl[data.name], ("%s \"%s\" already exists"):format(what, data.name))
+  end
+  
+  local function thing_name(thing)
+    if type(thing)=="string" then
+      return thing
+    elseif type(thing) == "table" then
+      return thing.name
+    else
+      return thing
+    end
+  end
+  
+  local function table_copy(tbl, exclude_keys)
+    local cpy = {}
+    setmetatable(cpy, getmetatable(tbl))
+    for k,v in pairs(tbl) do
+      if not exclude_keys[k] then
+        cpy[k]=v
+      end
+    end
+    return cpy
+  end
+  
+  local function sorted_keys(tbl)
+    local keys = {}
+    for k in pairs(tbl) do
+      table.insert(keys, k)
+    end
+    table.sort(keys)
+    return keys
+  end
+  
+  local Ruleset = {} --forward declaration
+  
+  local mt = {}
+  
+  mt.ruleset = {
+    __index = Ruleset,
+    __jsonorder = {"name", "info", "phases", "limiters", "lists", "rules"}
+  }
+    
+  mt.phase = {
+    new = function(name, data)
+      return setmetatable({name=name, lists=data}, mt.phase)
+    end,
+    __index = {
+      toJSON = function(self)
+        return json.encode(self, {indent=true})
+      end
+    },
+    __jsonval = function(self)
+      local lists = {}
+      for _, list in pairs(self.lists) do
+        table.insert(lists, list.name)
+      end
+      return lists
+    end
+  }
+    
+  mt.rules={__jsonorder=sorted_keys}
+  mt.lists={__jsonorder=sorted_keys}
+  mt.limiters={__jsonorder=sorted_keys}
+    
+  mt.list = {
+    new = function(data)
+      return setmetatable(data, mt.list)
+    end,
+    __index = {
+      toJSON = function(self)
+        return json.encode(self, {indent=true})
+      end
+    },
+    __jsonorder = {"name", "info", "rules"},
+    __jsonval = function(self)
+      local rules = {}
+      for _, rule in pairs(self.rules) do
+        table.insert(rules, rule.name)
+      end
+      
+      if self.info then
+        return setmetatable({info=self.info, rules=rules}, getmetatable(self))
+      else
+        return setmetatable(rules, getmetatable(self))
+      end
+    end
+  }
+  
+  local actions_array_meta = {__index = {toJSON=function(self) return json.encode(self, {indent = true}) end}}
+  mt.rule = {
+    new = function(data, ruleset)
+      local rule =setmetatable(data, mt.rule)
+      if data["if"] then
+        data["if"] = RuleComponent.condition.new(rule["if"], ruleset)
+      end
+      
+      for _,clause in pairs{"then", "else"} do
+        if data[clause] then
+          local actions = setmetatable({}, actions_array_meta)
+          for _,v in pairs(data[clause]) do
+            table.insert(actions, RuleComponent.action.new(v, ruleset))
+          end
+          data[clause]=actions
+        end
+      end
+      return data
+    end,
+    __index = {
+      toJSON = function(self)
+        return json.encode(self, {indent=true})
+      end
+    },
+    __jsonorder = {"name", "info", "key", "if", "if-any", "if-all", "then", "else"},
+    __jsonval = function(self)
+      if #self["else"] <= 1 or #self["then"] <= 1 or self.key or self["if"].condition == "any" or self["if"].condition == "all" or self["refs"] then
+        local ret = tcopy(self)
+        if self["if"].condition == "any" then ret["if-any"] = ret["if"].data; ret["if"] = nil end
+        if self["if"].condition == "all" then ret["if-all"] = ret["if"].data; ret["if"] = nil end
+        if #self["then"] == 0 then ret["then"] = nil end
+        if #self["then"] == 1 then ret["then"] = self["then"][1] end
+        if #self["else"] == 0 then ret["else"] = nil end
+        if #self["else"] == 1 then ret["else"] = self["else"][1] end
+        if self.key then self.key = self.key.string end
+        if ret.refs then ret.refs = nil end
+        return ret
+      end
+      return self
+    end
+  }
+    
+  mt.limiter = {
+    new = function(data)
+      return setmetatable(data, mt.limiter)
+    end,
+    __index = {
+      toJSON = function(self)
+        return json.encode(self, {indent=true})
+      end
+    },
+    __jsonorder = {"name", "info", "limit", "interval", "burst", "burst-expire"},
+    __jsonval = function(self)
+      if self.burst then
+        local cpy = tcopy(self)
+        cpy.burst = cpy.burst["name"]
+        return cpy
+      end
+      return self
+    end
+  }
+  
+  local function updateThing(self, thing_type, findThing, name, data)
+    --assumes data is already valid
+    local thing = findThing(self, name)
+    if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
+    local delta = {}
+    for k, v in pairs(data) do
+      delta[k]={old=thing[k], new=v}
+      thing[k]=v
+    end
+    if next(delta) then --at least one thing to update
+      Binding.call(thing_type, "update", thing, delta)
+    end
+    return thing
+  end
+  
+  function Ruleset:findLimiter(name)
+    return self.limiters[thing_name(name)]
+  end
+  function Ruleset:addLimiter(data, limiters_in)
+    if data.__already_loaded_as_burst_limiter then
+      data.__already_loaded_as_burst_limiter = nil
+      return nil
+    end
+    assert_unique_name("limiter", self.limiters, data)
+    local limiter = mt.limiter.new(data)
+    self.limiters[data.name]=limiter
+    if limiter.burst then
+      local burst_limiter = self:findLimiter(limiter.burst)
+      if not burst_limiter then
+        burst_limiter = self:addLimiter(limiters_in[limiter.burst], limiters_in)
+        limiters_in[limiter.burst].__already_loaded_as_burst_limiter = true
+        limiter.burst = burst_limiter
+      end
+    end
+    Binding.call("limiter", "create", limiter)
+    return limiter
+  end
+  function Ruleset:updateLimiter(name, data)
+    if data.burst then
+      local burst = self:findLimiter(data.burst)
+      assert(burst, ("unknown burst limiter \"%s\""):format(thing_name(data.burst)))
+      data.burst = burst
+    end
+  
+    return updateThing(self, "limiter", self.findLimiter, name, data)
+  end
+  function Ruleset:deleteLimiter(limiter)
+    assert(self.limiters[limiter.name] == limiter, "tried deleting unexpected limiter of the same name")
+    --TODO: check which rules use this limiter
+    self.limiters[limiter.name] = nil
+    
+    Binding.call("limiter", "delete", limiter)
+  end
+  
+  function Ruleset:findRule(name)
+    return self.rules[thing_name(name)]
+  end
+  
+  function Ruleset:addRule(data)
+    if not data.name then
+      data.name = self:uniqueName("rule")
+    else
+      assert_unique_name("rule", self.rules, data)
+    end
+    
+    local rule = mt.rule.new(data, self)
+    
+    self.rules[data.name]=rule
+    Binding.call("rule", "create", rule)
+    return rule
+  end
+  function Ruleset:updateRule(name, data)
+    return updateThing(self, "rule", self.findRule, name, data)
+  end
+  function Ruleset:deleteRule(rule)
+    assert(self.rules[rule.name] == rule, "tried deleting unexpected rule of the same name")
+    for list_name, list in pairs(self.lists) do
+      for _, list_rule in ipairs(list) do
+        assert(list_rule ~= rule, ("can't delete rule \"%s\", it's used in list \"%s\""):format(rule.name, list_name))
+      end
+    end
+    
+    self.rules[rule.name] = nil
+    
+    if rule["if"] then
+      RuleComponent.condition.delete(rule["if"], self)
+    end
+    
+    for _,clause in pairs{"then", "else"} do
+      if rule[clause] then
+        local actions = rule[clause]
+        for _,action in pairs(actions) do
+          RuleComponent.action.delete(action, self)
+        end
+        rule[clause]={}
+      end
+    end
+    Binding.call("rule", "delete", rule)
+  end
+  
+  function Ruleset:findList(name)
+    return self.lists[thing_name(name)]
+  end
+  
+  function Ruleset:addList(data)
+    assert(data.rules)
+    if not data.name then
+      data.name = self:uniqueName("list")
+    else
+      assert_unique_name("list", self.lists, data)
+    end
+    
+    for i, rule_data in ipairs(data.rules) do
+      data.rules[i]= self:findRule(rule_data.name) or self:addRule(rule_data)
+    end
+    local list = mt.list.new(data)
+    self.lists[data.name] = list
+    Binding.call("list", "create", list)
+    return list
+  end
+  function Ruleset:updateList(name, data)
+    if data.insertRule then
+      local list = assert(self:findList(name or data.name), "List not found")
+      local rule = assert(self:findRule(data.insertRule.name), "Rule to insert not found")
+      assert(data.insertRule.index, "Rule index missing")
+      if list.rules then
+        table.insert(list.rules, data.insertRule.index or #list.rules, rule)
+      end
+      Binding.call("list", "update", list, {insertRule = data.insertRule})
+      data.insertRule = nil
+    end
+    if data.removeRule then
+      local list = assert(self:findList(name or data.name), "List not found")
+      assert(tonumber(data.removeRule.index), "Rule index missing or not a number")
+      if list.rules then
+        table.remove(list.rules, data.removeRule.index)
+      end
+      Binding.call("list", "update", list, {removeRule=data.removeRule})
+      data.removeRule = nil
+    end
+    if data.rules then
+      data = data.rules
+      if data.name then assert(name == data.name) end
+    end
+    for i, rule_data in ipairs(data.rules) do
+      data.rules[i]= self:findRule(rule_data.name) or self:addRule(rule_data)
+    end
+    
+    return updateThing(self, "list", self.findList, name, data)
+  end
+  function Ruleset:deleteList(list)
+    assert(self.lists[list.name] == list, "tried deleting unexpected list of the same name")
+    for phase_name, phase in pairs(self.phases) do
+      for _, phase_list in ipairs(phase) do
+        assert(phase_list ~= list, ("can't delete list \"%s\", it's used in phase \"%s\""):format(list.name, phase_name))
+      end
+    end
+    self.lists[list.name] = nil
+    Binding.call("list", "delete", list)
+  end
+  
+  local possible_phases = {request=true}
+  function Ruleset:addPhase(data, name)
+    local lists
+    if data.name then -- {name: phaseName, lists: [...]}
+      if name then assert(name == data.name) end
+      lists = data.lists
+    else  -- [ lists ]
+      assert(name)
+      lists = data
+    end
+    
+    assert(possible_phases[name], ("unknown phase \"%s\""):format(name))
+    assert(not self.phases[name], ("phase \"%s\" already exists"):format(name))
+    
+    local err
+    for i, list in ipairs(lists) do
+      if type(list) == "string" then
+        list, err = self:findList(list)
+      else
+        local found_list = self:findList(list)
+        if found_list then
+          list = found_list
+        else
+          list, err = self:addList(list)
+        end
+      end
+      if not list then return nil, err or ("can't find list \"%s\" for phase \"%s\""):format(list, name) end
+      lists[i]=list
+    end
+    local phase = mt.phase.new(name, lists)
+    Binding.call("phase", "create", phase)
+    return phase
+  end
+  function Ruleset:deletePhase(name)
+    local phase = assert(self.phases[name], ("phase \"%s\" does not exist"):format(name))
+    Binding.call("phase", "delete", phase)
+    self.phases[name]=nil
+  end
+  
+  function Ruleset:uniqueName(thing)
+    local uniqs = {
+      ruleset = {},
+      rule = self.rules,
+      list = self.lists,
+      limiter = self.limiters
+    }
+    local checktbl = uniqs[thing]
+    if checktbl == nil then
+      error("don't knoq how to generate unique name for " .. tostring(thing))
+    end
+    
+    return assert(Module.uniqueName(thing, checktbl, self), "unique name can't be nil")
+  end
+  
+  function Ruleset:toJSON()
+    local rs = {
+      name = self.name,
+      info = self.info,
+      rules = tcopy(self.rules),
+      lists = tcopy(self.lists),
+      limiters = tcopy(self.limiters),
+      phases = self.phases,
+    }
+    setmetatable(rs, mt.ruleset)
+    
+    --remove inlined names from rules, lists, and limiters
+    local excludes = {name=true}
+    for _, thingsname in ipairs({"rules", "lists", "limiters", "phases"}) do
+      local things = rs[thingsname] or {}
+      for k, thing in pairs(things) do
+        things[k]=table_copy(thing, excludes)
+      end
+    end
+    
+    return json.encode(rs, {indent=true})
+  end
+  
+  function Ruleset:destroy()
+    --clear phases
+    for name, _ in pairs(self.phases) do
+      self:deletePhase(name)
+    end
+    
+    --clear lists
+    for _, list in pairs(self.lists) do
+      self:deleteList(list)
+    end
+    
+    --clear rules
+    for _, rule in pairs(self.rules) do
+      self:deleteRule(rule)
+    end
+    
+    --clear limiters
+    for _, limiter in pairs(self.limiters) do
+      self:deleteLimiter(limiter)
+    end
+    
+    Binding.call("ruleset", "delete", self)
+    
+  end
+  
+  Module = {
+    new = function(data)
+      local ruleset = setmetatable({
+        rules=setmetatable({}, mt.rules),
+        lists=setmetatable({}, mt.lists),
+        limiters=setmetatable({}, mt.limiters),
+        phases=setmetatable({}, mt.phases),
+        name = data and data.name or nil
+      }, mt.ruleset)
+  
+      if not ruleset.name then ruleset.name = ruleset:uniqueName("ruleset") end
+      
+      if data then
+        --load data
+        for _, v in pairs(data.limiters or {}) do
+          ruleset:addLimiter(v, data.limiters)
+        end
+        
+        for _, v in pairs(data.rules or {}) do
+          ruleset:addRule(v)
+        end
+        
+        for _, v in pairs(data.lists or {}) do
+          ruleset:addList(v)
+        end
+        
+        for n, v in pairs(data.phases or {}) do
+          ruleset:addPhase(v, n)
+        end
+      end
+      Binding.call("ruleset", "create", ruleset)
+      return ruleset
+    end,
+    newLimiter = mt.limiter.new,
+    newPhase = mt.phase.new,
+    newList = mt.list.new,
+    newRule = mt.rule.new,
+    
+    uniqueName = function(thingname, checktbl, ruleset)
+      error("uniqueName must be configured outside the Ruleset module")
+    end,
+    
+    RuleComponent = RuleComponent
+  }
+  
+  return Module
+  
 
 end)
 
