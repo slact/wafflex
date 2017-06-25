@@ -27,6 +27,17 @@
     end
   end
   
+  local function redis_gethash(redis_key)
+    local res = redis.call("HGETALL", redis_key)
+    if type(res)~="table" then return nil end
+    local h, k = {}, nil
+    for _, v in ipairs(res) do
+      if k == nil then k=v
+      else h[k]=v; k=nil end
+    end
+    return h
+  end
+  
   local function table_keys(tbl)
     local keys = {}
     for k, _ in pairs(tbl) do
@@ -294,6 +305,7 @@
   
   Binding.set("rule", {
     create = function(rule)
+      if rule.external then return end
       local rkey = keyf.rule:format(rule.name)
       if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" already exists") end
       rule.gen = 0
@@ -409,6 +421,66 @@
     end
   })
   
+  local function get_external_ruleset()
+    if not ruleset_name or #ruleset_name == 0 then return nil, "no ruleset name given" end
+    if redis.call("EXISTS", key.ruleset) == 0 then
+      return nil, ("ruleset \"%s\" does not exist"):format(ruleset_name)
+    end
+    local rs = redis_gethash(key.ruleset)
+    rs.external = true
+    rs = Ruleset.new(rs)
+    return rs
+  end
+  
+  local function check_existence_for_update(name, keyfmt, description)
+    if not name or #name == 0 then
+      return nil, description.." name missing"
+    end
+    if redis.call("EXISTS", keyfmt:format(name)) == 0 then
+      return nil, ("%s \"%s\" does exists"):format(description, name)
+    end
+    return true
+  end
+  
+  local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
+    local rs, parsed, err = get_external_ruleset()
+    if not rs then return {0, err} end
+    local thing_name
+    if what ~= "ruleset" then
+      thing_name = nextarg()
+      local ok, err = check_existence_for_update(thing_name, keyfmt, what)
+      if not ok then return {0, err} end
+    else
+      thing_name = ruleset_name
+    end
+    
+    local json_in = nextarg()
+    local p = Parser.new()
+    parsed, err = p:parseJSON(what, thing_name)
+    if not parsed then return {0, err} end
+    
+    if extra_fn then 
+      local ret
+      ret, err = extra_fn(rs, parsed)
+      if not ret then return {0, err} end
+    end
+    
+    if next(parsed) then
+      rs[update_method_name](rs, parsed)
+    end
+    
+    local msg = {
+      action = "update",
+      type = what,
+      name = thing_name,
+      json = json_in
+    }
+    redis.call("PUBLISH", key.ruleset_pubsub, cjson.encode(msg))
+    
+    return {1}
+  end
+  
+  
   local actions
   actions = {
     ruleset = {
@@ -417,7 +489,7 @@
           return {0, ("ruleset \"%s\" already exists"):format(ruleset_name)}
         end
         
-        local json_in = nextarg(1)
+        local json_in = nextarg()
         
         local p = Parser.new()
         local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset")
@@ -434,31 +506,20 @@
         return {1}
       end,
       update = function()
-        if not ruleset_name or #ruleset_name == 0 then return {0, ("no ruleset name given")} end
-        if redis.call("EXISTS", key.ruleset) == 0 then
-          return {0, ("ruleset \"%s\" does not exist"):format(ruleset_name)}
-        end
-        
-        local json_in = nextarg(1)
-        
-        local p = Parser.new({incomplete=true})
-        local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name)
-        if not parsed then
-          return {0, err}
-        end
+        return run_update_command("ruleset", "updateRuleset", nextarg())
       end,
       delete = function()
-        local name = nextarg(1)
-        error("can'd do this yet" .. name, ruleset_name)
+        local name = nextarg()
+        return {0, "can't do this yet"}
       end
     },
     list = {
       create = function()
-        local json_in, list_name = nextarg(2)
+        local list_name, json_in = nextarg(2)
         if not list_name then list_name = "" end
         
         if #list_name > 0 and redis.call("EXISTS", keyf.list:format(list_name)) == 1 then
-          return {0, ("rule \"%s\" already exists"):format(list_name)}
+          return {0, ("list \"%s\" already exists"):format(list_name)}
         end
         
         local p = Parser.new()
@@ -472,8 +533,12 @@
         
         return {1}
       end,
+      update = function()
+        return run_update_command("list", "updateList", nextarg(), keyf.list)
+      end,
       delete = function()
-        
+        local name = nextarg()
+        return {0, "can't do this yet"}
       end
     },
     rule = {
@@ -495,10 +560,13 @@
         
         hmm(rule)
         return {1}
-        
+      end,
+      update = function()
+        return run_update_command("rule", "updateRule", nextarg(), keyf.rule)
       end,
       delete = function()
-      
+        local name = nextarg()
+        return {0, "can't do this yet"}
       end
     },
     limiter = {
@@ -520,8 +588,12 @@
         hmm(rule)
         return {1}
       end,
+      update = function()
+        return run_update_command("limiter", "updateLimiter", nextarg(), keyf.limiter)
+      end,
       delete = function()
-        
+        local name = nextarg()
+        return {0, "can't do this yet"}
       end
     }
   }
@@ -568,7 +640,7 @@ local a=require"rulecomponent"local b=require"dkjson"local function c(d,e,f)loca
 end)
 
 module("ruleset", function()
-local a=require"rulecomponent"local b=require"binding"local c=require"dkjson"local d;local e=function(f,g)local h={}for i,j in pairs(f)do h[i]=j end;if g then return h else return setmetatable(h,getmetatable(f))end end;local function k(l,f,m)assert(m.name,("a %s must have a name"):format(l))assert(not f[m.name],("%s \"%s\" already exists"):format(l,m.name))end;local function n(o)if type(o)=="string"then return o elseif type(o)=="table"then return o.name else return o end end;local function p(f,q)local h={}setmetatable(h,getmetatable(f))for i,j in pairs(f)do if not q[i]then h[i]=j end end;return h end;local function r(f)local s={}for i in pairs(f)do table.insert(s,i)end;table.sort(s)return s end;local t={}local u={}u.ruleset={__index=t,__jsonorder={"name","info","phases","limiters","lists","rules"}}u.phase={new=function(v,m)return setmetatable({name=v,lists=m},u.phase)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonval=function(self)local w={}for x,y in pairs(self.lists)do table.insert(w,y.name)end;return w end}u.rules={__jsonorder=r}u.lists={__jsonorder=r}u.limiters={__jsonorder=r}u.list={new=function(m)return setmetatable(m,u.list)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","rules"},__jsonval=function(self)local z={}for x,A in pairs(self.rules)do table.insert(z,A.name)end;if self.info then return setmetatable({info=self.info,rules=z},getmetatable(self))else return setmetatable(z,getmetatable(self))end end}local B={__index={toJSON=function(self)return c.encode(self,{indent=true})end}}u.rule={new=function(m,C)local A=setmetatable(m,u.rule)if m["if"]then m["if"]=a.condition.new(A["if"],C)end;for x,D in pairs{"then","else"}do if m[D]then local E=setmetatable({},B)for x,j in pairs(m[D])do table.insert(E,a.action.new(j,C))end;m[D]=E end end;return m end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","key","if","if-any","if-all","then","else"},__jsonval=function(self)if#self["else"]<=1 or#self["then"]<=1 or self.key or self["if"].condition=="any"or self["if"].condition=="all"or self["refs"]then local F=e(self)if self["if"].condition=="any"then F["if-any"]=F["if"].data;F["if"]=nil end;if self["if"].condition=="all"then F["if-all"]=F["if"].data;F["if"]=nil end;if#self["then"]==0 then F["then"]=nil end;if#self["then"]==1 then F["then"]=self["then"][1]end;if#self["else"]==0 then F["else"]=nil end;if#self["else"]==1 then F["else"]=self["else"][1]end;if self.key then self.key=self.key.string end;if F.refs then F.refs=nil end;return F end;return self end}u.limiter={new=function(m)return setmetatable(m,u.limiter)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","limit","interval","burst","burst-expire"},__jsonval=function(self)if self.burst then local h=e(self)h.burst=h.burst["name"]return h end;return self end}local function G(self,H,I,v,m)local o=I(self,v)if not o then return nil,("%s \"%s\" not found."):format(H,v)end;local J={}for i,j in pairs(m)do J[i]={old=o[i],new=j}o[i]=j end;b.call(H,"update",o,J)return o end;function t:findLimiter(v)return self.limiters[n(v)]end;function t:addLimiter(m,K)if m.__already_loaded_as_burst_limiter then m.__already_loaded_as_burst_limiter=nil;return nil end;k("limiter",self.limiters,m)local L=u.limiter.new(m)self.limiters[m.name]=L;if L.burst then local M=self:findLimiter(L.burst)if not M then M=self:addLimiter(K[L.burst],K)K[L.burst].__already_loaded_as_burst_limiter=true;L.burst=M end end;b.call("limiter","create",L)return L end;function t:updateLimiter(v,m)if m.burst then local N=self:findLimiter(m.burst)assert(N,("unknown burst limiter \"%s\""):format(n(m.burst)))m.burst=N end;return G(self,"limiter",self.findLimiter,v,m)end;function t:deleteLimiter(L)assert(self.limiters[L.name]==L,"tried deleting unexpected limiter of the same name")self.limiters[L.name]=nil;b.call("limiter","delete",L)end;function t:findRule(v)return self.rules[n(v)]end;function t:addRule(m)if not m.name then m.name=self:uniqueName("rule")else k("rule",self.rules,m)end;local A=u.rule.new(m,self)self.rules[m.name]=A;b.call("rule","create",A)return A end;function t:updateRule(v,m)return G(self,"rule",self.findRule,v,m)end;function t:deleteRule(A)assert(self.rules[A.name]==A,"tried deleting unexpected rule of the same name")for O,y in pairs(self.lists)do for x,P in ipairs(y)do assert(P~=A,("can't delete rule \"%s\", it's used in list \"%s\""):format(A.name,O))end end;self.rules[A.name]=nil;if A["if"]then a.condition.delete(A["if"],self)end;for x,D in pairs{"then","else"}do if A[D]then local E=A[D]for x,Q in pairs(E)do a.action.delete(Q,self)end;A[D]={}end end;b.call("rule","delete",A)end;function t:findList(v)return self.lists[n(v)]end;function t:addList(m)assert(m.rules)if not m.name then m.name=self:uniqueName("list")else k("list",self.lists,m)end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;local y=u.list.new(m)self.lists[m.name]=y;b.call("list","create",y)return y end;function t:updateList(v,m)if m.rules then m=m.rules;if m.name then assert(v==m.name)end end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;return G(self,"list",self.findList,v,m)end;function t:deleteList(y)assert(self.lists[y.name]==y,"tried deleting unexpected list of the same name")for T,U in pairs(self.phases)do for x,V in ipairs(U)do assert(V~=y,("can't delete list \"%s\", it's used in phase \"%s\""):format(y.name,T))end end;self.lists[y.name]=nil;b.call("list","delete",y)end;local W={request=true}function t:addPhase(m,v)local w;if m.name then if v then assert(v==m.name)end;w=m.lists else assert(v)w=m end;assert(W[v],("unknown phase \"%s\""):format(v))assert(not self.phases[v],("phase \"%s\" already exists"):format(v))local X;for R,y in ipairs(w)do if type(y)=="string"then y,X=self:findList(y)else y,X=self:findList(y)if not y then y,X=self:addList(y)end end;if not y then return nil,X or("can't find list \"%s\" for phase \"%s\""):format(y,v)end;w[R]=y end;local U=u.phase.new(v,w)b.call("phase","create",U)return U end;function t:deletePhase(v)local U=assert(self.phases[v],("phase \"%s\" does not exist"):format(v))b.call("phase","delete",U)self.phases[v]=nil end;function t:uniqueName(o)local Y={ruleset={},rule=self.rules,list=self.lists,limiter=self.limiters}local Z=Y[o]if Z==nil then error("don't knoq how to generate unique name for "..tostring(o))end;return assert(d.uniqueName(o,Z,self),"unique name can't be nil")end;function t:toJSON()local _={name=self.name,info=self.info,rules=e(self.rules),lists=e(self.lists),limiters=e(self.limiters),phases=self.phases}setmetatable(_,u.ruleset)local a0={name=true}for x,a1 in ipairs({"rules","lists","limiters","phases"})do local a2=_[a1]or{}for i,o in pairs(a2)do a2[i]=p(o,a0)end end;return c.encode(_,{indent=true})end;function t:destroy()for v,x in pairs(self.phases)do self:deletePhase(v)end;for x,y in pairs(self.lists)do self:deleteList(y)end;for x,A in pairs(self.rules)do self:deleteRule(A)end;for x,L in pairs(self.limiters)do self:deleteLimiter(L)end;b.call("ruleset","delete",self)end;d={new=function(m)local C=setmetatable({rules=setmetatable({},u.rules),lists=setmetatable({},u.lists),limiters=setmetatable({},u.limiters),phases=setmetatable({},u.phases),name=m and m.name or nil},u.ruleset)if not C.name then C.name=C:uniqueName("ruleset")end;if m then for x,j in pairs(m.limiters)do C:addLimiter(j,m.limiters)end;for x,j in pairs(m.rules)do C:addRule(j)end;for x,j in pairs(m.lists)do C:addList(j)end;for a3,j in pairs(m.phases)do C:addPhase(j,a3)end end;b.call("ruleset","create",C)return C end,newLimiter=u.limiter.new,newPhase=u.phase.new,newList=u.list.new,newRule=u.rule.new,uniqueName=function(a4,Z,C)error("uniqueName must be configured outside the Ruleset module")end,RuleComponent=a}return d
+local a=require"rulecomponent"local b=require"binding"local c=require"dkjson"local d;local e=function(f,g)local h={}for i,j in pairs(f)do h[i]=j end;if g then return h else return setmetatable(h,getmetatable(f))end end;local function k(l,f,m)assert(m.name,("a %s must have a name"):format(l))assert(not f[m.name],("%s \"%s\" already exists"):format(l,m.name))end;local function n(o)if type(o)=="string"then return o elseif type(o)=="table"then return o.name else return o end end;local function p(f,q)local h={}setmetatable(h,getmetatable(f))for i,j in pairs(f)do if not q[i]then h[i]=j end end;return h end;local function r(f)local s={}for i in pairs(f)do table.insert(s,i)end;table.sort(s)return s end;local t={}local u={}u.ruleset={__index=t,__jsonorder={"name","info","phases","limiters","lists","rules"}}u.phase={new=function(v,m)return setmetatable({name=v,lists=m},u.phase)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonval=function(self)local w={}for x,y in pairs(self.lists)do table.insert(w,y.name)end;return w end}u.rules={__jsonorder=r}u.lists={__jsonorder=r}u.limiters={__jsonorder=r}u.list={new=function(m)return setmetatable(m,u.list)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","rules"},__jsonval=function(self)local z={}for x,A in pairs(self.rules)do table.insert(z,A.name)end;if self.info then return setmetatable({info=self.info,rules=z},getmetatable(self))else return setmetatable(z,getmetatable(self))end end}local B={__index={toJSON=function(self)return c.encode(self,{indent=true})end}}u.rule={new=function(m,C)local A=setmetatable(m,u.rule)if m["if"]then m["if"]=a.condition.new(A["if"],C)end;for x,D in pairs{"then","else"}do if m[D]then local E=setmetatable({},B)for x,j in pairs(m[D])do table.insert(E,a.action.new(j,C))end;m[D]=E end end;return m end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","key","if","if-any","if-all","then","else"},__jsonval=function(self)if#self["else"]<=1 or#self["then"]<=1 or self.key or self["if"].condition=="any"or self["if"].condition=="all"or self["refs"]then local F=e(self)if self["if"].condition=="any"then F["if-any"]=F["if"].data;F["if"]=nil end;if self["if"].condition=="all"then F["if-all"]=F["if"].data;F["if"]=nil end;if#self["then"]==0 then F["then"]=nil end;if#self["then"]==1 then F["then"]=self["then"][1]end;if#self["else"]==0 then F["else"]=nil end;if#self["else"]==1 then F["else"]=self["else"][1]end;if self.key then self.key=self.key.string end;if F.refs then F.refs=nil end;return F end;return self end}u.limiter={new=function(m)return setmetatable(m,u.limiter)end,__index={toJSON=function(self)return c.encode(self,{indent=true})end},__jsonorder={"name","info","limit","interval","burst","burst-expire"},__jsonval=function(self)if self.burst then local h=e(self)h.burst=h.burst["name"]return h end;return self end}local function G(self,H,I,v,m)local o=I(self,v)if not o then return nil,("%s \"%s\" not found."):format(H,v)end;local J={}for i,j in pairs(m)do J[i]={old=o[i],new=j}o[i]=j end;if next(J)then b.call(H,"update",o,J)end;return o end;function t:findLimiter(v)return self.limiters[n(v)]end;function t:addLimiter(m,K)if m.__already_loaded_as_burst_limiter then m.__already_loaded_as_burst_limiter=nil;return nil end;k("limiter",self.limiters,m)local L=u.limiter.new(m)self.limiters[m.name]=L;if L.burst then local M=self:findLimiter(L.burst)if not M then M=self:addLimiter(K[L.burst],K)K[L.burst].__already_loaded_as_burst_limiter=true;L.burst=M end end;b.call("limiter","create",L)return L end;function t:updateLimiter(v,m)if m.burst then local N=self:findLimiter(m.burst)assert(N,("unknown burst limiter \"%s\""):format(n(m.burst)))m.burst=N end;return G(self,"limiter",self.findLimiter,v,m)end;function t:deleteLimiter(L)assert(self.limiters[L.name]==L,"tried deleting unexpected limiter of the same name")self.limiters[L.name]=nil;b.call("limiter","delete",L)end;function t:findRule(v)return self.rules[n(v)]end;function t:addRule(m)if not m.name then m.name=self:uniqueName("rule")else k("rule",self.rules,m)end;local A=u.rule.new(m,self)self.rules[m.name]=A;b.call("rule","create",A)return A end;function t:updateRule(v,m)return G(self,"rule",self.findRule,v,m)end;function t:deleteRule(A)assert(self.rules[A.name]==A,"tried deleting unexpected rule of the same name")for O,y in pairs(self.lists)do for x,P in ipairs(y)do assert(P~=A,("can't delete rule \"%s\", it's used in list \"%s\""):format(A.name,O))end end;self.rules[A.name]=nil;if A["if"]then a.condition.delete(A["if"],self)end;for x,D in pairs{"then","else"}do if A[D]then local E=A[D]for x,Q in pairs(E)do a.action.delete(Q,self)end;A[D]={}end end;b.call("rule","delete",A)end;function t:findList(v)return self.lists[n(v)]end;function t:addList(m)assert(m.rules)if not m.name then m.name=self:uniqueName("list")else k("list",self.lists,m)end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;local y=u.list.new(m)self.lists[m.name]=y;b.call("list","create",y)return y end;function t:updateList(v,m)if m.insertRule then local y=assert(self:findList(v or m.name),"List not found")local A=assert(self:findRule(m.insertRule.name),"Rule to insert not found")assert(m.insertRule.index,"Rule index missing")if y.rules then table.insert(y.rules,m.insertRule.index or#y.rules,A)end;b.call("list","update",y,{insertRule=m.insertRule})m.insertRule=nil end;if m.removeRule then local y=assert(self:findList(v or m.name),"List not found")assert(tonumber(m.removeRule.index),"Rule index missing or not a number")if y.rules then table.remove(y.rules,m.removeRule.index)end;b.call("list","update",y,{removeRule=m.removeRule})m.removeRule=nil end;if m.rules then m=m.rules;if m.name then assert(v==m.name)end end;for R,S in ipairs(m.rules)do m.rules[R]=self:findRule(S.name)or self:addRule(S)end;return G(self,"list",self.findList,v,m)end;function t:deleteList(y)assert(self.lists[y.name]==y,"tried deleting unexpected list of the same name")for T,U in pairs(self.phases)do for x,V in ipairs(U)do assert(V~=y,("can't delete list \"%s\", it's used in phase \"%s\""):format(y.name,T))end end;self.lists[y.name]=nil;b.call("list","delete",y)end;local W={request=true}function t:addPhase(m,v)local w;if m.name then if v then assert(v==m.name)end;w=m.lists else assert(v)w=m end;assert(W[v],("unknown phase \"%s\""):format(v))assert(not self.phases[v],("phase \"%s\" already exists"):format(v))local X;for R,y in ipairs(w)do if type(y)=="string"then y,X=self:findList(y)else y,X=self:findList(y)if not y then y,X=self:addList(y)end end;if not y then return nil,X or("can't find list \"%s\" for phase \"%s\""):format(y,v)end;w[R]=y end;local U=u.phase.new(v,w)b.call("phase","create",U)return U end;function t:deletePhase(v)local U=assert(self.phases[v],("phase \"%s\" does not exist"):format(v))b.call("phase","delete",U)self.phases[v]=nil end;function t:uniqueName(o)local Y={ruleset={},rule=self.rules,list=self.lists,limiter=self.limiters}local Z=Y[o]if Z==nil then error("don't knoq how to generate unique name for "..tostring(o))end;return assert(d.uniqueName(o,Z,self),"unique name can't be nil")end;function t:toJSON()local _={name=self.name,info=self.info,rules=e(self.rules),lists=e(self.lists),limiters=e(self.limiters),phases=self.phases}setmetatable(_,u.ruleset)local a0={name=true}for x,a1 in ipairs({"rules","lists","limiters","phases"})do local a2=_[a1]or{}for i,o in pairs(a2)do a2[i]=p(o,a0)end end;return c.encode(_,{indent=true})end;function t:destroy()for v,x in pairs(self.phases)do self:deletePhase(v)end;for x,y in pairs(self.lists)do self:deleteList(y)end;for x,A in pairs(self.rules)do self:deleteRule(A)end;for x,L in pairs(self.limiters)do self:deleteLimiter(L)end;b.call("ruleset","delete",self)end;d={new=function(m)local C=setmetatable({rules=setmetatable({},u.rules),lists=setmetatable({},u.lists),limiters=setmetatable({},u.limiters),phases=setmetatable({},u.phases),name=m and m.name or nil},u.ruleset)if not C.name then C.name=C:uniqueName("ruleset")end;if m then for x,j in pairs(m.limiters or{})do C:addLimiter(j,m.limiters)end;for x,j in pairs(m.rules or{})do C:addRule(j)end;for x,j in pairs(m.lists or{})do C:addList(j)end;for a3,j in pairs(m.phases or{})do C:addPhase(j,a3)end end;b.call("ruleset","create",C)return C end,newLimiter=u.limiter.new,newPhase=u.phase.new,newList=u.list.new,newRule=u.rule.new,uniqueName=function(a4,Z,C)error("uniqueName must be configured outside the Ruleset module")end,RuleComponent=a}return d
 
 end)
 

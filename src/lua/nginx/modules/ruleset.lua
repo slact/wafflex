@@ -178,7 +178,9 @@ local function updateThing(self, thing_type, findThing, name, data)
     delta[k]={old=thing[k], new=v}
     thing[k]=v
   end
-  Binding.call(thing_type, "update", thing, delta)
+  if next(delta) then --at least one thing to update
+    Binding.call(thing_type, "update", thing, delta)
+  end
   return thing
 end
 
@@ -288,6 +290,25 @@ function Ruleset:addList(data)
   return list
 end
 function Ruleset:updateList(name, data)
+  if data.insertRule then
+    local list = assert(self:findList(name or data.name), "List not found")
+    local rule = assert(self:findRule(data.insertRule.name), "Rule to insert not found")
+    assert(data.insertRule.index, "Rule index missing")
+    if list.rules then
+      table.insert(list.rules, data.insertRule.index or #list.rules, rule)
+    end
+    Binding.call("list", "update", list, {insertRule = data.insertRule})
+    data.insertRule = nil
+  end
+  if data.removeRule then
+    local list = assert(self:findList(name or data.name), "List not found")
+    assert(tonumber(data.removeRule.index), "Rule index missing or not a number")
+    if list.rules then
+      table.remove(list.rules, data.removeRule.index)
+    end
+    Binding.call("list", "update", list, {removeRule=data.removeRule})
+    data.removeRule = nil
+  end
   if data.rules then
     data = data.rules
     if data.name then assert(name == data.name) end

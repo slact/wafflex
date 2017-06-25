@@ -124,8 +124,6 @@ Ruleset.uniqueName = function(thing, thingtbl, ruleset)
   end
 end
 
-local skip_binding = false
-
 local limiter_created = {} --needed because limiters can reference other limiters
 Binding.set("limiter", {
   create = function(limiter)
@@ -423,6 +421,64 @@ Binding.set("ruleset", {
   end
 })
 
+local function get_external_ruleset()
+  if not ruleset_name or #ruleset_name == 0 then return nil, "no ruleset name given" end
+  if redis.call("EXISTS", key.ruleset) == 0 then
+    return nil, ("ruleset \"%s\" does not exist"):format(ruleset_name)
+  end
+  local rs = redis_gethash(key.ruleset)
+  rs.external = true
+  rs = Ruleset.new(rs)
+  return rs
+end
+
+local function check_existence_for_update(name, keyfmt, description)
+  if not name or #name == 0 then
+    return nil, description.." name missing"
+  end
+  if redis.call("EXISTS", keyfmt:format(name)) == 0 then
+    return nil, ("%s \"%s\" does exists"):format(description, name)
+  end
+  return true
+end
+
+local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
+  local rs, parsed, err = get_external_ruleset()
+  if not rs then return {0, err} end
+  local thing_name
+  if what ~= "ruleset" then
+    thing_name = nextarg()
+    local ok, err = check_existence_for_update(thing_name, keyfmt, what)
+    if not ok then return {0, err} end
+  else
+    thing_name = ruleset_name
+  end
+  
+  local json_in = nextarg()
+  local p = Parser.new()
+  parsed, err = p:parseJSON(what, thing_name)
+  if not parsed then return {0, err} end
+  
+  if extra_fn then 
+    local ret
+    ret, err = extra_fn(rs, parsed)
+    if not ret then return {0, err} end
+  end
+  
+  if next(parsed) then
+    rs[update_method_name](rs, parsed)
+  end
+  
+  local msg = {
+    action = "update",
+    type = what,
+    name = thing_name,
+    json = json_in
+  }
+  redis.call("PUBLISH", key.ruleset_pubsub, cjson.encode(msg))
+  
+  return {1}
+end
 
 
 local actions
@@ -433,7 +489,7 @@ actions = {
         return {0, ("ruleset \"%s\" already exists"):format(ruleset_name)}
       end
       
-      local json_in = nextarg(1)
+      local json_in = nextarg()
       
       local p = Parser.new()
       local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name or "anonymous ruleset")
@@ -450,33 +506,20 @@ actions = {
       return {1}
     end,
     update = function()
-      if not ruleset_name or #ruleset_name == 0 then return {0, ("no ruleset name given")} end
-      if redis.call("EXISTS", key.ruleset) == 0 then
-        return {0, ("ruleset \"%s\" does not exist"):format(ruleset_name)}
-      end
-      
-      local json_in = nextarg(1)
-      
-      local p = Parser.new({incomplete=true})
-      local parsed, err = p:parseJSON("ruleset", json_in, ruleset_name)
-      if not parsed then return {0, err} end
-      
-      local rs = redis_gethash(key.ruleset)
-      rs.external = true
-      rs = Ruleset.new(rs)
+      return run_update_command("ruleset", "updateRuleset", nextarg())
     end,
     delete = function()
-      local name = nextarg(1)
-      error("can'd do this yet" .. name, ruleset_name)
+      local name = nextarg()
+      return {0, "can't do this yet"}
     end
   },
   list = {
     create = function()
-      local json_in, list_name = nextarg(2)
+      local list_name, json_in = nextarg(2)
       if not list_name then list_name = "" end
       
       if #list_name > 0 and redis.call("EXISTS", keyf.list:format(list_name)) == 1 then
-        return {0, ("rule \"%s\" already exists"):format(list_name)}
+        return {0, ("list \"%s\" already exists"):format(list_name)}
       end
       
       local p = Parser.new()
@@ -490,8 +533,12 @@ actions = {
       
       return {1}
     end,
+    update = function()
+      return run_update_command("list", "updateList", nextarg(), keyf.list)
+    end,
     delete = function()
-      
+      local name = nextarg()
+      return {0, "can't do this yet"}
     end
   },
   rule = {
@@ -513,10 +560,13 @@ actions = {
       
       hmm(rule)
       return {1}
-      
+    end,
+    update = function()
+      return run_update_command("rule", "updateRule", nextarg(), keyf.rule)
     end,
     delete = function()
-    
+      local name = nextarg()
+      return {0, "can't do this yet"}
     end
   },
   limiter = {
@@ -538,8 +588,12 @@ actions = {
       hmm(rule)
       return {1}
     end,
+    update = function()
+      return run_update_command("limiter", "updateLimiter", nextarg(), keyf.limiter)
+    end,
     delete = function()
-      
+      local name = nextarg()
+      return {0, "can't do this yet"}
     end
   }
 }
