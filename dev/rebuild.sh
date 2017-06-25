@@ -224,7 +224,7 @@ if [[ -z $NO_MAKE ]]; then
   
   _sha1_lua_scripts=`sha1sum ./smush_redis_scripts.rb "${_src_dir}"/lua/**/*.lua | sha1sum`
   if [[ $(cat .lua_rebuild_hash) != $_sha1_lua_scripts ]]; then
-    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/ruleset_write.main.lua ${_src_dir}/lua/nginx/modules/{inspect,dkjson,binding,rulecomponent,parser,ruleset}.lua > ${_src_dir}/lua/redis/ruleset_write.lua
+    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/ruleset_write.main.lua ${_src_dir}/lua/modules/{inspect,dkjson,binding,rulecomponent,parser,ruleset}.lua > ${_src_dir}/lua/redis/ruleset_write.lua
     
     if type "luacheck" > /dev/null; then
       pushd ${_src_dir}
@@ -250,13 +250,13 @@ if [[ -z $NO_MAKE ]]; then
       "${_src_dir}"/lua/nginx/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
     
     bundle exec hsss --header-only $_hsss_opt --prefix wfx_module_ \
-      "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
+      "${_src_dir}"/lua/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.h"
     if ! [ $? -eq 0 ]; then;
       echo "failed generating nginx lua module scripts";
       exit 1
     fi
     bundle exec hsss --data-only $_hsss_opt --prefix wfx_module_ \
-      "${_src_dir}"/lua/nginx/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
+      "${_src_dir}"/lua/modules/*.lua >> "${_src_dir}/ngx_wafflex_nginx_lua_scripts.c"
       
     setopt extendedglob
     #generate lua scripts for redis
