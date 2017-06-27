@@ -68,6 +68,7 @@
   local function genkeys(new_ruleset_name)
     kbase = ("%sruleset:%s"):format(prefix, new_ruleset_name)
     key = {
+      scripts =  "wafflex:scripts",
       rulesets = prefix.."rulesets",
       ruleset =  kbase,
       ruleset_pubsub = kbase..":pubsub",
@@ -329,6 +330,7 @@
       redis.call("SADD", key.rules, rule.name)
     end,
     update = function(rule, diff)
+      hmm("UPDATE YO")
       local rkey = keyf.rule:format(rule.name)
       if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
       assert(not diff.name, "don't know how to rename rules yet")
@@ -390,6 +392,7 @@
   
   Binding.set("ruleset", {
     create = function(ruleset)
+      if ruleset.external then return end
       if redis.call("SISMEMBER", key.rulesets, ruleset.name) == 1 then error(("ruleset \"%s\" already exists"):format(ruleset.name)) end
       
       ruleset.gen = 0
@@ -443,20 +446,36 @@
   end
   
   local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
-    local rs, parsed, err = get_external_ruleset()
+    local ret, parsed, rs, err
+    rs, err = get_external_ruleset()
     if not rs then return {0, err} end
-    local thing_name
     if what ~= "ruleset" then
-      thing_name = nextarg()
       local ok, err = check_existence_for_update(thing_name, keyfmt, what)
       if not ok then return {0, err} end
     else
       thing_name = ruleset_name
     end
+     
+    local extern = {
+      list = function(parser, name)
+        return redis.call("EXISTS", keyf.list:format(name)) == 1
+      end,
+      rule = function(parser, name)
+        hmm("yeah yo")
+        local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+        return parser:parseJSON("rule", json, "loaded rule", 1)
+      end,
+      limiter = function(parser, name)
+        local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+        return parser:parseJSON("limiter", json, "loaded limiter", 1)
+      end
+    }
     
-    local json_in = nextarg()
-    local p = Parser.new()
-    parsed, err = p:parseJSON(what, thing_name)
+    local parser = Parser.new({external=extern})
+    hmm(parser)
+    local old = parser:get(what, thing_name)
+    hmm(old)
+    parsed, err = parser:parseJSON(what, nextarg())
     if not parsed then return {0, err} end
     
     if extra_fn then 
@@ -465,8 +484,18 @@
       if not ret then return {0, err} end
     end
     
+    if #thing_name == 0 and parsed then thing_name = parsed.name end
+    if not thing_name or #thing_name == 0 then
+      return {0, ("missing %s name"):format(what)}
+    end
+    
     if next(parsed) then
-      rs[update_method_name](rs, parsed)
+      ret, err = rs[update_method_name](rs, thing_name, parsed)
+      if not ret then
+        return {0, err}
+      end
+    else
+      return {0, "nothing to update"}
     end
     
     local msg = {
@@ -501,7 +530,6 @@
         end
         
         local rs = Ruleset.new(parsed)
-        hmm(rs)
         
         return {1}
       end,
@@ -529,7 +557,6 @@
         end
         
         local list = Ruleset.newList(parsed)
-        hmm(list)
         
         return {1}
       end,
@@ -543,22 +570,25 @@
     },
     rule = {
       create = function()
-        local json_in, rule_name = nextarg(2)
+        local rule_name, json_in = nextarg(2)
         if not rule_name then rule_name = "" end
         
         if #rule_name > 0 and redis.call("EXISTS", keyf.rule:format(rule_name)) == 1 then
           return {0, ("rule \"%s\" already exists"):format(rule_name)}
         end
         
-        local p = Parser.new()
-        local parsed, err = p:parseJSON("rule", json_in, rule_name)
-        if not parsed then
-          return {0, err}
-        end
+        local ruleset
+        local parsed, err = Parser.new():parseJSON("rule", json_in, rule_name, true)
+        if not parsed then return {0, err} end
         
-        local rule = Ruleset.newRule(parsed)
+        ruleset, err = get_external_ruleset()
+        if not ruleset then return {0, err} end
         
-        hmm(rule)
+        if not parsed.name and #rule_name > 0 then parsed.name = rule_name end
+        ruleset:addRule(parsed)
+        
+        hmm(parsed)
+        
         return {1}
       end,
       update = function()
@@ -575,17 +605,16 @@
         if not limiter_name then limiter_name = "" end
         
         if #limiter_name > 0 and redis.call("EXISTS", keyf.rule:format(#limiter_name)) == 1 then
-          return {0, ("rule \"%s\" already exists"):format(#limiter_name)}
+          return {0, ("limiter \"%s\" already exists"):format(#limiter_name)}
         end
         
         local p = Parser.new()
-        local parsed, err = p:parseJSON("rule", json_in, #limiter_name)
+        local parsed, err = p:parseJSON("limiter", json_in, #limiter_name)
         if not parsed then
           return {0, err}
         end
         
-        local rule = Ruleset.newRule(parsed)
-        hmm(rule)
+        local rule = Ruleset.newLimiter(parsed)
         return {1}
       end,
       update = function()
@@ -2227,6 +2256,15 @@ module("parser", function()
     end
   end
   
+  function Parser:get(what, name)
+    if     what == "rule" then return self:getRule(name)
+    elseif what == "list" then return self:getList(name)
+    elseif what == "limiter" then return self:getLimiter(name)
+    else
+      error("unknown thing to get")
+    end
+  end
+  
   function Parser:error(err, ...)
     
     if not err then err = "unknown error" end
@@ -2301,7 +2339,7 @@ module("parser", function()
   function Parser:parseJSON(element_name, json_str, json_name, unprotected)
     self:assert_type(json_str, "string", "expected a JSON string")
     local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
-    self.name = json_name
+    if not self.name then self.name = json_name end
     
     local function parse_it()
       if not data then self:error("Error parsing JSON: " .. err) end
@@ -2747,12 +2785,13 @@ module("parser", function()
       for k, n in pairs{lists="list", rules="rule", limiters="limiter"} do
         local fn = opt.external[n]
         parser.external[k]=setmetatable({}, {__index = function(tbl, key)
-          local ret = fn(key)
+          local ret = fn(parser, key)
           if ret then
             if type(ret) ~= "table" then
               ret = {name=key, external=true}
             else
-              error("how do?...")
+              ret.external = true
+              if not ret.name then ret.name = key end
             end
           end
           tbl[key]=ret
@@ -2780,6 +2819,16 @@ module("ruleset", function()
   local Binding = require "binding"
   local json = require "dkjson"
   --local mm = require "mm"
+  
+  local inspect = require "inspect"
+  
+  --luacheck: globals redis cjson ARGV unpack
+  local hmm = function(thing)
+    local out = inspect(thing)
+    for line in out:gmatch('[^\r\n]+') do
+      redis.call("ECHO", line)
+    end
+  end
   
   local Module -- forward declaration
   
@@ -2949,6 +2998,9 @@ module("ruleset", function()
   
   local function updateThing(self, thing_type, findThing, name, data)
     --assumes data is already valid
+    assert(type(thing_type)=="string", "wrong thing_type type")
+    assert(type(name)=="string", "wrong name type")
+    hmm("...look for thing...")
     local thing = findThing(self, name)
     if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
     local delta = {}
@@ -3224,6 +3276,8 @@ module("ruleset", function()
       
       if data then
         --load data
+        if data.external then ruleset.external = true end
+        
         for _, v in pairs(data.limiters or {}) do
           ruleset:addLimiter(v, data.limiters)
         end
@@ -3239,6 +3293,7 @@ module("ruleset", function()
         for n, v in pairs(data.phases or {}) do
           ruleset:addPhase(v, n)
         end
+        
       end
       Binding.call("ruleset", "create", ruleset)
       return ruleset

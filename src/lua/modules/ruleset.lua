@@ -3,6 +3,16 @@ local Binding = require "binding"
 local json = require "dkjson"
 --local mm = require "mm"
 
+local inspect = require "inspect"
+
+--luacheck: globals redis cjson ARGV unpack
+local hmm = function(thing)
+  local out = inspect(thing)
+  for line in out:gmatch('[^\r\n]+') do
+    redis.call("ECHO", line)
+  end
+end
+
 local Module -- forward declaration
 
 local tcopy = function(tbl, skipmetatable)
@@ -171,6 +181,9 @@ mt.limiter = {
 
 local function updateThing(self, thing_type, findThing, name, data)
   --assumes data is already valid
+  assert(type(thing_type)=="string", "wrong thing_type type")
+  assert(type(name)=="string", "wrong name type")
+  hmm("...look for thing...")
   local thing = findThing(self, name)
   if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
   local delta = {}
@@ -446,6 +459,8 @@ Module = {
     
     if data then
       --load data
+      if data.external then ruleset.external = true end
+      
       for _, v in pairs(data.limiters or {}) do
         ruleset:addLimiter(v, data.limiters)
       end
@@ -461,6 +476,7 @@ Module = {
       for n, v in pairs(data.phases or {}) do
         ruleset:addPhase(v, n)
       end
+      
     end
     Binding.call("ruleset", "create", ruleset)
     return ruleset

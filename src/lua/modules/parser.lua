@@ -118,6 +118,15 @@ local function getlc_str(tbl)
   end
 end
 
+function Parser:get(what, name)
+  if     what == "rule" then return self:getRule(name)
+  elseif what == "list" then return self:getList(name)
+  elseif what == "limiter" then return self:getLimiter(name)
+  else
+    error("unknown thing to get")
+  end
+end
+
 function Parser:error(err, ...)
   
   if not err then err = "unknown error" end
@@ -192,7 +201,7 @@ end
 function Parser:parseJSON(element_name, json_str, json_name, unprotected)
   self:assert_type(json_str, "string", "expected a JSON string")
   local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
-  self.name = json_name
+  if not self.name then self.name = json_name end
   
   local function parse_it()
     if not data then self:error("Error parsing JSON: " .. err) end
@@ -638,12 +647,13 @@ local function newparser(opt)
     for k, n in pairs{lists="list", rules="rule", limiters="limiter"} do
       local fn = opt.external[n]
       parser.external[k]=setmetatable({}, {__index = function(tbl, key)
-        local ret = fn(key)
+        local ret = fn(parser, key)
         if ret then
           if type(ret) ~= "table" then
             ret = {name=key, external=true}
           else
-            error("how do?...")
+            ret.external = true
+            if not ret.name then ret.name = key end
           end
         end
         tbl[key]=ret

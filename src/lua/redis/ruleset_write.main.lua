@@ -68,6 +68,7 @@ local kbase, key, keyf;
 local function genkeys(new_ruleset_name)
   kbase = ("%sruleset:%s"):format(prefix, new_ruleset_name)
   key = {
+    scripts =  "wafflex:scripts",
     rulesets = prefix.."rulesets",
     ruleset =  kbase,
     ruleset_pubsub = kbase..":pubsub",
@@ -329,6 +330,7 @@ Binding.set("rule", {
     redis.call("SADD", key.rules, rule.name)
   end,
   update = function(rule, diff)
+    hmm("UPDATE YO")
     local rkey = keyf.rule:format(rule.name)
     if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
     assert(not diff.name, "don't know how to rename rules yet")
@@ -390,6 +392,7 @@ Binding.set("rule", {
 
 Binding.set("ruleset", {
   create = function(ruleset)
+    if ruleset.external then return end
     if redis.call("SISMEMBER", key.rulesets, ruleset.name) == 1 then error(("ruleset \"%s\" already exists"):format(ruleset.name)) end
     
     ruleset.gen = 0
@@ -443,20 +446,36 @@ local function check_existence_for_update(name, keyfmt, description)
 end
 
 local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
-  local rs, parsed, err = get_external_ruleset()
+  local ret, parsed, rs, err
+  rs, err = get_external_ruleset()
   if not rs then return {0, err} end
-  local thing_name
   if what ~= "ruleset" then
-    thing_name = nextarg()
     local ok, err = check_existence_for_update(thing_name, keyfmt, what)
     if not ok then return {0, err} end
   else
     thing_name = ruleset_name
   end
+   
+  local extern = {
+    list = function(parser, name)
+      return redis.call("EXISTS", keyf.list:format(name)) == 1
+    end,
+    rule = function(parser, name)
+      hmm("yeah yo")
+      local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+      return parser:parseJSON("rule", json, "loaded rule", 1)
+    end,
+    limiter = function(parser, name)
+      local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+      return parser:parseJSON("limiter", json, "loaded limiter", 1)
+    end
+  }
   
-  local json_in = nextarg()
-  local p = Parser.new()
-  parsed, err = p:parseJSON(what, thing_name)
+  local parser = Parser.new({external=extern})
+  hmm(parser)
+  local old = parser:get(what, thing_name)
+  hmm(old)
+  parsed, err = parser:parseJSON(what, nextarg())
   if not parsed then return {0, err} end
   
   if extra_fn then 
@@ -465,8 +484,18 @@ local function run_update_command(what, update_method_name, thing_name, keyfmt, 
     if not ret then return {0, err} end
   end
   
+  if #thing_name == 0 and parsed then thing_name = parsed.name end
+  if not thing_name or #thing_name == 0 then
+    return {0, ("missing %s name"):format(what)}
+  end
+  
   if next(parsed) then
-    rs[update_method_name](rs, parsed)
+    ret, err = rs[update_method_name](rs, thing_name, parsed)
+    if not ret then
+      return {0, err}
+    end
+  else
+    return {0, "nothing to update"}
   end
   
   local msg = {
@@ -541,20 +570,24 @@ actions = {
   },
   rule = {
     create = function()
-      local json_in, rule_name = nextarg(2)
+      local rule_name, json_in = nextarg(2)
       if not rule_name then rule_name = "" end
       
       if #rule_name > 0 and redis.call("EXISTS", keyf.rule:format(rule_name)) == 1 then
         return {0, ("rule \"%s\" already exists"):format(rule_name)}
       end
       
-      local p = Parser.new()
-      local parsed, err = p:parseJSON("rule", json_in, rule_name)
-      if not parsed then
-        return {0, err}
-      end
+      local ruleset
+      local parsed, err = Parser.new():parseJSON("rule", json_in, rule_name, true)
+      if not parsed then return {0, err} end
       
-      local rule = Ruleset.newRule(parsed)
+      ruleset, err = get_external_ruleset()
+      if not ruleset then return {0, err} end
+      
+      if not parsed.name and #rule_name > 0 then parsed.name = rule_name end
+      ruleset:addRule(parsed)
+      
+      hmm(parsed)
       
       return {1}
     end,

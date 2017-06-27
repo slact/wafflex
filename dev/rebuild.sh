@@ -226,6 +226,8 @@ if [[ -z $NO_MAKE ]]; then
   if [[ $(cat .lua_rebuild_hash) != $_sha1_lua_scripts ]]; then
     ./smush_redis_scripts.rb ${_src_dir}/lua/redis/ruleset_write.main.lua ${_src_dir}/lua/modules/{inspect,dkjson,binding,rulecomponent,parser,ruleset}.lua > ${_src_dir}/lua/redis/ruleset_write.lua
     
+    ./smush_redis_scripts.rb ${_src_dir}/lua/redis/ruleset_read.main.lua ${_src_dir}/lua/redis/modules/ruleset_read.lua > ${_src_dir}/lua/redis/ruleset_read.lua
+    
     if type "luacheck" > /dev/null; then
       pushd ${_src_dir}
       luacheck lua/ --ignore 611 212 631 --exclude-files "**/mm.lua" "**/dkjson.lua"

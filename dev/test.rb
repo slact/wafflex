@@ -34,16 +34,32 @@ class WafflexTest <  Minitest::Test
   end
 
   def test_scripts
-    json = IO.read("./testruleset.json")
+    #json = IO.read("./testruleset.json")
     
-    parsed_in = JSON.parse(json)
+    #parsed_in = JSON.parse(json)
     
-    ok, err = redis_script :ruleset_write, [], ["", "create", "ruleset", "rlst", json]
-    assert_equal 1, ok, err
+    #ok, err = redis_script :ruleset_write, [], ["", "create", "ruleset", "rlst", json]
+    #assert_equal 1, ok, err
     
-    out = redis_script :ruleset_read, [], ["", "ruleset", "rlst"]
+    out = redis_script :ruleset_read, [], ["", "rlst", "ruleset"]
     
     parsed = JSON.parse(out)
+    
+    binding.pry
+    
+    newrule = '{
+      "if": {"limit-break" : {
+        "name": "rate-limit",
+        "key": "hello $ISthis $it $request_real_ip banana ${1}"
+      }},
+      "then": [
+        {"#tag": "slowdown"}
+      ]
+    }'
+    ok, err = redis_script :ruleset_write, [], ["", "update", "rule", "rlst", "newrule", newrule]
+    assert_equal 1, ok, err
+    
+    
     
     
   end  

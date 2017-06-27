@@ -66,7 +66,7 @@ end
 function getRedisRulesetJSON(conf_ptr, ruleset_name)
   local redis = findRedis(conf_ptr)
   if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
-  local ruleset_json, err  = redis:script("ruleset_read", "", "ruleset", ruleset_name)
+  local ruleset_json, err  = redis:script("ruleset_read", "", ruleset_name, "ruleset")
   if ruleset_json == 0 then
     return nil, err
   else
