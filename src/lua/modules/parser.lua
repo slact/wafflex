@@ -199,7 +199,7 @@ function Parser:parseFile(path, unprotected)
 end
 
 function Parser:parseJSON(element_name, json_str, json_name, unprotected)
-  self:assert_type(json_str, "string", "expected a JSON string")
+  self:assert_type(json_str, "string", ("expected a JSON string, got %s"):format(type(json_str)))
   local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
   if not self.name then self.name = json_name end
   
@@ -337,6 +337,8 @@ function Parser:parsePhaseTable(data)
   self:assert_jsontype(data, "object", "phase table must be an object")
   self:pushContext(data, "phase table")
   
+  self:assert(not data.external, "forbidden attribute \"external\"")
+  
   for phase_name, phase_data in pairs(data) do
     self:assert_type(phase_name, "string", "phase table entries must be strings")
     if self:jsontype(phase_data) == "array" then
@@ -376,6 +378,7 @@ function Parser:parseList(data, name)
   self:pushContext(data, "list")
   local list = {}
   if self:jsontype(data) == "object" then
+    self:assert(not data.external, "forbidden attribute \"external\"")
     if name then
       self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
     else
@@ -419,6 +422,8 @@ function Parser:parseRule(data, name)
   end
   self:assert_type(data, "table", "invalid rule data type: " .. type(data))
   self:assert_jsontype(data, "object", ("invalid rule data type: %s"):format(self:jsontype(data)))
+  
+  self:assert(not data.external, "forbidden attribute \"external\"")
   
   if ((data["if"] or data["if-any"] or data["if-all"]) or data["then"]) then
     self:assert(not data["always"], [["always" clause can't be present in if/then rule]])
@@ -587,6 +592,8 @@ function Parser:parseLimiter(data, name)
   self:pushContext(data, "limiter")
   
   if not data.name then data.name = name end
+  
+  self:assert(not data.external, "forbidden attribute \"external\"")
   
   if attr_present(self, data, "interval") then
     data.interval = self:parseTimeInterval(data.interval, "interval value")

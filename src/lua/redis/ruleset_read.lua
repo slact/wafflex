@@ -203,7 +203,7 @@ module("ruleset_read", function()
       return want_json and j:json() or rs
       
     else
-      error("unknown thing we want here")
+      error("unknown thing we want here: " .. tostring(item))
     end
   end
   

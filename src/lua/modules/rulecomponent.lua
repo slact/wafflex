@@ -243,14 +243,18 @@ Component.condition.add({"limit-break", "limit-check"}, {
     data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
     parser:assert(data.increment >= 0, "\"increment\" must be >= 0")
     
-    parser:assert(data.name, "name missing")
+    parser:assert(data.name, "limiter name missing")
     parser:assert_type(data.name, "string", "invalid \"name\" type")
+    
+    if not parser:getLimiter(data.name) then
+      parser:error("unknown limiter \"%s\"", data.name)
+    end
     
     if Component.generate_refs then
       if not rule.refs then rule.refs = {} end
       if not rule_condition.refs then rule_condition.refs = {} end
-      table.insert(rule.refs, "limiter:"..data.name)
-      table.insert(rule_condition.refs, "limiter:"..data.name)
+      rule.refs["limiter:"..data.name]=true
+      rule_condition.refs["limiter:"..data.name]=true
     end
     
     return data

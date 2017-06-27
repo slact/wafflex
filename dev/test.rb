@@ -34,9 +34,9 @@ class WafflexTest <  Minitest::Test
   end
 
   def test_scripts
-    #json = IO.read("./testruleset.json")
+    json = IO.read("./testruleset.json")
     
-    #parsed_in = JSON.parse(json)
+    parsed_in = JSON.parse(json)
     
     #ok, err = redis_script :ruleset_write, [], ["", "create", "ruleset", "rlst", json]
     #assert_equal 1, ok, err
@@ -45,7 +45,7 @@ class WafflexTest <  Minitest::Test
     
     parsed = JSON.parse(out)
     
-    binding.pry
+    #binding.pry
     
     newrule = '{
       "if": {"limit-break" : {
@@ -56,7 +56,7 @@ class WafflexTest <  Minitest::Test
         {"#tag": "slowdown"}
       ]
     }'
-    ok, err = redis_script :ruleset_write, [], ["", "update", "rule", "rlst", "newrule", newrule]
+    ok, err = redis_script :ruleset_write, [], ["", "update", "rule", "rlst", "fwoop", newrule]
     assert_equal 1, ok, err
     
     

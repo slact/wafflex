@@ -24,14 +24,14 @@ local calls = {
     end
     return true
   end,
-  update = function(update_callback, self, update_name, update_data, ...)
+  update = function(update_callback, self, delta)
     if type(self) ~= "table" then
-      return nil, ("expected 'self' to be table, got %s)"):format(type(self))
+      return nil, ("expected self (current data) to be table, got %s)"):format(type(self))
     end
-    if type(update_name) ~= "string" then
-      return nil, ("expected 'update_name' to be string, got %s)"):format(type(self))
+    if not self.name then
+      return nil, "can't update nameless thing"
     end
-    local ref = update_callback(self, update_name, update_data, ...)
+    local ref = update_callback(self, delta)
     if type(ref) == "userdata" then
       self.__binding = ref
     end

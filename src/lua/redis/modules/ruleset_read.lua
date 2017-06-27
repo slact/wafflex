@@ -183,7 +183,7 @@ local function get_thing(prefix, ruleset_name, item, item_name, want_json, incom
     return want_json and j:json() or rs
     
   else
-    error("unknown thing we want here")
+    error("unknown thing we want here: " .. tostring(item))
   end
 end
 

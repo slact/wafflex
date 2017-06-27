@@ -321,8 +321,7 @@
       end
       if rule.refs then
         local rule_ref = "rule:"..rule.name
-        hmm(rule.refs)
-        for _, ref in ipairs(rule.refs) do
+        for ref, _ in pairs(rule.refs) do
           local ref_type, ref_name = ref:match "([^:]+):(.+)"
           local refkeyf = assert(keyf[ref_type .. "_refs"], "keyf \"" .. tostring(ref_type).."_refs" .. "\" missing " .. inspect(keyf))
           redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
@@ -331,44 +330,40 @@
       redis.call("SADD", key.rules, rule.name)
     end,
     update = function(rule, diff)
-      hmm("UPDATE YO")
       local rkey = keyf.rule:format(rule.name)
-      if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
+      if redis.call("EXISTS", rkey) == 0 then error("rule \"" .. rule.name .. "\" does not exist") end
       assert(not diff.name, "don't know how to rename rules yet")
       rule.gen = tonumber(rule.gen or 0) + 1
       diff.gen = true
       
-      local function update_refs(old, new)
+      if diff["if"] then
+        redis.call("HSET", rkey, "if", rule["if"]:toJSON())
+        diff["if"]=nil
+      end
+      if diff["then"] then
+        redis.call("HSET", rkey, "then", rule["then"]:toJSON())
+        diff["then"]=nil
+      end
+      if diff["else"] then
+        redis.call("HSET", rkey, "else", rule["else"]:toJSON())
+        diff["else"]=nil
+      end
+      
+      if diff.refs then
         local ref_kind, ref_name, refkey
         local rule_ref = "rule:"..rule.name
-        for _, ref in ipairs(old) do
+        for ref, _ in pairs(diff.refs.old or {}) do
           ref_kind, ref_name = ref:match("(.+):(.+)")
           refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
           redis.call("ZINCRBY", refkey, -1, rule_ref)
           redis.call("ZREMRANGEBYSCORE", refkey, "-inf", 0)
         end
         
-        for _, ref in ipairs(new) do
+        for ref, _ in pairs(diff.refs.new or {}) do
           ref_kind, ref_name = ref:match("(.+):(.+)")
           refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
           redis.call("ZINCRBY", refkey, 1, rule_ref)
         end
-      end
-      
-      if diff["if"] then
-        update_refs(diff["if"].old, diff["if"].new)
-        redis.call("HSET", rkey, "if", rule["if"]:toJSON())
-        diff["if"]=nil
-      end
-      if diff["then"] then
-        update_refs(diff["then"].old, diff["then"].new)
-        redis.call("HSET", rkey, "then", rule["then"]:toJSON())
-        diff["then"]=nil
-      end
-      if diff["else"] then
-        update_refs(diff["else"].old, diff["else"].new)
-        redis.call("HSET", rkey, "else", rule["else"]:toJSON())
-        diff["else"]=nil
       end
       
       redis_hmset(rkey, rule, table_keys(diff))
@@ -379,7 +374,7 @@
       if redis.call("ZCARD", keyf.rule_refs:format(rule.name)) > 0 then error("rule \"" .. rule.name .. "\" still in use") end
       
       local rule_ref = "rule:"..rule.name
-      for _, ref in ipairs(rule.refs or {}) do
+      for ref, _ in pairs(rule.refs or {}) do
         local ref_kind, ref_name = ref:match("(.+):(.+)")
         local refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
         redis.call("ZINCRBY", refkey, -1, rule_ref)
@@ -425,12 +420,17 @@
     end
   })
   
-  local function get_external_ruleset()
+  local function get_external_ruleset(parsed_ruleset)
     if not ruleset_name or #ruleset_name == 0 then return nil, "no ruleset name given" end
     if redis.call("EXISTS", key.ruleset) == 0 then
       return nil, ("ruleset \"%s\" does not exist"):format(ruleset_name)
     end
     local rs = redis_gethash(key.ruleset)
+    if parsed_ruleset then
+      for k,v in pairs(parsed_ruleset) do
+        rs[k]=v
+      end
+    end
     rs.external = true
     rs = Ruleset.new(rs)
     return rs
@@ -441,43 +441,57 @@
       return nil, description.." name missing"
     end
     if redis.call("EXISTS", keyfmt:format(name)) == 0 then
-      return nil, ("%s \"%s\" does exists"):format(description, name)
+      return nil, ("%s \"%s\" does not exist"):format(description, name)
     end
     return true
   end
   
+  local parser_update_opts = { external = {
+    list = function(parser, name)
+      return redis.call("EXISTS", keyf.list:format(name)) == 1
+    end,
+    rule = function(parser, name)
+      local json = ruleset_read(prefix, ruleset_name, "rule", name, true)
+      local rule = parser:parseJSON("rule", json, "loaded rule", 1)
+      parser.ruleset.rules[rule.name]=rule
+      return rule
+    end,
+    limiter = function(parser, name)
+      local json = ruleset_read(prefix, ruleset_name, "limiter", name, true)
+      local lim = parser:parseJSON("limiter", json, "loaded limiter", 1)
+      parser.ruleset.limiters[lim.name]=lim
+      if lim.burst then
+        parser:getLimiter(lim.burst)
+      end
+      return lim
+    end
+  }}
+  
   local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
     local ret, parsed, rs, err
-    rs, err = get_external_ruleset()
-    if not rs then return {0, err} end
     if what ~= "ruleset" then
       ret, err = check_existence_for_update(thing_name, keyfmt, what)
       if not ret then return {0, err} end
     else
       thing_name = ruleset_name
     end
-     
-    local extern = {
-      list = function(parser, name)
-        return redis.call("EXISTS", keyf.list:format(name)) == 1
-      end,
-      rule = function(parser, name)
-        local json = ruleset_read(prefix, ruleset_name, "rule", name, true)
-        return parser:parseJSON("rule", json, "loaded rule", 1)
-      end,
-      limiter = function(parser, name)
-        local json = ruleset_read(prefix, ruleset_name, "parser", name, true)
-        return parser:parseJSON("limiter", json, "loaded limiter", 1)
-      end
-    }
     
-    local parser = Parser.new({external=extern})
-    hmm(parser)
+    local parser = Parser.new(parser_update_opts)
     local old = parser:get(what, thing_name)
-    hmm(old)
-    local json_in = nextarg
-    parsed, err = parser:parseJSON(what, json_in)
+    
+    local json_in = nextarg()
+    parsed, err = parser:parseJSON(what, json_in, "rule update")
     if not parsed then return {0, err} end
+    hmm(old)
+    hmm("AND NOW...")
+    hmm(parser.ruleset)
+    hmm("also")
+    hmm(parsed)
+    
+    rs, err = get_external_ruleset(parser.ruleset)
+    if not rs then return {0, err} end
+    hmm("...kay then")
+    
     
     if extra_fn then
       ret, err = extra_fn(rs, parsed)
@@ -488,7 +502,7 @@
     if not thing_name or #thing_name == 0 then
       return {0, ("missing %s name"):format(what)}
     end
-    
+      
     if next(parsed) then
       ret, err = rs[update_method_name](rs, thing_name, parsed)
       if not ret then
@@ -1731,14 +1745,14 @@ module("binding", function()
       end
       return true
     end,
-    update = function(update_callback, self, update_name, update_data, ...)
+    update = function(update_callback, self, delta)
       if type(self) ~= "table" then
-        return nil, ("expected 'self' to be table, got %s)"):format(type(self))
+        return nil, ("expected self (current data) to be table, got %s)"):format(type(self))
       end
-      if type(update_name) ~= "string" then
-        return nil, ("expected 'update_name' to be string, got %s)"):format(type(self))
+      if not self.name then
+        return nil, "can't update nameless thing"
       end
-      local ref = update_callback(self, update_name, update_data, ...)
+      local ref = update_callback(self, delta)
       if type(ref) == "userdata" then
         self.__binding = ref
       end
@@ -2043,14 +2057,18 @@ module("rulecomponent", function()
       data.increment = parser:assert(tonumber(data.increment), "invalid or empty \"increment\" value")
       parser:assert(data.increment >= 0, "\"increment\" must be >= 0")
       
-      parser:assert(data.name, "name missing")
+      parser:assert(data.name, "limiter name missing")
       parser:assert_type(data.name, "string", "invalid \"name\" type")
+      
+      if not parser:getLimiter(data.name) then
+        parser:error("unknown limiter \"%s\"", data.name)
+      end
       
       if Component.generate_refs then
         if not rule.refs then rule.refs = {} end
         if not rule_condition.refs then rule_condition.refs = {} end
-        table.insert(rule.refs, "limiter:"..data.name)
-        table.insert(rule_condition.refs, "limiter:"..data.name)
+        rule.refs["limiter:"..data.name]=true
+        rule_condition.refs["limiter:"..data.name]=true
       end
       
       return data
@@ -2332,7 +2350,7 @@ module("parser", function()
   end
   
   function Parser:parseJSON(element_name, json_str, json_name, unprotected)
-    self:assert_type(json_str, "string", "expected a JSON string")
+    self:assert_type(json_str, "string", ("expected a JSON string, got %s"):format(type(json_str)))
     local data, _, err = json.decode(json_str, 1, json.null, jsonmeta("object"), jsonmeta("array"))
     if not self.name then self.name = json_name end
     
@@ -2470,6 +2488,8 @@ module("parser", function()
     self:assert_jsontype(data, "object", "phase table must be an object")
     self:pushContext(data, "phase table")
     
+    self:assert(not data.external, "forbidden attribute \"external\"")
+    
     for phase_name, phase_data in pairs(data) do
       self:assert_type(phase_name, "string", "phase table entries must be strings")
       if self:jsontype(phase_data) == "array" then
@@ -2509,6 +2529,7 @@ module("parser", function()
     self:pushContext(data, "list")
     local list = {}
     if self:jsontype(data) == "object" then
+      self:assert(not data.external, "forbidden attribute \"external\"")
       if name then
         self:assert(name == data.name, "rule list 'name' attribute must match outside list name")
       else
@@ -2552,6 +2573,8 @@ module("parser", function()
     end
     self:assert_type(data, "table", "invalid rule data type: " .. type(data))
     self:assert_jsontype(data, "object", ("invalid rule data type: %s"):format(self:jsontype(data)))
+    
+    self:assert(not data.external, "forbidden attribute \"external\"")
     
     if ((data["if"] or data["if-any"] or data["if-all"]) or data["then"]) then
       self:assert(not data["always"], [["always" clause can't be present in if/then rule]])
@@ -2721,6 +2744,8 @@ module("parser", function()
     
     if not data.name then data.name = name end
     
+    self:assert(not data.external, "forbidden attribute \"external\"")
+    
     if attr_present(self, data, "interval") then
       data.interval = self:parseTimeInterval(data.interval, "interval value")
       self:assert(data.interval >= 60, "\"interval\" value must be >= 60 seconds")
@@ -2821,7 +2846,9 @@ module("ruleset", function()
   local hmm = function(thing)
     local out = inspect(thing)
     for line in out:gmatch('[^\r\n]+') do
-      redis.call("ECHO", line)
+      if redis then
+        redis.call("ECHO", line)
+      end
     end
   end
   
@@ -2995,7 +3022,6 @@ module("ruleset", function()
     --assumes data is already valid
     assert(type(thing_type)=="string", "wrong thing_type type")
     assert(type(name)=="string", "wrong name type")
-    hmm("...look for thing...")
     local thing = findThing(self, name)
     if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
     local delta = {}
@@ -3003,6 +3029,7 @@ module("ruleset", function()
       delta[k]={old=thing[k], new=v}
       thing[k]=v
     end
+    hmm(delta)
     if next(delta) then --at least one thing to update
       Binding.call(thing_type, "update", thing, delta)
     end
@@ -3017,7 +3044,9 @@ module("ruleset", function()
       data.__already_loaded_as_burst_limiter = nil
       return nil
     end
-    assert_unique_name("limiter", self.limiters, data)
+    if not data.external then
+      assert_unique_name("limiter", self.limiters, data)
+    end
     local limiter = mt.limiter.new(data)
     self.limiters[data.name]=limiter
     if limiter.burst then
@@ -3055,18 +3084,19 @@ module("ruleset", function()
   function Ruleset:addRule(data)
     if not data.name then
       data.name = self:uniqueName("rule")
-    else
+    elseif not data.external then
       assert_unique_name("rule", self.rules, data)
     end
-    
     local rule = mt.rule.new(data, self)
-    
     self.rules[data.name]=rule
     Binding.call("rule", "create", rule)
     return rule
   end
   function Ruleset:updateRule(name, data)
-    return updateThing(self, "rule", self.findRule, name, data)
+    hmm("updating... make new rule")
+    local newRule = mt.rule.new(data, self)
+    hmm("...ok")
+    return updateThing(self, "rule", self.findRule, name, newRule)
   end
   function Ruleset:deleteRule(rule)
     assert(self.rules[rule.name] == rule, "tried deleting unexpected rule of the same name")
@@ -3102,7 +3132,7 @@ module("ruleset", function()
     assert(data.rules)
     if not data.name then
       data.name = self:uniqueName("list")
-    else
+    elseif not data.external then
       assert_unique_name("list", self.lists, data)
     end
     
@@ -3496,7 +3526,7 @@ module("ruleset_read", function()
       return want_json and j:json() or rs
       
     else
-      error("unknown thing we want here")
+      error("unknown thing we want here: " .. tostring(item))
     end
   end
   

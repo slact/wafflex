@@ -9,7 +9,9 @@ local inspect = require "inspect"
 local hmm = function(thing)
   local out = inspect(thing)
   for line in out:gmatch('[^\r\n]+') do
-    redis.call("ECHO", line)
+    if redis then
+      redis.call("ECHO", line)
+    end
   end
 end
 
@@ -183,7 +185,6 @@ local function updateThing(self, thing_type, findThing, name, data)
   --assumes data is already valid
   assert(type(thing_type)=="string", "wrong thing_type type")
   assert(type(name)=="string", "wrong name type")
-  hmm("...look for thing...")
   local thing = findThing(self, name)
   if not thing then return nil, ("%s \"%s\" not found."):format(thing_type, name) end
   local delta = {}
@@ -191,6 +192,7 @@ local function updateThing(self, thing_type, findThing, name, data)
     delta[k]={old=thing[k], new=v}
     thing[k]=v
   end
+  hmm(delta)
   if next(delta) then --at least one thing to update
     Binding.call(thing_type, "update", thing, delta)
   end
@@ -205,7 +207,9 @@ function Ruleset:addLimiter(data, limiters_in)
     data.__already_loaded_as_burst_limiter = nil
     return nil
   end
-  assert_unique_name("limiter", self.limiters, data)
+  if not data.external then
+    assert_unique_name("limiter", self.limiters, data)
+  end
   local limiter = mt.limiter.new(data)
   self.limiters[data.name]=limiter
   if limiter.burst then
@@ -243,18 +247,19 @@ end
 function Ruleset:addRule(data)
   if not data.name then
     data.name = self:uniqueName("rule")
-  else
+  elseif not data.external then
     assert_unique_name("rule", self.rules, data)
   end
-  
   local rule = mt.rule.new(data, self)
-  
   self.rules[data.name]=rule
   Binding.call("rule", "create", rule)
   return rule
 end
 function Ruleset:updateRule(name, data)
-  return updateThing(self, "rule", self.findRule, name, data)
+  hmm("updating... make new rule")
+  local newRule = mt.rule.new(data, self)
+  hmm("...ok")
+  return updateThing(self, "rule", self.findRule, name, newRule)
 end
 function Ruleset:deleteRule(rule)
   assert(self.rules[rule.name] == rule, "tried deleting unexpected rule of the same name")
@@ -290,7 +295,7 @@ function Ruleset:addList(data)
   assert(data.rules)
   if not data.name then
     data.name = self:uniqueName("list")
-  else
+  elseif not data.external then
     assert_unique_name("list", self.lists, data)
   end
   

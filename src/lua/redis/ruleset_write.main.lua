@@ -321,8 +321,7 @@ Binding.set("rule", {
     end
     if rule.refs then
       local rule_ref = "rule:"..rule.name
-      hmm(rule.refs)
-      for _, ref in ipairs(rule.refs) do
+      for ref, _ in pairs(rule.refs) do
         local ref_type, ref_name = ref:match "([^:]+):(.+)"
         local refkeyf = assert(keyf[ref_type .. "_refs"], "keyf \"" .. tostring(ref_type).."_refs" .. "\" missing " .. inspect(keyf))
         redis.call("ZINCRBY", refkeyf:format(ref_name), 1, rule_ref)
@@ -331,44 +330,40 @@ Binding.set("rule", {
     redis.call("SADD", key.rules, rule.name)
   end,
   update = function(rule, diff)
-    hmm("UPDATE YO")
     local rkey = keyf.rule:format(rule.name)
-    if redis.call("EXISTS", rkey) == 1 then error("rule \"" .. rule.name .. "\" does not exist") end
+    if redis.call("EXISTS", rkey) == 0 then error("rule \"" .. rule.name .. "\" does not exist") end
     assert(not diff.name, "don't know how to rename rules yet")
     rule.gen = tonumber(rule.gen or 0) + 1
     diff.gen = true
     
-    local function update_refs(old, new)
+    if diff["if"] then
+      redis.call("HSET", rkey, "if", rule["if"]:toJSON())
+      diff["if"]=nil
+    end
+    if diff["then"] then
+      redis.call("HSET", rkey, "then", rule["then"]:toJSON())
+      diff["then"]=nil
+    end
+    if diff["else"] then
+      redis.call("HSET", rkey, "else", rule["else"]:toJSON())
+      diff["else"]=nil
+    end
+    
+    if diff.refs then
       local ref_kind, ref_name, refkey
       local rule_ref = "rule:"..rule.name
-      for _, ref in ipairs(old) do
+      for ref, _ in pairs(diff.refs.old or {}) do
         ref_kind, ref_name = ref:match("(.+):(.+)")
         refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
         redis.call("ZINCRBY", refkey, -1, rule_ref)
         redis.call("ZREMRANGEBYSCORE", refkey, "-inf", 0)
       end
       
-      for _, ref in ipairs(new) do
+      for ref, _ in pairs(diff.refs.new or {}) do
         ref_kind, ref_name = ref:match("(.+):(.+)")
         refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
         redis.call("ZINCRBY", refkey, 1, rule_ref)
       end
-    end
-    
-    if diff["if"] then
-      update_refs(diff["if"].old, diff["if"].new)
-      redis.call("HSET", rkey, "if", rule["if"]:toJSON())
-      diff["if"]=nil
-    end
-    if diff["then"] then
-      update_refs(diff["then"].old, diff["then"].new)
-      redis.call("HSET", rkey, "then", rule["then"]:toJSON())
-      diff["then"]=nil
-    end
-    if diff["else"] then
-      update_refs(diff["else"].old, diff["else"].new)
-      redis.call("HSET", rkey, "else", rule["else"]:toJSON())
-      diff["else"]=nil
     end
     
     redis_hmset(rkey, rule, table_keys(diff))
@@ -379,7 +374,7 @@ Binding.set("rule", {
     if redis.call("ZCARD", keyf.rule_refs:format(rule.name)) > 0 then error("rule \"" .. rule.name .. "\" still in use") end
     
     local rule_ref = "rule:"..rule.name
-    for _, ref in ipairs(rule.refs or {}) do
+    for ref, _ in pairs(rule.refs or {}) do
       local ref_kind, ref_name = ref:match("(.+):(.+)")
       local refkey = assert(keyf[ref_kind .. "_refs"]):format(ref_name)
       redis.call("ZINCRBY", refkey, -1, rule_ref)
@@ -425,12 +420,17 @@ Binding.set("ruleset", {
   end
 })
 
-local function get_external_ruleset()
+local function get_external_ruleset(parsed_ruleset)
   if not ruleset_name or #ruleset_name == 0 then return nil, "no ruleset name given" end
   if redis.call("EXISTS", key.ruleset) == 0 then
     return nil, ("ruleset \"%s\" does not exist"):format(ruleset_name)
   end
   local rs = redis_gethash(key.ruleset)
+  if parsed_ruleset then
+    for k,v in pairs(parsed_ruleset) do
+      rs[k]=v
+    end
+  end
   rs.external = true
   rs = Ruleset.new(rs)
   return rs
@@ -441,43 +441,57 @@ local function check_existence_for_update(name, keyfmt, description)
     return nil, description.." name missing"
   end
   if redis.call("EXISTS", keyfmt:format(name)) == 0 then
-    return nil, ("%s \"%s\" does exists"):format(description, name)
+    return nil, ("%s \"%s\" does not exist"):format(description, name)
   end
   return true
 end
 
+local parser_update_opts = { external = {
+  list = function(parser, name)
+    return redis.call("EXISTS", keyf.list:format(name)) == 1
+  end,
+  rule = function(parser, name)
+    local json = ruleset_read(prefix, ruleset_name, "rule", name, true)
+    local rule = parser:parseJSON("rule", json, "loaded rule", 1)
+    parser.ruleset.rules[rule.name]=rule
+    return rule
+  end,
+  limiter = function(parser, name)
+    local json = ruleset_read(prefix, ruleset_name, "limiter", name, true)
+    local lim = parser:parseJSON("limiter", json, "loaded limiter", 1)
+    parser.ruleset.limiters[lim.name]=lim
+    if lim.burst then
+      parser:getLimiter(lim.burst)
+    end
+    return lim
+  end
+}}
+
 local function run_update_command(what, update_method_name, thing_name, keyfmt, extra_fn)
   local ret, parsed, rs, err
-  rs, err = get_external_ruleset()
-  if not rs then return {0, err} end
   if what ~= "ruleset" then
     ret, err = check_existence_for_update(thing_name, keyfmt, what)
     if not ret then return {0, err} end
   else
     thing_name = ruleset_name
   end
-   
-  local extern = {
-    list = function(parser, name)
-      return redis.call("EXISTS", keyf.list:format(name)) == 1
-    end,
-    rule = function(parser, name)
-      local json = ruleset_read(prefix, ruleset_name, "rule", name, true)
-      return parser:parseJSON("rule", json, "loaded rule", 1)
-    end,
-    limiter = function(parser, name)
-      local json = ruleset_read(prefix, ruleset_name, "parser", name, true)
-      return parser:parseJSON("limiter", json, "loaded limiter", 1)
-    end
-  }
   
-  local parser = Parser.new({external=extern})
-  hmm(parser)
+  local parser = Parser.new(parser_update_opts)
   local old = parser:get(what, thing_name)
-  hmm(old)
-  local json_in = nextarg
-  parsed, err = parser:parseJSON(what, json_in)
+  
+  local json_in = nextarg()
+  parsed, err = parser:parseJSON(what, json_in, "rule update")
   if not parsed then return {0, err} end
+  hmm(old)
+  hmm("AND NOW...")
+  hmm(parser.ruleset)
+  hmm("also")
+  hmm(parsed)
+  
+  rs, err = get_external_ruleset(parser.ruleset)
+  if not rs then return {0, err} end
+  hmm("...kay then")
+  
   
   if extra_fn then
     ret, err = extra_fn(rs, parsed)
@@ -488,7 +502,7 @@ local function run_update_command(what, update_method_name, thing_name, keyfmt, 
   if not thing_name or #thing_name == 0 then
     return {0, ("missing %s name"):format(what)}
   end
-  
+    
   if next(parsed) then
     ret, err = rs[update_method_name](rs, thing_name, parsed)
     if not ret then
