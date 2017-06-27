@@ -1,4 +1,4 @@
-
+--main script
 --luacheck: globals redis cjson ARGV
 local prefix =        ARGV[1]
 local ruleset_name =  ARGV[2]

@@ -2,6 +2,7 @@ local Parser = require "parser"
 local Ruleset = require "ruleset"
 local Binding = require "binding"
 local inspect = require "inspect"
+local ruleset_read = require "ruleset_read"
 
 --luacheck: globals redis cjson ARGV unpack
 local hmm = function(thing)
@@ -450,8 +451,8 @@ local function run_update_command(what, update_method_name, thing_name, keyfmt, 
   rs, err = get_external_ruleset()
   if not rs then return {0, err} end
   if what ~= "ruleset" then
-    local ok, err = check_existence_for_update(thing_name, keyfmt, what)
-    if not ok then return {0, err} end
+    ret, err = check_existence_for_update(thing_name, keyfmt, what)
+    if not ret then return {0, err} end
   else
     thing_name = ruleset_name
   end
@@ -461,12 +462,11 @@ local function run_update_command(what, update_method_name, thing_name, keyfmt, 
       return redis.call("EXISTS", keyf.list:format(name)) == 1
     end,
     rule = function(parser, name)
-      hmm("yeah yo")
-      local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+      local json = ruleset_read(prefix, ruleset_name, "rule", name, true)
       return parser:parseJSON("rule", json, "loaded rule", 1)
     end,
     limiter = function(parser, name)
-      local json = redis.call("EVALSHA", redis.call("HGET", key.scripts, "ruleset_read"), 0, prefix, item, ruleset_name, name)
+      local json = ruleset_read(prefix, ruleset_name, "parser", name, true)
       return parser:parseJSON("limiter", json, "loaded limiter", 1)
     end
   }
@@ -475,13 +475,13 @@ local function run_update_command(what, update_method_name, thing_name, keyfmt, 
   hmm(parser)
   local old = parser:get(what, thing_name)
   hmm(old)
-  parsed, err = parser:parseJSON(what, nextarg())
+  local json_in = nextarg
+  parsed, err = parser:parseJSON(what, json_in)
   if not parsed then return {0, err} end
   
-  if extra_fn then 
-    local ret
+  if extra_fn then
     ret, err = extra_fn(rs, parsed)
-    if not ret then return {0, err} end
+    if not ret then return {0, err or "extra_fn failed"} end
   end
   
   if #thing_name == 0 and parsed then thing_name = parsed.name end
@@ -528,16 +528,13 @@ actions = {
       if #ruleset_name > 0 then
         parsed.name = ruleset_name
       end
-      
       local rs = Ruleset.new(parsed)
-      
-      return {1}
+      return rs and {1} or {0, "failed to create ruleset"}
     end,
     update = function()
       return run_update_command("ruleset", "updateRuleset", nextarg())
     end,
     delete = function()
-      local name = nextarg()
       return {0, "can't do this yet"}
     end
   },
@@ -557,14 +554,12 @@ actions = {
       end
       
       local list = Ruleset.newList(parsed)
-      
-      return {1}
+      return list and {1} or {0, "failed to create list"}
     end,
     update = function()
       return run_update_command("list", "updateList", nextarg(), keyf.list)
     end,
     delete = function()
-      local name = nextarg()
       return {0, "can't do this yet"}
     end
   },
@@ -585,17 +580,17 @@ actions = {
       if not ruleset then return {0, err} end
       
       if not parsed.name and #rule_name > 0 then parsed.name = rule_name end
-      ruleset:addRule(parsed)
-      
-      hmm(parsed)
-      
-      return {1}
+      if ruleset:addRule(parsed) then
+        return {1}
+      else
+        return {0, "failed to create rule"}
+      end
     end,
     update = function()
       return run_update_command("rule", "updateRule", nextarg(), keyf.rule)
     end,
     delete = function()
-      local name = nextarg()
+      --local name = nextarg()
       return {0, "can't do this yet"}
     end
   },
@@ -615,13 +610,13 @@ actions = {
       end
       
       local rule = Ruleset.newLimiter(parsed)
-      return {1}
+      return rule and {1} or {0, "failed to create rule"}
     end,
     update = function()
       return run_update_command("limiter", "updateLimiter", nextarg(), keyf.limiter)
     end,
     delete = function()
-      local name = nextarg()
+      --local name = nextarg()
       return {0, "can't do this yet"}
     end
   }
