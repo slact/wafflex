@@ -1,7 +1,9 @@
 local Redis = require "redis"
 --local mm = require "mm"
+local json = require "dkjson"
+local Parser = require "parser"
 
---luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe
+--luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe findRuleset
 
 local function parseRedisUrl(url)
   local host, port, pass, db
@@ -16,7 +18,6 @@ local function parseRedisUrl(url)
   if port then port=tonumber(port); url = rest end
   db = url:match("^/(%d+)")
   if db then db = tonumber(db) end
-  
   
   local ret = {
     url=("redis://%s%s:%i%s"):format(pass and ":"..pass.."@" or "", host, port, db and "/"..db or ""),
@@ -66,7 +67,7 @@ end
 function getRedisRulesetJSON(conf_ptr, ruleset_name)
   local redis = findRedis(conf_ptr)
   if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
-  local ruleset_json, err  = redis:script("ruleset_read", "", ruleset_name, "ruleset")
+  local ruleset_json, err  = redis:script("ruleset_read", "", ruleset_name,  "ruleset")
   if ruleset_json == 0 then
     return nil, err
   else
@@ -79,9 +80,31 @@ function redisRulesetSubscribe(conf_ptr, ruleset_name)
   if not redis then return nil, "no redis found for conf_ptr " .. tostring(conf_ptr) end
   --TODO: prefix
   
-  local updater = function(msg)
-    print("UPDATE NAW")
-    print(msg)
+  local updater = function(data)
+    local parser = Parser.new()
+    local ruleset = findRuleset(ruleset_name)
+    if not ruleset then
+      error("can't find ruleset " .. ruleset_name)
+    end
+    local msg = json.decode(data, 1, json.null, nil)
+    if msg.action == "create" then
+      --create stuff
+      if msg.type == "rule" then
+        local rule = parser:parseJSON("rule", msg.data)
+        rule.name = msg.name
+        ruleset:addRule(rule)
+      end
+    elseif msg.action == "update" then
+      if msg.type == "rule" then
+        local rule = parser:parseJSON("rule", msg.data)
+        rule.name = msg.name
+        ruleset:updateRule(rule)
+      else
+        error("don't know what to do")
+      end
+    else
+      error("don't know what action this is")
+    end
   end
   
   return redis:subscribe(("ruleset:%s:pubsub"):format(ruleset_name), updater)

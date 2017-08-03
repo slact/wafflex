@@ -96,6 +96,20 @@
   end
   genkeys(ruleset_name)
   
+  local function publish(action_name, thing_type, thing_name, thing_data)
+    local msg = {
+      action = action_name,
+      type = thing_type,
+      name = thing_name,
+      data = thing_data
+    }
+    
+    assert(action_name == "create" or action_name == "update" or action_name == "delete", "publish: invalid action " .. action_name)
+    assert(thing_type == "ruleset" or thing_type == "phase" or thing_type == "limiter" or thing_type == "list" or thing_type == "rule", "publish: invalid thing type " .. thing_type)
+    
+    redis.call("PUBLISH", key.ruleset_pubsub, cjson.encode(msg))
+  end
+  
   Ruleset.uniqueName = function(thing, thingtbl, ruleset)
     local name, thing_key, n, set_key
     if thing == "ruleset" then
@@ -512,13 +526,7 @@
       return {0, "nothing to update"}
     end
     
-    local msg = {
-      action = "update",
-      type = what,
-      name = thing_name,
-      json = json_in
-    }
-    redis.call("PUBLISH", key.ruleset_pubsub, cjson.encode(msg))
+    publish("update", what, thing_name, json_in)
     
     return {1}
   end
@@ -568,6 +576,7 @@
         end
         
         local list = Ruleset.newList(parsed)
+        publish("create", "list", list.name, list:toJSON())
         return list and {1} or {0, "failed to create list"}
       end,
       update = function()
@@ -594,7 +603,10 @@
         if not ruleset then return {0, err} end
         
         if not parsed.name and #rule_name > 0 then parsed.name = rule_name end
-        if ruleset:addRule(parsed) then
+        
+        local new_rule = ruleset:addRule(parsed)
+        if new_rule then
+          publish("create", "rule", new_rule.name, new_rule:toJSON())
           return {1}
         else
           return {0, "failed to create rule"}
@@ -623,8 +635,13 @@
           return {0, err}
         end
         
-        local rule = Ruleset.newLimiter(parsed)
-        return rule and {1} or {0, "failed to create rule"}
+        local new_limiter = Ruleset.newLimiter(parsed)
+        if new_limiter then
+          publish("create", "limiter", new_limiter.name, new_limiter:toJSON())
+          return {1}
+        else
+          return {0, "failed to create rule"}
+        end
       end,
       update = function()
         return run_update_command("limiter", "updateLimiter", nextarg(), keyf.limiter)
@@ -2840,17 +2857,17 @@ module("ruleset", function()
   local json = require "dkjson"
   --local mm = require "mm"
   
-  local inspect = require "inspect"
+  --local inspect = require "inspect"
   
   --luacheck: globals redis cjson ARGV unpack
-  local hmm = function(thing)
+  --[[local hmm = function(thing)
     local out = inspect(thing)
     for line in out:gmatch('[^\r\n]+') do
       if redis then
         redis.call("ECHO", line)
       end
     end
-  end
+  end]]
   
   local Module -- forward declaration
   
@@ -3029,7 +3046,7 @@ module("ruleset", function()
       delta[k]={old=thing[k], new=v}
       thing[k]=v
     end
-    hmm(delta)
+    --hmm(delta)
     if next(delta) then --at least one thing to update
       Binding.call(thing_type, "update", thing, delta)
     end
@@ -3093,9 +3110,9 @@ module("ruleset", function()
     return rule
   end
   function Ruleset:updateRule(name, data)
-    hmm("updating... make new rule")
+    --hmm("updating... make new rule")
     local newRule = mt.rule.new(data, self)
-    hmm("...ok")
+    --hmm("...ok")
     return updateThing(self, "rule", self.findRule, name, newRule)
   end
   function Ruleset:deleteRule(rule)

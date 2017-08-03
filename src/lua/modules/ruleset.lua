@@ -3,17 +3,17 @@ local Binding = require "binding"
 local json = require "dkjson"
 --local mm = require "mm"
 
-local inspect = require "inspect"
+--local inspect = require "inspect"
 
 --luacheck: globals redis cjson ARGV unpack
-local hmm = function(thing)
+--[[local hmm = function(thing)
   local out = inspect(thing)
   for line in out:gmatch('[^\r\n]+') do
     if redis then
       redis.call("ECHO", line)
     end
   end
-end
+end]]
 
 local Module -- forward declaration
 
@@ -192,7 +192,7 @@ local function updateThing(self, thing_type, findThing, name, data)
     delta[k]={old=thing[k], new=v}
     thing[k]=v
   end
-  hmm(delta)
+  --hmm(delta)
   if next(delta) then --at least one thing to update
     Binding.call(thing_type, "update", thing, delta)
   end
@@ -256,9 +256,9 @@ function Ruleset:addRule(data)
   return rule
 end
 function Ruleset:updateRule(name, data)
-  hmm("updating... make new rule")
+  --hmm("updating... make new rule")
   local newRule = mt.rule.new(data, self)
-  hmm("...ok")
+  --hmm("...ok")
   return updateThing(self, "rule", self.findRule, name, newRule)
 end
 function Ruleset:deleteRule(rule)

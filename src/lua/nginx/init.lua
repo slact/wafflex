@@ -4,6 +4,7 @@
 --luacheck: globals parseRulesetFile deferRulesetCreation createDeferredRulesets
 --luacheck: globals deferRulesetRedisLoad loadDeferredRedisRulesets
 --luacheck: globals shutdown printFunctions
+--luacheck: globals findRuleset
 
 --luacheck: globals getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe --external crud
 
@@ -34,6 +35,9 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
   Binding = require "binding"
   local mm = require "mm"
   
+  function findRuleset(name)
+    return rulesets[name]
+  end
   
   do
     local ruleset_n = 0
