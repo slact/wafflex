@@ -2152,6 +2152,18 @@ module("rulecomponent", function()
   end})
   Component.action.add("reject", {parse = function(data, parser)
     parser:assert_type(data, "table", "\"reject\" value must be an object")
+    if data.status then
+      data.status = tonumber(data.status)
+      parser:assert_type(data.status, "number", "\"status\" value must be a number")
+      parser:assert(data.status >=100 and data.status <=599, "invalid HTTP \"status\" " .. tostring(data.status))
+    else
+      data.status = nil
+    end
+    if data.body then
+      parser:assert_type(data.status, "string", "\"body\" value must be a string")
+    else
+      data.body = nil
+    end
     --parser:assert_table_size(data, 0, "\"reject\" value must be empty")
   end})
   
