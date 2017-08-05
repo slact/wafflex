@@ -23,7 +23,7 @@ static int string_create(lua_State *L) {
   }
   sz = str.len + sizeof(*part) * parts_count;
   
-  wstr = ruleset_common_shm_alloc_init_item_noname(wfx_str_t, sz, L);
+  wstr = ruleset_common_shm_alloc_init_noname_item(wfx_str_t, sz, L);
   
   wstr->str.len = str.len;
   wstr->str.data=(u_char *)&wstr[1];
@@ -60,7 +60,7 @@ static int string_create(lua_State *L) {
 
 static int string_destroy(lua_State *L) {
   wfx_str_t *wstr = lua_touserdata(L, 1);
-  ruleset_common_shm_free(L, wstr);
+  ruleset_common_shm_free_noname_item(L, wstr);
   return 0;
 }
 

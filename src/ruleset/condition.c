@@ -10,7 +10,7 @@ static wfx_condition_type_t condition_types[];
 
 int condition_simple_destroy(lua_State *L) {
   wfx_condition_t *cond = lua_touserdata(L, 1);
-  ruleset_common_shm_free(L, cond);
+  ruleset_common_shm_free_custom_name_item(L, cond, condition);
   return 0;
 }
 
@@ -20,7 +20,7 @@ int condition_false_destroy(lua_State *L) {
 }
 
 wfx_condition_t *condition_create(lua_State *L, size_t data_sz, wfx_condition_eval_pt eval) {
-  wfx_condition_t *condition = ruleset_common_shm_alloc_init_item(wfx_condition_t, data_sz, L, condition);
+  wfx_condition_t *condition = ruleset_common_shm_alloc_init_custom_name_item(wfx_condition_t, data_sz, L, condition);
   condition->eval = eval;
   lua_pushlightuserdata(L, condition);
   return condition;

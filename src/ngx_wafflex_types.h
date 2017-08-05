@@ -29,7 +29,12 @@ typedef enum {WFX_COND_FALSE=0, WFX_COND_TRUE, WFX_COND_DEFER, WFX_COND_ERROR} w
 typedef enum {WFX_REJECT=0, WFX_ACCEPT, WFX_OK, WFX_SKIP, WFX_DEFER, WFX_ERROR} wfx_rc_t;
 
 typedef enum {WFX_EVAL_NONE=0, WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evaldata_type_t;
-typedef enum{WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
+typedef enum {WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
+
+typedef struct {
+  ngx_atomic_uint_t reading;
+  ngx_atomic_uint_t writing;
+} wfx_readwrite_t;
 
 typedef struct {
   int           luaref;
@@ -90,6 +95,7 @@ typedef struct wfx_limiter_s wfx_limiter_t;
 struct wfx_limiter_s {
   char             *name;
   int               luaref;
+  wfx_readwrite_t   rw;
   time_t            interval;
   ngx_int_t         limit;
   ngx_int_t         sync_steps;
@@ -136,18 +142,19 @@ struct wfx_rule_s {
   char             *name;
   int               luaref;
   int               gen;
+  wfx_readwrite_t   rw;
   wfx_condition_t  *condition;
-  int               actions_len;
-  wfx_action_t     *(*actions);
-  int               else_actions_len;
-  wfx_action_t     *(*else_actions);
+  size_t            then_actions_count;
+  size_t            else_actions_count;
+  wfx_action_t     *(*all_actions);
 }; //wfx_rule_t
 
 typedef struct {
   char             *name;
   int               luaref;
-  size_t            len;
   int               gen;
+  wfx_readwrite_t   rw;
+  size_t            len;
   wfx_rule_t       *rules[1];
 } wfx_rule_list_t;
 
@@ -155,6 +162,7 @@ typedef struct {
   char             *name;
   int               luaref;
   int               gen;
+  wfx_readwrite_t   rw;
   size_t            len;
   wfx_rule_list_t  *lists[1];
 } wfx_phase_t;
@@ -163,6 +171,7 @@ typedef struct {
   char             *name;
   int               luaref;
   int               gen;
+  wfx_readwrite_t   rw;
   wfx_phase_t      *phase[WFX_PHASE_INVALID];
 } wfx_ruleset_t;
 

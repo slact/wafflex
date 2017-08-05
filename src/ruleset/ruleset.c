@@ -31,7 +31,7 @@ static int ruleset_create(lua_State *L) {
   wfx_ruleset_t     *ruleset;
   wfx_phase_t       *phase = NULL;
   
-  ruleset = ruleset_common_shm_alloc_init_item(wfx_ruleset_t, 0, L, name);
+  ruleset = ruleset_common_shm_alloc_init_item(wfx_ruleset_t, 0, L);
   if(ruleset == NULL) {
     ERR("failed to initialize ruleset: out of memory");
   }
@@ -69,7 +69,7 @@ static int ruleset_delete(lua_State *L) {
     return 0;
   }
   
-  ruleset_common_shm_free(L, ruleset);
+  ruleset_common_shm_free_item(L, ruleset);
   return 0;
 }
 
@@ -134,20 +134,30 @@ void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t
   lua_getfield(L, -1, str_key);
   tmpstr = lua_tolstring(L, -1, &tmpstrlen);
   
-  if((ptr = wfx_shm_calloc(item_sz + data_sz + tmpstrlen+1)) != NULL) {
-    str = (char *)ptr + item_sz + data_sz;
-    strptr = (char **)((char *)ptr + str_offset);
-    strcpy(str, tmpstr);
-    *strptr = str;
-    refptr = (int *)((char *)ptr + luaref_offset);
-    *refptr = tmpref;
+  ptr = wfx_shm_calloc(item_sz + data_sz);
+  str = wfx_shm_alloc(tmpstrlen + 1);
+  
+  if(ptr == NULL || str == NULL) {
+    ERR("unable to allocate shme ruleset item");
+    return NULL;
   }
+
+  strptr = (char **)((char *)ptr + str_offset);
+  strcpy(str, tmpstr);
+  str[tmpstrlen]='\0';
+  
+  *strptr = str;
+  refptr = (int *)((char *)ptr + luaref_offset);
+  *refptr = tmpref;
   
   lua_pop(L, 2);
   return ptr;
 }
 
-void __ruleset_common_shm_free(void *ptr) {
+void __ruleset_common_shm_free_item(lua_State *L, void *ptr, char *name_str) {
+  if(name_str != NULL) {
+    wfx_shm_free(name_str);
+  }
   wfx_shm_free(ptr);
 }
 

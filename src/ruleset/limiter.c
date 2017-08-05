@@ -49,7 +49,7 @@ static int limiter_current_value(wfx_limiter_t *limiter, wfx_limiter_value_t *lv
 static int limiter_create(lua_State *L) {
   //expecting a limiter table at top of stack
   wfx_limiter_t     *limiter;
-  limiter = ruleset_common_shm_alloc_init_item(wfx_limiter_t, 0, L, name);
+  limiter = ruleset_common_shm_alloc_init_item(wfx_limiter_t, 0, L);
   if(limiter == NULL) {
     luaL_error(L, "failed to initialize limiter: out of memory");
     return 0;
@@ -64,7 +64,7 @@ static int limiter_create(lua_State *L) {
   lua_pop(L,1);
   
   lua_getfield(L, -1, "burst");
-  if lua_isnil(L, -1) {
+  if(lua_isnil(L, -1)) {
     limiter->burst.limiter = NULL;
     limiter->burst.expire = 0;
   }
@@ -113,7 +113,7 @@ static int limiter_delete(lua_State *L) {
   ngx_free(limiter->values);
   limiter->values = NULL;
   
-  ruleset_common_shm_free(L, limiter);
+  ruleset_common_shm_free_item(L, limiter);
   return 0;
 }
 

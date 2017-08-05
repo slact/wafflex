@@ -7,12 +7,12 @@ static wfx_action_type_t action_types[];
 
 int action_simple_destroy(lua_State *L) {
   wfx_action_t *action = lua_touserdata(L, 1);
-  ruleset_common_shm_free(L, action);
+  ruleset_common_shm_free_custom_name_item(L, action, action);
   return 0;
 }
 
 wfx_action_t *action_create(lua_State *L, size_t data_sz, wfx_action_eval_pt eval) {
-  wfx_action_t *action = ruleset_common_shm_alloc_init_item(wfx_action_t, data_sz, L, action);
+  wfx_action_t *action = ruleset_common_shm_alloc_init_custom_name_item(wfx_action_t, data_sz, L, action);
   action->eval = eval;
   lua_pushlightuserdata(L, action);
   return action;

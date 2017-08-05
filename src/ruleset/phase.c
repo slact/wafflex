@@ -52,7 +52,7 @@ static int phase_create(lua_State *L) {
   
   lua_getfield(L, 1, "lists");
   len = wfx_lua_len(L, -1); //number of rule lists for this phase
-  phase = ruleset_common_shm_alloc_init_item(wfx_phase_t, sizeof(list) * (len - 1), L, name);
+  phase = ruleset_common_shm_alloc_init_item(wfx_phase_t, sizeof(list) * (len - 1), L);
   phase->len=len;
   phase->gen = 0;
   for(i=0; i<len; i++) {
@@ -69,7 +69,7 @@ static int phase_create(lua_State *L) {
 
 static int phase_delete(lua_State *L) {
   wfx_phase_t     *phase = lua_touserdata(L, 1);
-  ruleset_common_shm_free(L, phase);
+  ruleset_common_shm_free_item(L, phase);
   return 0;
 }
 

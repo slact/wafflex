@@ -51,7 +51,7 @@ static int list_create(lua_State *L) {
   rules_n = wfx_lua_len(L, -1);
   lua_pop(L, 1);
   
-  list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, (sizeof(rule)*(rules_n - 1)), L, name);
+  list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, (sizeof(rule)*(rules_n - 1)), L);
   
   list->len = rules_n;
   list->gen = 0;
@@ -72,7 +72,7 @@ static int list_create(lua_State *L) {
 
 static int list_delete(lua_State *L) {
   wfx_rule_list_t     *list = lua_touserdata(L, 1);
-  ruleset_common_shm_free(L, list);
+  ruleset_common_shm_free_item(L, list);
   return 0;
 }
 
