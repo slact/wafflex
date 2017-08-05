@@ -181,7 +181,7 @@ mt.limiter = {
   end
 }
 
-local function updateThing(self, thing_type, findThing, name, data)
+local function updateThing(self, thing_type, findThing, name, data, deltaCallback)
   --assumes data is already valid
   assert(type(thing_type)=="string", "wrong thing_type type")
   assert(type(name)=="string", "wrong name type")
@@ -195,6 +195,9 @@ local function updateThing(self, thing_type, findThing, name, data)
   --hmm(delta)
   if next(delta) then --at least one thing to update
     Binding.call(thing_type, "update", thing, delta)
+  end
+  if deltaCallback then
+    deltaCallback(thing, delta)
   end
   return thing
 end
@@ -259,7 +262,20 @@ function Ruleset:updateRule(name, data)
   --hmm("updating... make new rule")
   local newRule = mt.rule.new(data, self)
   --hmm("...ok")
-  return updateThing(self, "rule", self.findRule, name, newRule)
+  
+  return updateThing(self, "rule", self.findRule, name, newRule, function(rule, delta)
+    if delta["if"] then
+      RuleComponent.condition.delete(delta["if"].old, self)
+    end
+    for _,clause in pairs{"then", "else"} do
+      if delta[clause] then
+        local actions = delta[clause].old
+        for _,action in pairs(actions) do
+          RuleComponent.action.delete(action, self)
+        end
+      end
+    end
+  end)
 end
 function Ruleset:deleteRule(rule)
   assert(self.rules[rule.name] == rule, "tried deleting unexpected rule of the same name")
