@@ -10,6 +10,9 @@
 #include "phase.h"
 #include "string.h"
 #include "tracer.h"
+
+#include <assert.h>
+
 static wfx_binding_t wfx_ruleset_binding;
 
 
@@ -61,6 +64,26 @@ static int ruleset_create(lua_State *L) {
   return 1;
 }
 
+static int ruleset_update(lua_State *L) {
+  // stack index 2: delta table
+  // stack index 1: ruleset (userdata)
+  
+  wfx_ruleset_t *ruleset = lua_touserdata(L, 1);
+  
+  assert(ruleset->rw.reading == 0);
+  assert(ruleset->rw.writing == 1);
+  ruleset->rw.writing = 2;
+  
+  ruleset_common_update_item_name(L, &ruleset->name);
+  
+  //TODO: do we need to update phases possibly? Not sure...
+  
+  ruleset->gen++;
+  
+  ruleset->rw.writing = 0;
+  return 0;
+}
+
 static int ruleset_delete(lua_State *L) {
   wfx_ruleset_t     *ruleset = lua_touserdata(L, 1);
   if (!ruleset) {
@@ -101,6 +124,32 @@ int wfx_ruleset_bindings_set(lua_State *L) {
   wfx_lua_binding_set(L, &wfx_ruleset_binding);
   
   return 0;
+}
+
+int ruleset_common_update_item_name(lua_State *L, char **nameptr) {
+  int          updated = 0;
+  size_t       tmpstrlen;
+  const char  *tmpstr;
+  lua_getfield(L, 2, "name");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    tmpstr = lua_tolstring(L, -1, &tmpstrlen);
+    
+    wfx_shm_free(*nameptr);
+    *nameptr = wfx_shm_alloc(tmpstrlen + 1);
+    if(*nameptr != NULL) {
+      strcpy(*nameptr, tmpstr);
+      *nameptr[tmpstrlen]='\0';
+      updated = 1;
+    }
+    else {
+      *nameptr = "???";
+      ERR("unable to allocathe shared memory for item name");
+    }
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  return updated;
 }
 
 void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, size_t data_sz, off_t luaref_offset) {
@@ -164,7 +213,7 @@ void __ruleset_common_shm_free_item(lua_State *L, void *ptr, char *name_str) {
 static wfx_binding_t wfx_ruleset_binding = {
   "ruleset",
   ruleset_create,
-  NULL,
+  ruleset_update,
   ruleset_delete
 };
 

@@ -17,6 +17,8 @@ int ruleset_subbinding_call(lua_State *L,const char *binding_name, const char *s
 int ruleset_subbinding_getname_call(lua_State *L, const char *binding_name, const char *call_name, int nargs);
 */
 
+int ruleset_common_update_item_name(lua_State *L, char **nameptr);
+
 #define ruleset_common_shm_alloc_init_item(type, data_sz, L) \
   ruleset_common_shm_alloc_init_custom_name_item(type, data_sz, L, name)
 

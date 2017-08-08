@@ -4,6 +4,8 @@
 #include "condition.h"
 #include "tracer.h"
 
+#include <assert.h>
+
 static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   int              i, start, n;
   wfx_rc_t         rc = WFX_OK;
@@ -127,6 +129,83 @@ static int rule_create(lua_State *L) {
   return 1;
 }
 
+static int rule_update(lua_State *L) {
+  // stack index 2: delta table
+  // stack index 1: rule (userdata)
+  
+  wfx_rule_t    *rule = lua_touserdata(L, 1);
+  
+  assert(rule->rw.reading == 0);
+  assert(rule->rw.writing == 1);
+  rule->rw.writing = 2;
+  
+  int            i, n = 0, update_actions = 0, then_actions = 0, else_actions = 0;
+  ERR("rule update");
+  
+  ruleset_common_update_item_name(L, &rule->name);
+  
+  lua_getfield(L, 2, "if");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    lua_getfield(L, -1, "__binding");
+    rule->condition=lua_touserdata(L, -1);
+    lua_pop(L, 2);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, 2, "then");
+  if(!lua_isnil(L, -1)) {
+    update_actions = 1;
+    lua_getfield(L, -1, "new");
+    then_actions = wfx_lua_len(L, -1);
+    lua_pop(L, 2);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, 2, "else");
+  if(!lua_isnil(L, -1)) {
+    update_actions = 1;
+    lua_getfield(L, -1, "new");
+    else_actions = wfx_lua_len(L, -1);
+    lua_pop(L, 2);
+  }
+  lua_pop(L, 1);
+  
+  if(update_actions) {
+    wfx_shm_free(rule->all_actions);
+    rule->all_actions = wfx_shm_alloc(sizeof(*(rule->all_actions)) * (then_actions + else_actions));
+    rule->then_actions_count = then_actions;
+    rule->else_actions_count = else_actions;
+    if(then_actions > 0) {
+      lua_getfield(L, 2, "then");
+      lua_getfield(L, -1, "new");
+      for(i=0; i<then_actions; i++) {
+        lua_geti(L, -1, i+1);
+        lua_getfield(L, -1, "__binding");
+        rule->all_actions[n++] = lua_touserdata(L, -1);
+        lua_pop(L, 2);
+      }
+      lua_pop(L, 2);
+    }
+    
+    if(then_actions > 0) {
+      lua_getfield(L, 2, "else");
+      lua_getfield(L, -1, "new");
+      for(i=0; i<else_actions; i++) {
+        lua_geti(L, -1, i+1);
+        lua_getfield(L, -1, "__binding");
+        rule->all_actions[n++] = lua_touserdata(L, -1);
+        lua_pop(L, 2);
+      }
+      lua_pop(L, 2);
+    }
+  }
+  rule->gen++;
+  
+  rule->rw.writing = 0;
+  return 0;
+}
+
 static int rule_delete(lua_State *L) {
   wfx_rule_t    *rule = lua_touserdata(L, 1);
   wfx_action_t **actions;
@@ -145,7 +224,7 @@ static int rule_delete(lua_State *L) {
 static wfx_binding_t wfx_rule_binding = {
   "rule",
   rule_create,
-  NULL,
+  rule_update,
   rule_delete
 };
 

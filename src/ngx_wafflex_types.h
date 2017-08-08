@@ -155,7 +155,8 @@ typedef struct {
   int               gen;
   wfx_readwrite_t   rw;
   size_t            len;
-  wfx_rule_t       *rules[1];
+  size_t            max_len;
+  wfx_rule_t      **rules;
 } wfx_rule_list_t;
 
 typedef struct {
@@ -163,8 +164,9 @@ typedef struct {
   int               luaref;
   int               gen;
   wfx_readwrite_t   rw;
+  size_t            max_len;
   size_t            len;
-  wfx_rule_list_t  *lists[1];
+  wfx_rule_list_t **lists;
 } wfx_phase_t;
 
 typedef struct {

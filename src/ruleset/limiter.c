@@ -101,6 +101,63 @@ static int limiter_create(lua_State *L) {
   return 1;
 }
 
+static int limiter_update(lua_State *L) {
+  // stack index 2: delta table
+  // stack index 1: rule (userdata)
+  
+  wfx_limiter_t     *limiter = lua_touserdata(L, 1);
+  
+  assert(limiter->rw.reading == 0);
+  assert(limiter->rw.writing == 1);
+  limiter->rw.writing = 2;
+  
+  ruleset_common_update_item_name(L, &limiter->name);
+  
+  lua_getfield(L, 2, "limit");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    limiter->limit = lua_tonumber(L, -1);
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, 2, "interval");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    limiter->interval = lua_tonumber(L, -1);
+    limiter->values->tick_usec = (limiter->interval * 1000) / LIMITER_VALUE_CHECKS_PER_INTERVAL;
+    //TODO: maybe restart timer?
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, 2, "burst");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    if(lua_isnil(L, -1)) {
+      limiter->burst.limiter = NULL;
+    }
+    else {
+      lua_getfield(L, -1, "__binding");
+      limiter->burst.limiter = lua_touserdata(L, -1);
+      lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  
+  lua_getfield(L, 2, "burst_expire");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    limiter->burst.expire = lua_isnil(L, -1) ? -1 : lua_tonumber(L, -1);
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
+  
+  limiter->rw.writing = 0;
+  return 0;
+}
+
 static int limiter_delete(lua_State *L) {
   wfx_limiter_t     *limiter = lua_touserdata(L, 1);
   if (!limiter) {
@@ -152,7 +209,7 @@ static void limiter_reap_value(wfx_limiter_value_t *lval, wfx_limiter_t *limiter
 static wfx_binding_t wfx_limiter_binding = {
   "limiter",
   limiter_create,
-  NULL,
+  limiter_update,
   limiter_delete
 };
 
