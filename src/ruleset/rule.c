@@ -44,36 +44,56 @@ static wfx_rc_t wfx_rule_actions_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_
 }
 
 wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
+  wfx_rc_t                  rc;
   wfx_condition_rc_t        cond_rc;
   DBG("RULE: #%i %s", ctx->rule.i, self->name);
-  if(!ctx->nocheck && ctx->rule.gen != self->gen) {
-    ERR("rule was changed, restart it from the top");
-    condition_stack_clear(&ctx->rule.condition_stack);
-    ngx_memzero(&ctx->rule, sizeof(ctx->rule));
-    tracer_unwind(ed, WFX_RULE, "rule has changed");
+  
+  if(!ruleset_common_reserve_read(ed, &self->rw)) {
+    tracer_log_cstr(ed, "updating", "true");
+    return WFX_DEFER;
   }
-  if(ctx->nocheck || !ctx->rule.condition_done) {
-    tracer_push(ed, WFX_CONDITION, self->condition);
-    cond_rc = self->condition->eval(self->condition, ed, &ctx->rule.condition_stack);
-    tracer_pop(ed, WFX_CONDITION, cond_rc);
-    switch(cond_rc) {
-      case WFX_COND_TRUE:
-      case WFX_COND_FALSE:
-        ctx->rule.condition_done = 1;
-        ctx->rule.condition_true = cond_rc == WFX_COND_TRUE ? 1 : 0;
-        return wfx_rule_actions_eval(self, ed, ctx);
-      case WFX_COND_ERROR:
-        return WFX_ERROR;
-      case WFX_COND_DEFER:
-        return WFX_DEFER;
+  
+  if(self->disabled) {
+    tracer_log_cstr(ed, "disabled", "true");
+    rc = WFX_OK;
+  }
+  else {
+    if(!ctx->nocheck && ctx->rule.gen != self->gen) {
+      ERR("rule was changed, restart it from the top");
+      condition_stack_clear(&ctx->rule.condition_stack);
+      ngx_memzero(&ctx->rule, sizeof(ctx->rule));
+      tracer_unwind(ed, WFX_RULE, "rule has changed");
+    }
+    if(ctx->nocheck || !ctx->rule.condition_done) {
+      tracer_push(ed, WFX_CONDITION, self->condition);
+      cond_rc = self->condition->eval(self->condition, ed, &ctx->rule.condition_stack);
+      tracer_pop(ed, WFX_CONDITION, cond_rc);
+      switch(cond_rc) {
+        case WFX_COND_TRUE:
+        case WFX_COND_FALSE:
+          ctx->rule.condition_done = 1;
+          ctx->rule.condition_true = cond_rc == WFX_COND_TRUE ? 1 : 0;
+          rc = wfx_rule_actions_eval(self, ed, ctx);
+          break;
+        case WFX_COND_ERROR:
+          rc = WFX_ERROR;
+          break;
+        case WFX_COND_DEFER:
+          rc = WFX_DEFER;
+          break;
+      }
+    }
+    else if(ctx->rule.condition_done) {
+      rc = wfx_rule_actions_eval(self, ed, ctx);
+    }
+    else {
+      ERR("not supposed to happen");
+      raise(SIGABRT);
+      rc = WFX_ERROR;
     }
   }
-  else if(ctx->rule.condition_done) {
-    return wfx_rule_actions_eval(self, ed, ctx);
-  }
-  ERR("not supposed to happen");
-  raise(SIGABRT);
-  return WFX_ERROR;
+  ruleset_common_release_read(ed, &self->rw);
+  return rc;
 }
 
 static int rule_create(lua_State *L) {
@@ -92,6 +112,10 @@ static int rule_create(lua_State *L) {
   
   rule = ruleset_common_shm_alloc_init_item(wfx_rule_t, 0, L);
   actions = wfx_shm_alloc(sizeof(*actions) * (then_actions + else_actions));
+  
+  lua_getfield(L, -1, "disabled");
+  rule->disabled = lua_toboolean(L, -1);
+  lua_pop(L, 1);
   
   if(rule == NULL || actions == NULL) {
     return 0;
@@ -143,6 +167,14 @@ static int rule_update(lua_State *L) {
   ERR("rule update");
   
   ruleset_common_update_item_name(L, &rule->name);
+  
+  lua_getfield(L, 2, "disabled");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    rule->disabled = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
   
   lua_getfield(L, 2, "if");
   if(!lua_isnil(L, -1)) {

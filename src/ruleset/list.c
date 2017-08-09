@@ -13,6 +13,14 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   wfx_rule_t         **rule = self->rules;
   wfx_rc_t             rc = WFX_OK;
   
+  if(!ruleset_common_reserve_read(ed, &self->rw)) {
+    tracer_log_cstr(ed, "updating", "true");
+    rc = WFX_DEFER;
+    ctx->list.gen = 0; // guaranteed(?) to differ from 'gen' value once update completes.
+                       // don't want to read value as it's being updated
+    return rc;
+  }
+  
   if(self->disabled) {
     tracer_log_cstr(ed, "disabled", "true");
     ruleset_common_release_read(ed, &self->rw);
@@ -39,15 +47,19 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
       case WFX_OK:
         continue;
       case WFX_SKIP: //next list
+        ruleset_common_release_read(ed, &self->rw);
         return WFX_OK;
       case WFX_DEFER:
         ctx->list.gen = self->gen;
+        ruleset_common_release_read(ed, &self->rw);
         return rc;
       default:
+        ruleset_common_release_read(ed, &self->rw);
         return rc;
     }
   }
   ctx->rule.i = 0;
+  ruleset_common_release_read(ed, &self->rw);
   return rc;
 }
 

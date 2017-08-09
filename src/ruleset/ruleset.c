@@ -18,13 +18,27 @@ static wfx_binding_t wfx_ruleset_binding;
 
 wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *ctx) {
   wfx_phase_t  *phase = self->phase[ed->phase];
+  wfx_rc_t      rc;
   DBG("RULESET: #%i %s", ctx->ruleset.i, self->name);
   tracer_push(ed, WFX_PHASE, phase);
-  wfx_rc_t      rc = wfx_phase_eval(phase, ed, ctx);
-  tracer_pop(ed, WFX_PHASE, rc);
+  if(ruleset_common_reserve_read(ed, &self->rw)) {
+    if(!self->disabled) {
+      rc = wfx_phase_eval(phase, ed, ctx);
+    }
+    else {
+      tracer_log_cstr(ed, "disabled", "true");
+      rc = WFX_OK;
+    }
+  }
+  else {
+    tracer_log_cstr(ed, "updating", "true");
+    rc = WFX_DEFER;
+  }
   if(rc == WFX_DEFER) {
     ctx->ruleset.gen = self->gen;
   }
+  ruleset_common_release_read(ed, &self->rw);
+  tracer_pop(ed, WFX_PHASE, rc);
   return rc;
 }
 
@@ -39,6 +53,10 @@ static int ruleset_create(lua_State *L) {
     ERR("failed to initialize ruleset: out of memory");
   }
   ruleset->gen = 0;
+  
+  lua_getfield(L, -1, "disabled");
+  ruleset->disabled = lua_toboolean(L, -1);
+  lua_pop(L, 1);
   
   lua_getfield(L, -1, "phases");
   lua_pushnil(L);  // first key 
@@ -77,6 +95,14 @@ static int ruleset_update(lua_State *L) {
   ruleset_common_update_item_name(L, &ruleset->name);
   
   //TODO: do we need to update phases possibly? Not sure...
+  
+  lua_getfield(L, 2, "disabled");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    ruleset->disabled = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
   
   ruleset->gen++;
   
@@ -208,6 +234,20 @@ void __ruleset_common_shm_free_item(lua_State *L, void *ptr, char *name_str) {
     wfx_shm_free(name_str);
   }
   wfx_shm_free(ptr);
+}
+
+int ruleset_common_reserve_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw) {
+  return 1;
+}
+int ruleset_common_release_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw) {
+  return 1;
+}
+
+int ruleset_common_reserve_write(wfx_readwrite_t *rw) {
+  return 1;
+}
+int ruleset_common_release_write(wfx_readwrite_t *rw) {
+  return 1;
 }
 
 static wfx_binding_t wfx_ruleset_binding = {

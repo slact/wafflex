@@ -47,4 +47,9 @@ void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz,
 
 void __ruleset_common_shm_free_item(lua_State *L, void *ptr, char *name_str);
 
+int ruleset_common_reserve_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw);
+int ruleset_common_release_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw);
+int ruleset_common_reserve_write(wfx_readwrite_t *rw);
+int ruleset_common_release_write(wfx_readwrite_t *rw);
+
 #endif //WFX_RULESET_TYPES_H

@@ -12,7 +12,17 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
   int              len = self->len, i, start;
   wfx_rc_t         rc = WFX_OK;
   wfx_rule_list_t *list;
-  if( ctx->nocheck) {//from the top
+  
+  if(!ruleset_common_reserve_read(ed, &self->rw)) {
+    tracer_log_cstr(ed, "updating", "true");
+    rc = WFX_DEFER;
+    ctx->phase.gen = 0; // guaranteed(?) to differ from 'gen' value once update completes.
+                        // don't want to read value as it's being updated
+    ctx->phase.phase = ed->phase;
+    return rc;
+  }
+  
+  if(ctx->nocheck) {//from the top
     start = 0;
   }
   else if(self->gen != ctx->phase.gen) { // phase has changed, start over
@@ -34,15 +44,19 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
       case WFX_OK:
         continue;
       case WFX_SKIP:
+        ruleset_common_release_read(ed, &self->rw);
         return WFX_OK;
       case WFX_DEFER:
         ctx->phase.gen = self->gen;
         ctx->phase.phase = ed->phase;
+        ruleset_common_release_read(ed, &self->rw);
         return rc;
       default:
+        ruleset_common_release_read(ed, &self->rw);
         return rc;
     }
   }
+  ruleset_common_release_read(ed, &self->rw);
   return rc;
 }
 
