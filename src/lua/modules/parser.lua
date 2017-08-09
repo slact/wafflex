@@ -2,6 +2,14 @@ local RuleComponent = require "rulecomponent"
 local json = require "dkjson"
 --local mm = require "mm"
 
+local function setDisabledFlag(data)
+  if data.disabled and data.disabled ~= 0 and data.disabled ~= "false" then
+    data.disabled = true
+  else
+    data.disabled = false
+  end
+end
+
 local function parseRulesetThing(parser, data_in, opt)
   local data = data_in[opt.key]
   parser:pushContext(data, opt.key)
@@ -17,6 +25,8 @@ local function parseRulesetThing(parser, data_in, opt)
       parser:assert(ruleset[opt.key][ret.name] == nil, "%s %s already exists", opt.thing, ret.name)
       ruleset[opt.key][ret.name]=ret
     end
+    
+    setDisabledFlag(data)
   end
   parser:popContext()
   return true
@@ -387,6 +397,8 @@ function Parser:parseList(data, name)
     data = data.rules
   end
   
+  setDisabledFlag(data)
+  
   local rules
   
   if attr_present(self, data, nil, "missing rule list") then
@@ -482,6 +494,8 @@ function Parser:parseRule(data, name)
   if data.key then
     data.key = self:parseInterpolatedString(data.key)
   end
+  
+  setDisabledFlag(data)
   
   self:popContext()
   --reuse metatable for debugging purposes

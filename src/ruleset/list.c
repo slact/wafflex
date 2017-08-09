@@ -12,6 +12,13 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   int                  start, i, len = self->len;
   wfx_rule_t         **rule = self->rules;
   wfx_rc_t             rc = WFX_OK;
+  
+  if(self->disabled) {
+    tracer_log_cstr(ed, "disabled", "true");
+    ruleset_common_release_read(ed, &self->rw);
+    return WFX_OK;
+  }
+  
   if(ctx->nocheck) {
     start = 0;
   }
@@ -59,6 +66,10 @@ static int list_create(lua_State *L) {
   list = ruleset_common_shm_alloc_init_item(wfx_rule_list_t, 0, L);
   rules_array = wfx_shm_alloc((sizeof(rule)*(rules_n + EXTRA_RULES_SPACE)));
   
+  lua_getfield(L, -1, "disabled");
+  list->disabled = lua_toboolean(L, -1);
+  lua_pop(L, 1);
+  
   if(list == NULL || rules_array == NULL) {
     ERR("failed to create list");
     return 0;
@@ -100,6 +111,14 @@ static int list_update(lua_State *L) {
   list->rw.writing = 2;
   
   ruleset_common_update_item_name(L, &list->name);
+  
+  lua_getfield(L, 2, "disabled");
+  if(!lua_isnil(L, -1)) {
+    lua_getfield(L, -1, "new");
+    list->disabled = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+  }
+  lua_pop(L, 1);
   
   lua_getfield(L, 2, "rules");
   if(!lua_isnil(L, -1)) {

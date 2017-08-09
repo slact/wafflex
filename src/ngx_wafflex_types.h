@@ -141,6 +141,7 @@ struct wfx_action_s {
 struct wfx_rule_s {
   char             *name;
   int               luaref;
+  unsigned          disabled:1;
   int               gen;
   wfx_readwrite_t   rw;
   wfx_condition_t  *condition;
@@ -152,6 +153,7 @@ struct wfx_rule_s {
 typedef struct {
   char             *name;
   int               luaref;
+  unsigned          disabled:1;
   int               gen;
   wfx_readwrite_t   rw;
   size_t            len;
@@ -172,6 +174,7 @@ typedef struct {
 typedef struct {
   char             *name;
   int               luaref;
+  unsigned          disabled:1;
   int               gen;
   wfx_readwrite_t   rw;
   wfx_phase_t      *phase[WFX_PHASE_INVALID];
