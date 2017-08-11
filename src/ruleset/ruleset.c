@@ -37,7 +37,7 @@ wfx_rc_t wfx_ruleset_eval(wfx_ruleset_t *self, wfx_evaldata_t *ed, wfx_request_c
   if(rc == WFX_DEFER) {
     ctx->ruleset.gen = self->gen;
   }
-  ruleset_common_release_read(ed, &self->rw);
+  ruleset_common_release_read(&self->rw);
   tracer_pop(ed, WFX_PHASE, rc);
   return rc;
 }
@@ -88,9 +88,10 @@ static int ruleset_update(lua_State *L) {
   
   wfx_ruleset_t *ruleset = lua_touserdata(L, 1);
   
-  assert(ruleset->rw.reading == 0);
-  assert(ruleset->rw.writing == 1);
-  ruleset->rw.writing = 2;
+  if(!ruleset_common_reserve_write(&ruleset->rw)) {
+    ruleset_common_delay_update(L, &ruleset->rw, ruleset_update);
+    return 0;
+  }
   
   ruleset_common_update_item_name(L, &ruleset->name);
   
@@ -106,7 +107,7 @@ static int ruleset_update(lua_State *L) {
   
   ruleset->gen++;
   
-  ruleset->rw.writing = 0;
+  ruleset_common_release_write(&ruleset->rw);
   return 0;
 }
 
@@ -236,20 +237,6 @@ void __ruleset_common_shm_free_item(lua_State *L, void *ptr, char *name_str) {
   wfx_shm_free(ptr);
 }
 
-int ruleset_common_reserve_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw) {
-  return 1;
-}
-int ruleset_common_release_read(wfx_evaldata_t *ed, wfx_readwrite_t *rw) {
-  return 1;
-}
-
-int ruleset_common_reserve_write(wfx_readwrite_t *rw) {
-  return 1;
-}
-int ruleset_common_release_write(wfx_readwrite_t *rw) {
-  return 1;
-}
-
 static wfx_binding_t wfx_ruleset_binding = {
   "ruleset",
   ruleset_create,
@@ -261,5 +248,8 @@ ngx_int_t wfx_ruleset_init_runtime(lua_State *L, int manager) {
   wfx_limiter_init_runtime(L, manager);
   wfx_tag_init_runtime(L, manager);
   wfx_tracer_init_runtime(L, manager);
+  
+  wfx_readwrite_init_runtime(L, manager);
+  
   return NGX_OK;
 }

@@ -107,9 +107,10 @@ static int limiter_update(lua_State *L) {
   
   wfx_limiter_t     *limiter = lua_touserdata(L, 1);
   
-  assert(limiter->rw.reading == 0);
-  assert(limiter->rw.writing == 1);
-  limiter->rw.writing = 2;
+  if(!ruleset_common_reserve_write(&limiter->rw)) {
+    ruleset_common_delay_update(L, &limiter->rw, limiter_update);
+    return 0;
+  }
   
   ruleset_common_update_item_name(L, &limiter->name);
   
@@ -154,7 +155,7 @@ static int limiter_update(lua_State *L) {
   }
   lua_pop(L, 1);
   
-  limiter->rw.writing = 0;
+  ruleset_common_release_write(&limiter->rw);
   return 0;
 }
 

@@ -92,7 +92,7 @@ wfx_rc_t wfx_rule_eval(wfx_rule_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t *
       rc = WFX_ERROR;
     }
   }
-  ruleset_common_release_read(ed, &self->rw);
+  ruleset_common_release_read(&self->rw);
   return rc;
 }
 
@@ -159,9 +159,10 @@ static int rule_update(lua_State *L) {
   
   wfx_rule_t    *rule = lua_touserdata(L, 1);
   
-  assert(rule->rw.reading == 0);
-  assert(rule->rw.writing == 1);
-  rule->rw.writing = 2;
+  if(!ruleset_common_reserve_write(&rule->rw)) {
+    ruleset_common_delay_update(L, &rule->rw, rule_update);
+    return 0;
+  }
   
   int            i, n = 0, update_actions = 0, then_actions = 0, else_actions = 0;
   ERR("rule update");
@@ -234,7 +235,7 @@ static int rule_update(lua_State *L) {
   }
   rule->gen++;
   
-  rule->rw.writing = 0;
+  ruleset_common_release_write(&rule->rw);
   return 0;
 }
 

@@ -23,7 +23,7 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
   
   if(self->disabled) {
     tracer_log_cstr(ed, "disabled", "true");
-    ruleset_common_release_read(ed, &self->rw);
+    ruleset_common_release_read(&self->rw);
     return WFX_OK;
   }
   
@@ -47,19 +47,19 @@ wfx_rc_t wfx_list_eval(wfx_rule_list_t *self, wfx_evaldata_t *ed, wfx_request_ct
       case WFX_OK:
         continue;
       case WFX_SKIP: //next list
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return WFX_OK;
       case WFX_DEFER:
         ctx->list.gen = self->gen;
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return rc;
       default:
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return rc;
     }
   }
   ctx->rule.i = 0;
-  ruleset_common_release_read(ed, &self->rw);
+  ruleset_common_release_read(&self->rw);
   return rc;
 }
 
@@ -118,9 +118,10 @@ static int list_update(lua_State *L) {
   
   ERR("list update");
   
-  assert(list->rw.reading == 0);
-  assert(list->rw.writing == 1);
-  list->rw.writing = 2;
+  if(!ruleset_common_reserve_write(&list->rw)) {
+    ruleset_common_delay_update(L, &list->rw, list_update);
+    return 0;
+  }
   
   ruleset_common_update_item_name(L, &list->name);
   
@@ -168,7 +169,7 @@ static int list_update(lua_State *L) {
   
   list->gen++;
   
-  list->rw.writing = 0;
+  ruleset_common_release_write(&list->rw);
   
   return 0;
 }

@@ -32,8 +32,8 @@ typedef enum {WFX_EVAL_NONE=0, WFX_EVAL_ACCEPT, WFX_EVAL_HTTP_REQUEST} wfx_evald
 typedef enum {WFX_PHASE_CONNECT, WFX_PHASE_HTTP_REQUEST_HEADERS, WFX_PHASE_HTTP_REQUEST_BODY, WFX_PHASE_HTTP_RESPOND_HEADERS, WFX_PHASE_HTTP_RESPOND_BODY, WFX_PHASE_INVALID} wfx_phase_type_t;
 
 typedef struct {
-  ngx_atomic_uint_t reading;
-  ngx_atomic_uint_t writing;
+  ngx_atomic_int_t  reading;
+  ngx_atomic_int_t  writing;
 } wfx_readwrite_t;
 
 typedef struct {

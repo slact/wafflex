@@ -14,6 +14,9 @@ typedef struct {
 
   wfx_lua_script_t limiter;
 
+  //readwrite suspend/resume stuff
+  wfx_lua_script_t readwrite;
+
   wfx_lua_script_t redis;
 
   wfx_lua_script_t tag;

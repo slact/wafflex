@@ -44,19 +44,19 @@ wfx_rc_t wfx_phase_eval(wfx_phase_t *self, wfx_evaldata_t *ed, wfx_request_ctx_t
       case WFX_OK:
         continue;
       case WFX_SKIP:
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return WFX_OK;
       case WFX_DEFER:
         ctx->phase.gen = self->gen;
         ctx->phase.phase = ed->phase;
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return rc;
       default:
-        ruleset_common_release_read(ed, &self->rw);
+        ruleset_common_release_read(&self->rw);
         return rc;
     }
   }
-  ruleset_common_release_read(ed, &self->rw);
+  ruleset_common_release_read(&self->rw);
   return rc;
 }
 
@@ -110,9 +110,10 @@ static int phase_update(lua_State *L) {
   
   ERR("phase update");
   
-  assert(phase->rw.reading == 0);
-  assert(phase->rw.writing == 1);
-  phase->rw.writing = 2;
+  if(!ruleset_common_reserve_write(&phase->rw)) {
+    ruleset_common_delay_update(L, &phase->rw, phase_update);
+    return 0;
+  }
   
   ruleset_common_update_item_name(L, &phase->name);
   
@@ -152,7 +153,7 @@ static int phase_update(lua_State *L) {
   
   phase->gen++;
   
-  phase->rw.writing = 0;
+  ruleset_common_release_write(&phase->rw);
   return 0;
 }
 

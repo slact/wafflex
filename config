@@ -50,6 +50,7 @@ _NGX_WAFFLEX_SRCS="\
   ${ngx_addon_dir}/src/ngx_wafflex_redis_lua_scripts.c \
   ${ngx_addon_dir}/src/ngx_wafflex_setup.c \
   ${ngx_addon_dir}/src/ngx_wafflex.c \
+  ${ngx_addon_dir}/src/ruleset/readwrite.c \
   ${ngx_addon_dir}/src/ruleset/ruleset.c \
   ${ngx_addon_dir}/src/ruleset/phase.c \
   ${ngx_addon_dir}/src/ruleset/list.c \
