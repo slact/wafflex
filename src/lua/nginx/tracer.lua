@@ -1,7 +1,5 @@
 local mm = require "mm"
---luacheck: globals newTracer getTracer
-local ngx = {}
-
+--luacheck: globals newTracer getTracer ngx
 local tracers = {}
   
 local Tracer = {}
@@ -12,7 +10,7 @@ local function tracerCleaner(ref)
   tracers[ref] = nil
 end
 
-function newTracer(ref_type, req_ref)
+function newTracer(ref_type, req_ref, opt)
   local tracer = {
     stack = {},
     complete = {},
@@ -52,7 +50,7 @@ function Tracer:push(element, el_name, el_gen, el_ref)
       time = { }
     }
     if self.profile then
-      el.time.start = ngx.time_msec()
+      el.time.start = ngx.cached_msec_time()
     end
     table.insert(self.stack, self.cur, el)
   else
@@ -62,7 +60,7 @@ function Tracer:push(element, el_name, el_gen, el_ref)
     --assert(el.ref == el_ref)
     el.deferred = nil
     if el.time.defer_start then
-      el.time.defer = (el.time.defer or 0) + (ngx.time_msec() - el.time.defer_start)
+      el.time.defer = (el.time.defer or 0) + (ngx.cached_msec_time() - el.time.defer_start)
       el.time.defer_start = nil
     end
   end
@@ -77,10 +75,10 @@ function Tracer:pop(element, rc, ...)
     assert(el.type == element)
     el.deferred = true
     if self.profile then
-      el.time.defer_start = ngx.time_msec()
+      el.time.defer_start = ngx.cached_msec_time()
     end
     if el.time.start then
-      el.time.run = el.time.run or 0 + (ngx.time_msec() - el.time.start)
+      el.time.run = el.time.run or 0 + (ngx.cached_msec_time() - el.time.start)
       el.time.start = nil
     end
   else
@@ -91,7 +89,7 @@ function Tracer:pop(element, rc, ...)
       el.error = ({...})[1]
     end
     if el.time.start then
-      el.time.run = el.time.run or 0 + (ngx.time_msec() - el.time.start)
+      el.time.run = el.time.run or 0 + (ngx.cached_msec_time() - el.time.start)
       el.time.total = el.time.run + (el.time.defer or 0)
       el.time.start = nil
     end
@@ -153,12 +151,3 @@ function Tracer:finish()
   mm(self)
 end
 
-return function(ngx_cached_msec_time, ngx_cached_time, ngx_add_request_cleanup_handler, ngx_error_log)
-  ngx.time_msec = function()
-    local sec, msec = ngx_cached_msec_time()
-    return sec + msec/1000
-  end
-  ngx.time_cached = ngx_cached_time
-  ngx.error_log = ngx_error_log
-  ngx.add_request_cleanup_handler = ngx_add_request_cleanup_handler
-end

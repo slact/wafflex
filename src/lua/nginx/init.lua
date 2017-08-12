@@ -5,6 +5,7 @@
 --luacheck: globals deferRulesetRedisLoad loadDeferredRedisRulesets
 --luacheck: globals shutdown printFunctions
 --luacheck: globals findRuleset
+--luacheck: globals ngx
 
 --luacheck: globals getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe --external crud
 
@@ -24,10 +25,25 @@ setmetatable(package.preload, {__index = function(self, name)
   return loader
 end})
 
+ngx = {
+  LOG_EMERG =   1,
+  LOG_ALERT =   2,
+  LOG_CRIT =    3,
+  LOG_ERR =     4,
+  LOG_WARN =    5,
+  LOG_NOTICE =  6,
+  LOG_INFO =    7,
+  LOG_DEBUG =   8
+}
 
-return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_cfunc)
-  package_loader = package_loader_cfunc
+return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_cfunc,
+                ngx_cached_time,
+                ngx_cached_msec_time,
+                ngx_log_error,
+                ngx_add_request_cleanup_handler)
   
+  package_loader = package_loader_cfunc
+
   local rulesets = {}
   
   Parser = require "parser"
@@ -80,6 +96,23 @@ return function(package_loader_cfunc, manager, init_bind_cfunc, ruleset_confset_
   end
   
   if manager then
+    
+    ngx.cached_time = ngx_cached_time
+    ngx.cached_msec_time = function()
+      local sec, msec = ngx_cached_msec_time()
+      return sec + msec/1000
+    end
+    ngx.add_request_cleanup_handler = ngx_add_request_cleanup_handler
+    ngx.log = function(lvl, msg, ...)
+      if type(lvl) ~= "number" or lvl < ngx.LOG_EMERG or lvl > ngx.LOG_DEBUG then
+        error("invalid log level " .. lvl)
+      end
+      if select("#", ...) > 0 then
+        msg = msg:format(...)
+      end
+      return ngx_log_error(lvl, msg)
+    end
+    
     local parsed_ruleset_data = {}
     
     function parseRulesetFile(prefix, path, ruleset_name)

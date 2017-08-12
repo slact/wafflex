@@ -219,7 +219,50 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
   return 0;
 }
 
-ngx_int_t ngx_wafflex_init_lua(int manager) {  
+
+static int ngx_lua_msec_cached_time(lua_State *L) {
+  ngx_time_t *t = ngx_timeofday();
+  lua_pushnumber(L, t->sec);
+  lua_pushnumber(L, t->msec);
+  return 2;
+}
+static int ngx_lua_sec_cached_time(lua_State *L) {
+  lua_pushnumber(L, ngx_time());
+  return 1;
+}
+static void request_cleanup_handler(void *pd) {
+  ngx_http_request_t *r = pd;
+  lua_rawgetp(wfx_Lua, LUA_REGISTRYINDEX, r);
+  lua_pushlightuserdata(wfx_Lua, r);
+  lua_ngxcall(wfx_Lua, 1, 0);
+  
+  lua_pushnil(wfx_Lua);
+  lua_rawsetp(wfx_Lua, LUA_REGISTRYINDEX, r);
+}
+static int ngx_lua_add_request_cleanup(lua_State *L) {
+  ngx_http_cleanup_t   *cln;
+  ngx_http_request_t   *r = lua_touserdata(L, 1);
+  assert(lua_isfunction(L, 2));
+  cln = ngx_http_cleanup_add(r, 0);
+  if(!cln)
+    return 0;
+  cln->handler = request_cleanup_handler;
+  cln->data = r;
+  
+  lua_pushvalue(L, 2);
+  lua_rawsetp(L, LUA_REGISTRYINDEX, r);
+  
+  lua_pushboolean(L, 1);
+  return 1;
+}
+
+static int ngx_lua_log(lua_State *L) {
+  ngx_int_t   loglevel =      lua_tonumber(L, 1);
+  ngx_str_t   message =       lua_tongxstr(L, 2);
+  ngx_log_error(ngx_cycle->log, loglevel, message);
+}
+
+ngx_int_t ngx_wafflex_init_lua(int manager) {
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
   
@@ -231,6 +274,12 @@ ngx_int_t ngx_wafflex_init_lua(int manager) {
     lua_pushboolean(wfx_Lua, 1);
     wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
     wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
+    
+    lua_pushcfunction(L, ngx_lua_msec_cached_time);
+    lua_pushcfunction(L, ngx_lua_sec_cached_time);
+    lua_pushcfunction(L, ngx_lua_add_request_cleanup);
+    lua_pushcfunction(L, ngx_lua_log);
+    
     lua_ngxcall(wfx_Lua, 4, 0);
     
     ngx_wafflex_init_redis();

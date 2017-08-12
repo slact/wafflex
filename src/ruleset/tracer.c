@@ -17,18 +17,6 @@
   if(!ed->tracer.on) return;  \
   wfx_tracer_t       *t = &ed->tracer
   
-static int ngx_lua_msec_cached_time(lua_State *L) {
-  ngx_time_t *t = ngx_timeofday();
-  lua_pushnumber(L, t->sec);
-  lua_pushnumber(L, t->msec);
-  return 2;
-}
-
-static int ngx_lua_sec_cached_time(lua_State *L) {
-  lua_pushnumber(L, ngx_time());
-  return 1;
-}
-  
 static void tracer_lua_call(lua_State *L, wfx_tracer_t *t, const char *func, int nargs, int nresp) {
   wfx_lua_pushfromref(L, t->luaref);
   lua_getfield(L, -1, func);
@@ -292,38 +280,8 @@ void tracer_finish(wfx_evaldata_t *ed) {
   tracer_lua_call(wfx_Lua, t, "finish", 0, 0);
 }
 
-static void request_cleanup_handler(void *pd) {
-  ngx_http_request_t *r = pd;
-  lua_rawgetp(wfx_Lua, LUA_REGISTRYINDEX, r);
-  lua_pushlightuserdata(wfx_Lua, r);
-  lua_ngxcall(wfx_Lua, 1, 0);
-  
-  lua_pushnil(wfx_Lua);
-  lua_rawsetp(wfx_Lua, LUA_REGISTRYINDEX, r);
-}
-
-static int ngx_lua_add_request_cleanup(lua_State *L) {
-  ngx_http_cleanup_t   *cln;
-  ngx_http_request_t   *r = lua_touserdata(L, 1);
-  assert(lua_isfunction(L, 2));
-  cln = ngx_http_cleanup_add(r, 0);
-  if(!cln)
-    return 0;
-  cln->handler = request_cleanup_handler;
-  cln->data = r;
-  
-  lua_pushvalue(L, 2);
-  lua_rawsetp(L, LUA_REGISTRYINDEX, r);
-  
-  lua_pushboolean(L, 1);
-  return 1;
-}
-
 int wfx_tracer_init_runtime(lua_State *L, int manager) {
   wfx_lua_loadscript(L, tracer);
-  wfx_lua_register(L, ngx_lua_msec_cached_time);
-  wfx_lua_register(L, ngx_lua_sec_cached_time);
-  wfx_lua_register(L, ngx_lua_add_request_cleanup);
   lua_ngxcall(L, 3, 0);
   return 1;
 }

@@ -27,10 +27,9 @@ int ruleset_common_update_item_name(lua_State *L, char **nameptr);
   
 #define ruleset_common_shm_alloc_init_noname_item(type, data_sz, L) \
   __ruleset_common_shm_alloc_init_item_noname(L, sizeof(type), data_sz, offsetof(type, luaref))
-  
+
 void * __ruleset_common_shm_alloc_init_item(lua_State *L, size_t item_sz, size_t data_sz, char *str_key, off_t str_offset, off_t luaref_offset);
 void * __ruleset_common_shm_alloc_init_item_noname(lua_State *L, size_t item_sz, size_t data_sz, off_t luaref_offset);
-
 
 #define ruleset_common_shm_free_item(L, what) \
   ruleset_common_shm_free_custom_name_item(L, what, name)
