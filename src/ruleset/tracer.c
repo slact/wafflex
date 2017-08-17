@@ -225,7 +225,7 @@ void tracer_init(wfx_evaldata_t *ed) {
   wfx_condition_rc_t     cond_rc = WFX_COND_FALSE;
   wfx_tracer_round_t    *tracer_round = NULL;
   
-    ngx_memzero(&condition_stack, sizeof(condition_stack));
+  ngx_memzero(&condition_stack, sizeof(condition_stack));
   
   for(i=0; i<16; i++) {
     tracer_round = &wfx_shm_data->tracer_rounds[i];
@@ -280,8 +280,98 @@ void tracer_finish(wfx_evaldata_t *ed) {
   tracer_lua_call(wfx_Lua, t, "finish", 0, 0);
 }
 
+static int tracer_round_create(lua_State *L) {
+  ERR("tracer round create");
+  wfx_tracer_round_t     *round;
+  int                     i, found = 0;
+  const char             *str;
+  
+  for(i=0; i<16; i++) {
+    round = &wfx_shm_data->tracer_rounds[i];
+    if(round->uses == 0) {
+      found = 1;
+      break;
+    } 
+  }
+  if(!found) {
+    ERR("can't create tracer round, all 16 rounds in use");
+    return 0;
+  }
+  
+  if(round->condition) { //remove previous condition
+    //TODO
+    assert(0);
+  }
+  
+  lua_getfield(L, -1, "condition");
+  lua_getfield(L, -1, "__binding");
+  round->condition=lua_touserdata(L, -1);
+  lua_pop(L, 2);
+  
+  lua_getfield(L, -1, "profile");
+  round->profile = lua_toboolean(L, -1);
+  lua_pop(L, 1);
+  
+  lua_getfield(L, -1, "trace");
+  round->profile = lua_toboolean(L, -1);
+  lua_pop(L, 1);
+  
+  lua_getfield(L, -1, "target");
+  str = lua_tostring(L, -1);
+  if (strcmp("redis", str) == 0) {
+    round->target = WFX_TRACER_TARGET_REDIS;
+  }
+  else {
+    round->target = WFX_TRACER_TARGET_LOG;
+  }
+  lua_pop(L, 1);
+  
+  if(round->target == WFX_TRACER_TARGET_REDIS) {
+    lua_getfield(L, -1, "target_type");
+    str = lua_tostring(L, -1);
+    if (strcmp("pubsub", str) == 0) {
+      round->target = WFX_TRACER_TARGET_REDIS_PUBSUB;
+    }
+    else {
+      round->target = WFX_TRACER_TARGET_REDIS_KEY;
+    }
+    lua_pop(L, 1);
+    
+    lua_getfield(L, -1, "target_key");
+    lua_tongxstr(L, -1, &round->redis_target_key);
+    lua_pop(L, 1);
+  }
+  
+  lua_getfield(L, -1, "uses");
+  round->uses = lua_tonumber(L, -1);
+  lua_pop(L,1);
+  
+  lua_pushlightuserdata (L, round);
+  return 1;
+}
+
+static int tracer_round_delete(lua_State *L) {
+  //nothing to do really
+  return 0;
+}
+
+static wfx_binding_t wfx_tracer_round_binding = {
+  "tracer-round",
+  tracer_round_create,
+  NULL,
+  tracer_round_delete
+};
+
 int wfx_tracer_init_runtime(lua_State *L, int manager) {
   wfx_lua_loadscript(L, tracer);
-  lua_ngxcall(L, 3, 0);
+  wfx_lua_binding_set(L, &wfx_tracer_round_binding);
   return 1;
+}
+
+int tracer_round_load(lua_State *L) {
+  //for(i=0; i<16; i++) {
+  //  tracer_round = &wfx_shm_data->tracer_rounds[i];
+  //end
+
+  return 0;
 }

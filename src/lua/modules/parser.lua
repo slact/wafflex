@@ -223,6 +223,8 @@ function Parser:parseJSON(element_name, json_str, json_name, unprotected)
       return self:parseList(data)
     elseif element_name == "rule" then
       return self:parseRule(data)
+    elseif element_name == "tracer-round" then
+      return self:parseTracerRound(data)
     end
   end
   
@@ -235,6 +237,48 @@ function Parser:parseJSON(element_name, json_str, json_name, unprotected)
     else
       return res
     end
+  end
+end
+
+function Parser:parseTracerRound(data)
+  if data.condition then
+    self:pushContext(data, "condition")
+    data.condition = self:parseCondition(data.condition)
+    self:popContext()
+  else
+    self.condition = {["true"]={}}
+  end
+  if data.target == nil then
+    data.target = "log" --default is write to log
+  end
+  
+  self:pushContext(data, "target")
+  self:assert_type(data.target, "string", "tracer round target must be string")
+  if data.target ~="log" then
+    local dst_type, dst_key = data.target:match("redis:(%w+):(.+)")
+    if not dst_type or not dst_key then
+      data:error("invalid tracer round target " .. data.target)
+    elseif dst_type == "pubsub" then
+      data.target_type = "pubsub"
+    elseif dst_type == "key" then
+      data.target_type = "key"
+    else
+      self:error("invalid tracer round target type " .. tostring(dst_type))
+    end
+    data.target_key = dst_key
+  end
+  self:popContext()
+  
+  self:pushContext(data, "uses")
+  self:assert_type(data.uses, "number", "tracer round 'uses' must be a number")
+  self:popContext()
+  
+  data.profile = data.profile and true or false
+  
+  if data.trace == false then
+    data.trace = false
+  else
+    data.trace = true
   end
 end
 

@@ -48,6 +48,9 @@ typedef struct {
   wfx_condition_t *condition;
   unsigned         profile;
   unsigned         trace;
+  enum {WFX_TRACER_TARGET_LOG, WFX_TRACER_TARGET_REDIS} target;
+  enum {WFX_TRACER_TARGET_REDIS_PUBSUB, WFX_TRACER_TARGET_REDIS_KEY} redis_target_type;
+  ngx_str_t        redis_target_key;
 } wfx_tracer_round_t;
 
 typedef struct {

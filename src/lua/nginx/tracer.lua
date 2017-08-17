@@ -1,13 +1,37 @@
 local mm = require "mm"
---luacheck: globals newTracer getTracer ngx
+--luacheck: globals newTracer getTracer newTracerRound ngx
 local tracers = {}
-  
+local RuleComponent = require "rulecomponent"
+local Binding = require "binding"
 local Tracer = {}
 local tracer_mt = {__index = Tracer}
 
 local function tracerCleaner(ref)
   print("CLEANED UP AFTER TRACER")
   tracers[ref] = nil
+end
+
+local tracer_round_mt = { __index = {
+  delete = function(self)
+    if self.condition then
+      RuleComponent.condition.delete(self.condition, self)
+    end
+  end
+}}
+
+function newTracerRound(data)
+  local round = {
+    condition = RuleComponent.condition.new(data.condition, nil),
+    target = data.target,
+    target_type = data.target_type,
+    target_key = data.target_key,
+    profile = data.profile,
+    trace = data.trace,
+    uses = data.uses
+  }
+  setmetatable(round, tracer_round_mt)
+  Binding.call("tracer-round", "create", round)
+  return round
 end
 
 function newTracer(ref_type, req_ref, opt)
