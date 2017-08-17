@@ -25,8 +25,6 @@ local function parseRulesetThing(parser, data_in, opt)
       parser:assert(ruleset[opt.key][ret.name] == nil, "%s %s already exists", opt.thing, ret.name)
       ruleset[opt.key][ret.name]=ret
     end
-    
-    setDisabledFlag(data)
   end
   parser:popContext()
   return true
