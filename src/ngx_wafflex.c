@@ -222,8 +222,8 @@ static int wfx_postinit_conf_attach_ruleset(lua_State *L) {
 
 static int ngx_lua_msec_cached_time(lua_State *L) {
   ngx_time_t *t = ngx_timeofday();
-  lua_pushnumber(L, t->sec);
-  lua_pushnumber(L, t->msec);
+  lua_Number msec = t->sec + (lua_Number)t->msec/1000;
+  lua_pushnumber(L, msec);
   return 2;
 }
 static int ngx_lua_sec_cached_time(lua_State *L) {
@@ -256,38 +256,35 @@ static int ngx_lua_add_request_cleanup(lua_State *L) {
   return 1;
 }
 
-static int ngx_lua_log(lua_State *L) {
-  ngx_uint_t  loglevel =      lua_tonumber(L, 1);
-  ngx_str_t   message;
-  lua_tongxstr(L, 2, &message);
-  ngx_log_error(loglevel, ngx_cycle->log, 0, "%V", &message);
-  return 0;
-}
-
 ngx_int_t ngx_wafflex_init_lua(int manager) {
   wfx_Lua = luaL_newstate();
   luaL_openlibs(wfx_Lua);
+  
+  //set ngx global
+  lua_newtable(wfx_Lua);  
+  lua_pushcfunction(wfx_Lua, ngx_lua_sec_cached_time);
+  lua_setfield(wfx_Lua, -2, "cached_time");
+  lua_pushcfunction(wfx_Lua, ngx_lua_msec_cached_time);
+  lua_setfield(wfx_Lua, -2, "cached_msec_time");
+  lua_pushcfunction(wfx_Lua, wfx_lua_ngx_log_error);
+  lua_setfield(wfx_Lua, -2, "log");
+  lua_pushcfunction(wfx_Lua, ngx_lua_add_request_cleanup);
+  lua_setfield(wfx_Lua, -2, "add_request_cleanup_handler");
+  lua_setglobal(wfx_Lua, "ngx");
   
   wfx_lua_loadscript(wfx_Lua, ipc);
   
   wfx_lua_loadscript(wfx_Lua, init);
   wfx_lua_register(wfx_Lua, wfx_lua_require_module);
+  lua_pushboolean(wfx_Lua, manager);
   if(manager) {
-    lua_pushboolean(wfx_Lua, 1);
     wfx_lua_register(wfx_Lua, wfx_init_bind_lua);
     wfx_lua_register(wfx_Lua, wfx_postinit_conf_attach_ruleset);
-    
-    lua_pushcfunction(wfx_Lua, ngx_lua_msec_cached_time);
-    lua_pushcfunction(wfx_Lua, ngx_lua_sec_cached_time);
-    lua_pushcfunction(wfx_Lua, ngx_lua_add_request_cleanup);
-    lua_pushcfunction(wfx_Lua, ngx_lua_log);
-    
-    lua_ngxcall(wfx_Lua, 8, 0);
-    
+    lua_ngxcall(wfx_Lua, 4, 0);
     ngx_wafflex_init_redis();
   }
   else {
-    lua_ngxcall(wfx_Lua, 1, 0);
+    lua_ngxcall(wfx_Lua, 2, 0);
   }
   
   return NGX_OK;

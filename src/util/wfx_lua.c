@@ -19,8 +19,7 @@ static int wfx_lua_traceback(lua_State *L) {
     return 1;  /* keep it intact */
   }
 
-  lua_getglobal(L, "debug");
-  lua_getfield(L, -1, "traceback");
+  wfx_lua_getlib_field(wfx_Lua, "debug", "traceback");
 
   lua_pushvalue(L, 1);  /* pass error message */
   lua_pushinteger(L, 2);  /* skip this function and traceback */
@@ -155,6 +154,14 @@ void lua_pushngxstr(lua_State *L, ngx_str_t *str) {
   lua_pushlstring(L, (const char *)str->data, str->len);
 }
 
+
+void wfx_lua_getlib_field(lua_State *L, const char *lib, const char *field) {
+  lua_getglobal(L, lib);
+  assert(lua_istable(L, -1));
+  lua_getfield(L, -1, "get");
+  lua_remove(L, -2);
+}
+
 typedef struct {
   lua_State  *L;
   int         ref;
@@ -239,11 +246,11 @@ int wfx_lua_ngx_log_error(lua_State *L) {
   
   nargs = lua_gettop(L);
   if(nargs != 2) {
-    return luaL_error(L, "expected 2 string arguments to wfx_lua_ngx_log_error, got %i", nargs);
+    return luaL_error(L, "expected 2 arguments, got %i", nargs);
   }
   
-  lvl = lua_tostring(L, 1);
-  err = lua_tostring(L, 2);
+  lvl = luaL_checkstring(L, 1);
+  err = luaL_checkstring(L, 2);
   if(strcmp(lvl, "emerg") == 0)
     errlvl = NGX_LOG_EMERG;
   else if(strcmp(lvl, "alert") == 0)

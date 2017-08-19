@@ -52,7 +52,7 @@ static int lua_send_ipc_read_resume_alert(lua_State *L) {
 
 ngx_int_t wfx_readwrite_init_runtime(lua_State *L, int manager) {
   if(manager) {
-    wfx_lua_loadscript(L, init);
+    wfx_lua_loadscript(L, readwrite);
     lua_pushcfunction(L, lua_send_ipc_read_resume_alert);
     lua_ngxcall(L, 1, 0);
     

@@ -17,6 +17,8 @@
   if(!ed->tracer.on) return;  \
   wfx_tracer_t       *t = &ed->tracer
   
+#define TRACER_ROUND_CLEANUP_INTERVAL_MSEC 1000
+  
 static void tracer_lua_call(lua_State *L, wfx_tracer_t *t, const char *func, int nargs, int nresp) {
   wfx_lua_pushfromref(L, t->luaref);
   lua_getfield(L, -1, func);
@@ -261,7 +263,7 @@ void tracer_init(wfx_evaldata_t *ed) {
   
   TRACER_OR_BUST(ed, t);
   if(t->luaref == LUA_NOREF) {
-    wfx_lua_getfunction(wfx_Lua, "getTracer");
+    wfx_lua_getlib_field(wfx_Lua, "Tracer", "get");
     lua_pushstring(wfx_Lua, evaldata_type(ed));
     switch(ed->type) {
       case WFX_EVAL_HTTP_REQUEST:
@@ -278,6 +280,24 @@ void tracer_init(wfx_evaldata_t *ed) {
 void tracer_finish(wfx_evaldata_t *ed) {
   TRACER_OR_BUST(ed, t);
   tracer_lua_call(wfx_Lua, t, "finish", 0, 0);
+}
+
+int tracer_round_cleanup(void *data) {
+  int                     i, remaining = 0;
+  wfx_tracer_round_t     *round;
+  for(i=0; i<16; i++) {
+    round = &wfx_shm_data->tracer_rounds[i];
+    if(round->uses == 0) {
+      wfx_lua_getlib_field(wfx_Lua, "Tracer", "delete");
+      wfx_lua_pushfromref(wfx_Lua, round->luaref);
+      lua_ngxcall(wfx_Lua, 1, 0);
+    }
+    else {
+      remaining++;
+    }
+  }
+  
+  return remaining == 0 ? 0 : TRACER_ROUND_CLEANUP_INTERVAL_MSEC;
 }
 
 static int tracer_round_create(lua_State *L) {
@@ -302,6 +322,8 @@ static int tracer_round_create(lua_State *L) {
     //TODO
     assert(0);
   }
+  
+  round->luaref = wfx_lua_ref(L, -1);
   
   lua_getfield(L, -1, "condition");
   lua_getfield(L, -1, "__binding");
@@ -346,12 +368,17 @@ static int tracer_round_create(lua_State *L) {
   round->uses = lua_tonumber(L, -1);
   lua_pop(L,1);
   
+  //init tracer cleanup timer
+  wfx_add_reusable_timer(tracer_round_cleanup, 0, TRACER_ROUND_CLEANUP_INTERVAL_MSEC);
+  
   lua_pushlightuserdata (L, round);
   return 1;
 }
 
 static int tracer_round_delete(lua_State *L) {
-  //nothing to do really
+  wfx_tracer_round_t   *round = lua_touserdata(L, 1);
+  wfx_lua_unref(L, round->luaref);
+  round->condition = NULL;
   return 0;
 }
 
