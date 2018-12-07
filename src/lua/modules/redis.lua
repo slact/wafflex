@@ -1,6 +1,6 @@
 local module = {c={}}
 local mm = require "mm"
---luacheck: globals newRedis unpack
+--luacheck: globals newRedis unpack ngx
 
 local Redis = {}
 local rmeta = {__index = Redis}
@@ -106,7 +106,7 @@ function Redis:connect()
     
     local my_url = ("redis://%s:%i%s"):format(self.connection_params.host, self.connection_params.port, self.connection_params.db and "/" .. self.connection_params.db or "")
     
-    module.c.log_error("error", ("Failed to connect to %s: %s. Retry in 5 sec."):format(my_url, msg or "unknown error"))
+    ngx.log("error", ("Failed to connect to %s: %s. Retry in 5 sec."):format(my_url, msg or "unknown error"))
     
     module.c.timeout(5000, coroutine.wrap(function()
       self:connect()
@@ -207,8 +207,8 @@ function Redis:subscribe(channel, callback)
   
   assert(self.pubsub_handlers[channel] == nil, ("already subscribed to \"%s\""):format(channel))
   self.pubsub_handlers[channel]=callback
-  assert(type(channel) == "string")
-  assert(type(callback) == "function")
+  assert(type(channel) == "string", "channel name must be a string")
+  assert(type(callback) == "function", "subscribe callback must be a function")
   
   local co = current_coroutine()
   if co then

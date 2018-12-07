@@ -26,6 +26,8 @@ int wfx_luaL_loadbuffer(lua_State *L, const char *buff, size_t sz, const char *n
 void lua_pushngxstr(lua_State *L, ngx_str_t *str);
 #define lua_tongxstr(L, index, str) ((str)->data = (u_char *)lua_tolstring(L, index, &((str)->len)))
 
+void wfx_lua_getlib_field(lua_State *L, const char *lib, const char *field);
+
 int wfx_lua_resume(lua_State *thread, int nargs);
 
 int wfx_lua_timeout(lua_State *L);

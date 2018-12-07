@@ -2,8 +2,9 @@ local Redis = require "redis"
 --local mm = require "mm"
 local json = require "dkjson"
 local Parser = require "parser"
+local mm = require "mm"
 
---luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe findRuleset
+--luacheck: globals registerRedis connectRedises testRedisConnector findRedis getRedisRulesetJSON redisRulesetSubscribe redisRulesetUnsubscribe findRuleset wafflexSubscribeHandler TracerRound ngx
 
 local function parseRedisUrl(url)
   local host, port, pass, db
@@ -58,9 +59,37 @@ function registerRedis(url, conf_ptr)
   return parsedUrl.url
 end
 
+function wafflexSubscribeHandler(redis, data)
+  local msg = json.decode(data, 1, json.null, nil)
+  if not msg then
+    ngx.log("error", "invalid non-json mesage: \"" .. data .. "\"")
+    return
+  end
+  local cmd = msg.cmd
+  local ok, err
+  if     cmd == "load-tracer-round" then
+    ok, err = TracerRound.create(msg.data)
+  elseif cmd == "unload-tracer-round" then
+    ok, err = TracerRound.delete(msg.data)
+  elseif cmd == "stats" then
+    ok, err = nil, "stats command not implemented"
+  else
+    error("received unknown command \"" .. tostring(msg.cmd) .. "\"")
+  end
+  
+  if not ok then
+    ngx.log("error", err)
+  end
+  
+end
+
 function connectRedises()
   for _, r in pairs(redises) do
     r:connect()
+    r:subscribe("wafflex", function(data, channel)
+      mm("yeap")
+      wafflexSubscribeHandler(r, data)
+    end)
   end
 end
 
@@ -141,7 +170,7 @@ function testRedisConnector()
   end)()
 end
 
-return function(redis_connect, redis_close, redis_command, get_hiredis_asyncContext_peername, timeout, log_error, scripts)
+return function(redis_connect, redis_close, redis_command, get_hiredis_asyncContext_peername, timeout, scripts)
   assert(type(redis_connect) == "function")
   assert(type(redis_command) == "function")
   assert(type(timeout) == "function")
@@ -150,7 +179,6 @@ return function(redis_connect, redis_close, redis_command, get_hiredis_asyncCont
   Redis.c.redis_command = redis_command
   Redis.c.timeout = timeout
   Redis.c.get_hiredis_asyncContext_peername = get_hiredis_asyncContext_peername
-  Redis.c.log_error = log_error
   for _, script in ipairs(scripts) do
     Redis.addScript(script.name, script.hash, script.src)
   end

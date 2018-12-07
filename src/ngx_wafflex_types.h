@@ -44,6 +44,8 @@ typedef struct {
 typedef struct wfx_condition_s wfx_condition_t;
 
 typedef struct {
+  ngx_uint_t       id;
+  int              luaref;
   ngx_atomic_int_t uses;
   wfx_condition_t *condition;
   unsigned         profile;
