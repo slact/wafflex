@@ -2,12 +2,20 @@
 
 typedef struct {
   ngx_event_t    ev;
-  int            (*cb)(void *pd);
+  union {
+    int            (*reusable)(void *pd);
+    void           (*oneshot)(void *pd);
+  }              cb;
 } custom_timer_t;
+
+typedef enum {
+  TIMER_ONESHOT,
+  TIMER_REUSABLE
+} timer_type_t;
 
 void oneshot_timer_callback(ngx_event_t *ev) {
   custom_timer_t  *timer = container_of(ev, custom_timer_t, ev);
-  timer->cb(ev->data);
+  timer->cb.oneshot(ev->data);
   ngx_free(timer);
 }
 
@@ -19,7 +27,7 @@ void reusable_timer_callback(ngx_event_t *ev) {
     ret = 0;
   }
   else {
-    ret = timer->cb(ev->data);
+    ret = timer->cb.reusable(ev->data);
   }
   
   if(ret > 0) {
@@ -31,24 +39,33 @@ void reusable_timer_callback(ngx_event_t *ev) {
   }
 }
 
-static ngx_event_t *wfx_add_custom_timer(void (*timer_cb)(ngx_event_t *ev), int (*cb)(void *), size_t data_sz, ngx_msec_t delay) {
+static ngx_event_t *wfx_add_custom_timer(timer_type_t timer_type, void *callback, size_t data_sz, ngx_msec_t delay) {
   custom_timer_t *timer = ngx_alloc(sizeof(*timer) + data_sz, ngx_cycle->log);
   if(!timer) {
     return NULL;
   }
   ngx_memzero(&timer->ev, sizeof(timer->ev));
-  timer->cb = cb;
-  wfx_init_timer(&timer->ev, timer_cb, data_sz > 0 ? (void *)&timer[1] : NULL);
+  switch(timer_type) {
+    case TIMER_REUSABLE:
+      timer->cb.reusable = callback;
+      wfx_init_timer(&timer->ev, reusable_timer_callback, data_sz > 0 ? (void *)&timer[1] : NULL);
+      break;
+    case TIMER_ONESHOT:
+      timer->cb.oneshot = callback;
+      wfx_init_timer(&timer->ev, oneshot_timer_callback, data_sz > 0 ? (void *)&timer[1] : NULL);
+      break;
+  }
+  
   ngx_add_timer(&timer->ev, delay);
   return &timer->ev;
 }
  
 ngx_event_t *wfx_add_reusable_timer(int (*cb)(void *), size_t data_sz, ngx_msec_t delay) {
-  return wfx_add_custom_timer(reusable_timer_callback, cb, data_sz, delay);
+  return wfx_add_custom_timer(TIMER_REUSABLE, cb, data_sz, delay);
 }
  
 ngx_event_t *wfx_add_oneshot_timer(void (*cb)(void *), size_t data_sz, ngx_msec_t delay) {
-  return wfx_add_custom_timer(oneshot_timer_callback, (int (*)(void *))cb, data_sz, delay);
+  return wfx_add_custom_timer(TIMER_ONESHOT, cb, data_sz, delay);
 }
 
 ngx_int_t wfx_init_timer(ngx_event_t *ev, void (*cb)(ngx_event_t *), void *pd) {
