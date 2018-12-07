@@ -1,14 +1,14 @@
 #!/bin/zsh
-_nginx_ver_latest=1.13.0
-_nginx_ver_stable=1.12.0
-_nginx_ver_nopool=1.11.2
+_nginx_ver_latest=1.15.7
+_nginx_ver_stable=1.14.2
+_nginx_ver_nopool=1.15.6
 _nginx_ver_legacy=1.8.1
 _nginx_ver_old=1.6.3
 _nginx_ver_very_old=0.8.55
 _ngx_echo_module_ver=0.60
-_lua_nginx_module_ver="master"
+_lua_nginx_module_ver=0.10.13
 _lua_upstream_nginx_module_ver="0.06"
-_openresty_ver=1.11.2.2
+_openresty_ver=1.13.6.2
 
 _target_module_name=ngx_wafflex
 
@@ -30,27 +30,9 @@ if [[ $SANITIZE_UNDEFINED == 1 ]]; then
 fi
 _include_http2=0
 
-_semver_lt() {
-  _ver1=(${1//./ })
-  _ver2=(${2//./ })
-  
-  if (( ${_ver1[0]} < ${_ver2[0]} )); then
-    return 0
-  elif (( ${_ver1[0]} == ${_ver2[0]} && ${_ver1[1]} < ${_ver2[1]} )); then
-    return 0
-  elif (( ${_ver1[0]} == ${_ver2[0]} && ${_ver1[1]} == ${_ver2[1]} && ${_ver1[2]} < ${_ver2[2]} )); then
-    return 0
-  else
-    return 1
-  fi
-}
-
 _semver_gteq() {
-  if (_semver_lt "$1" "$2"); then
-    return 1
-  else
-    return 0
-  fi
+  ruby -rrubygems -e "exit Gem::Version.new(('$1').match(/\/?([.\d]+)/)[1]) < Gem::Version.new(('$2').match(/^[^\s+]/)) ? 0 : 1"
+  return $?
 }
 
 if [[ $NO_POOL == 1 ]] && [[ -z $USE_OPENRESTY ]]; then
@@ -107,6 +89,7 @@ arch=('any')
 install=install
 
 
+makedepends=('ruby')
 depends=('pcre' 'zlib' 'openssl')
 url="http://nginx.org"
 license=('custom')
@@ -169,7 +152,7 @@ _lua_upstream_nginx_module_url="https://github.com/openresty/lua-upstream-nginx-
 _ngx_debug_pool_url="https://github.com/chobits/ngx_debug_pool.git"
 _ngx_echo_module="https://github.com/openresty/echo-nginx-module/archive/v${_ngx_echo_module_ver}.tar.gz"
 
-_lua_stream_module_ver=0.0.1
+_lua_stream_module_ver=0.0.5
 _lua_stream_module_src="https://github.com/openresty/stream-lua-nginx-module/archive/v${_lua_stream_module_ver}.tar.gz"
 
 if [[ -n $USE_OPENRESTY ]]; then
@@ -233,7 +216,7 @@ build() {
   if [[ -z $USE_OPENRESTY ]]; then
     sed -i.bak '/n == SSL_R_NO_CIPHERS_PASSED/d' src/event/ngx_event_openssl.c
   else
-    sed -i.bak '/n == SSL_R_NO_CIPHERS_PASSED/d' build/nginx-*/src/event/ngx_event_openssl.c
+    sed -i.bak '/n == SSL_R_NO_CIPHERS_PASSED/d' bundle/nginx-*/src/event/ngx_event_openssl.c
   fi
   
   if [[ -z $CONTINUE ]] && [[ -z $NO_EXTRACT_SOURCE ]]; then
@@ -266,12 +249,11 @@ build() {
   CONFIGURE=()
   
   if [[ -n $EXTRA_CONFIG_OPT ]]; then
-    if type "readarray"; then
-      readarray -t lines <<<"$EXTRA_CONFIG_OPT"
+    if [[ $0 == "/usr/bin/makepkg" ]]; then
+      CONFIGURE+=${EXTRA_CONFIG_OPT}
     else
-      lines="${(@f)EXTRA_CONFIG_OPT}"
+      CONFIGURE+=( ${=EXTRA_CONFIG_OPT} )
     fi    
-    CONFIGURE+=$lines
   fi
   
   if [[ -z $DEFAULT_PREFIX ]]; then
@@ -354,12 +336,12 @@ build() {
   fi
 
   
-  if [[ $CC == *clang* ]]; then
+  if [[ $CC == *clang* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
     #not a valid clang parameter
     CFLAGS="${CFLAGS/-fvar-tracking-assignments/}"
     CFLAGS="${CFLAGS/-fvar-tracking-assignments/}"
     if [[ -z $CLANG_ANALYZER ]]; then
-      CFLAGS="-ferror-limit=5 $CFLAGS"
+      CFLAGS="-ferror-limit=5 $CFLAGS -Wconditional-uninitialized"
     fi
   elif [[ $CC == "cc" ]] || [[ $CC == "gcc" ]] || [[ -z $CC ]] && [[ -z $NO_GCC_COLOR ]]; then
     CFLAGS="-fdiagnostics-color=always  -Wmaybe-uninitialized $CFLAGS"
@@ -369,7 +351,7 @@ build() {
   export CCACHE_CPP2=yes
   if ! [[ -z $CLANG_ANALYZER ]]; then
     scan-build -o "$CLANG_ANALYZER" ./configure ${CONFIGURE[@]}
-    scan-build -o "$CLANG_ANALYZER" make
+    scan-build -o "$CLANG_ANALYZER" make -j4
   elif ! [[ -z $CONTINUE ]]; then
     make $REMAKE
   else
@@ -379,16 +361,26 @@ build() {
       ln -s auto/configure ./
     fi
     
+    if [[ -n $USE_OPENSSL_10 ]]; then
+      CFLAGS="-I/usr/include/openssl-1.0/ $CFLAGS"
+      LDFLAGS="-L/usr/lib/openssl-1.0/ $LDFLAGS"
+    fi
     
     if [[ -n $EXPLICIT_CFLAGS ]]; then
-      echo "./configure ${CONFIGURE[@]} --with-cc-opt=${CFLAGS}"
-      ./configure ${CONFIGURE[@]} "--with-cc-opt=${CFLAGS}"
+      echo "./configure ${CONFIGURE[@]} --with-cc-opt=${CFLAGS} --with-ld-opt=${LDFLAGS}"
+      ./configure ${CONFIGURE[@]} "--with-cc-opt=${CFLAGS}" "--with-ld-opt=${LDFLAGS}"
     else
       ./configure ${CONFIGURE[@]}
     fi
     
     
-    make
+    #ln -sf ${srcdir}/lua-nginx-module-${_lua_nginx_module_ver}/src ../ngx_lua_ipc/src/lua-nginx-module-source > /dev/null
+    
+    if [[ $? == 0 ]]; then
+      make
+    else
+      exit 1
+    fi
   fi
 }
 

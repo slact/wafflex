@@ -32,10 +32,14 @@ for opt in $*; do
       ;;
     sanitize-address)
       export CC="$_clang $clang_sanitize_addres";;
+    gcc)
+      export CC="gcc";;
+    gcc6)
+      export CC="ccache gcc-6";;
     gcc5)
-      export CC=gcc-5;;
+      export CC="ccache gcc-5";;
     gcc4|gcc47|gcc4.7)
-      export CC=gcc-4.7;;
+      export CC="ccache gcc-4.7";;
     nopool|no-pool|nop) 
       export NO_POOL=1;;
     debug-pool|debugpool) 
@@ -100,10 +104,16 @@ for opt in $*; do
       export DEFAULT_PREFIX=1;;
     prefix=*)
       export CUSTOM_PREFIX="${opt:7}";;
+    explicit_cflags)
+      export EXPLICIT_CFLAGS=1
+      ;;
     openresty)
       export EXPLICIT_CFLAGS=1
       export WITH_LUA_MODULE=""
       export USE_OPENRESTY=1
+      ;;
+    openssl1.0)
+      export USE_OPENSSL_10=1
       ;;
     openresty=*)
       export OPENRESTY_CUSTOM_VERSION="${opt:10}"
@@ -128,8 +138,10 @@ for opt in $*; do
 done
 
 export NO_WITH_DEBUG=$NO_WITH_DEBUG;
-export EXTRA_CONFIG_OPT=`echo $_extra_config_opt`
+export EXTRA_CONFIG_OPT="`echo $_extra_config_opt`"
 
+
+echo $EXTRA_CONFIG_OPT
 _build_nginx() {
 
   if type "makepkg" > /dev/null; then
@@ -192,6 +204,7 @@ _build_nginx() {
 
   rm "${srcdir}/nginx"
   ln -sf "${srcdir}/${_extracted_dir}" "${srcdir}/nginx"
+  ln -sf "${startdir}/nchan" "${srcdir}/nchan"
   
   build
 
