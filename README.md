@@ -240,8 +240,6 @@ Limiters are used to track a rate, and whether that rate exceeds some threshold.
 All limiters must have names unique to the [rule set](#rule-set).
 
 
-<img align="right" src="https://media.giphy.com/media/3o7bu5A0GCRyvBZV2o/giphy.gif"  />
-
 ## Using Limiters
 
 Limiters are used to perform rate limit checks on numeric *counters* associated with a *key* specified in a rule. This counter is incremented  during the execution of rules, and decreases linearly at a rate of `limit`/`interval` until it reaches 0. The counter values are shared and synchronized between Nginx servers.
